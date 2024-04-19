@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 /* #include <signal.h> */
-#include "exception.h"
+#include "../exception.h"
 
 static void pfree(void *p)
 {

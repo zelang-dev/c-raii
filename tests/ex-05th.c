@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "exception.h"
+#include "../exception.h"
 
 enum { n_th = 4 };
 

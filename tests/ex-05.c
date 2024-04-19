@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "exception.h"
+#include "../exception.h"
 
 EXCEPTION(division_by_zero);
 

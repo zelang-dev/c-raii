@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
-#include "exception.h"
+#include "../exception.h"
 
 enum { n_th = 4, n_loop = 25000000 };
 
@@ -44,7 +44,7 @@ int main(void)
   pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_JOINABLE);
 
   t0 = clock();
-  
+
   for (i = 0; i < n_th; i++) {
     /* fprintf(stderr, "Starting thread %d\n", i); */
     if (pthread_create(&th[i],&attr,test,0)) {

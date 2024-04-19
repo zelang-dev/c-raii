@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include "exception.h"
+#include "../exception.h"
 
 enum { n_th = 4 };
 
@@ -31,7 +31,7 @@ static void* test(void *_)
 
     p = malloc(sizeof("p"));
     if (p) strcpy(p,"p");
-    
+
     free(p);
 
     p = malloc(sizeof("p2")); /* still protected */

@@ -20,7 +20,7 @@ TLS=yes
 
 compile()
 {
-  $CC $OPT exception.c $1.c -o $1
+  $CC $OPT ../exception.c $1.c -o $1
 }
 
 run()

@@ -34,14 +34,48 @@
  |
 */
 
-#ifndef __STDC__
-#error "exception.h needs ISO C compiler to work properly"
-#endif
-
 /* exception config
  */
-/* disable Thread Local Storage or use compiler-specific keyword */
-/* #define __thread */
+#if defined(__GNUC__) && (!defined(_WIN32) || !defined(_WIN64))
+    #define _GNU_SOURCE
+#endif
+
+#if defined(_MSC_VER)
+    #if !defined(__cplusplus)
+        #define __STDC__ 1
+    #endif
+#endif
+
+#if !defined(thread_local) /* User can override thread_local for obscure compilers */
+     /* Running in multi-threaded environment */
+    #if defined(__STDC__) /* Compiling as C Language */
+      #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
+        #define thread_local __declspec(thread)
+      #elif __STDC_VERSION__ < 201112L /* If we are on C90/99 */
+        #if defined(__clang__) || defined(__GNUC__) /* Clang and GCC */
+          #define thread_local __thread
+        #else /* Otherwise, we ignore the directive (unless user provides their own) */
+          #define thread_local
+        #endif
+      #elif __APPLE__ && __MACH__
+        #define thread_local __thread
+      #else /* C11 and newer define thread_local in threads.h */
+        #include <threads.h>
+      #endif
+    #elif defined(__cplusplus) /* Compiling as C++ Language */
+      #if __cplusplus < 201103L /* thread_local is a C++11 feature */
+        #if defined(_MSC_VER)
+          #define thread_local __declspec(thread)
+        #elif defined(__clang__) || defined(__GNUC__)
+          #define thread_local __thread
+        #else /* Otherwise, we ignore the directive (unless user provides their own) */
+          #define thread_local
+        #endif
+      #else /* In C++ >= 11, thread_local in a builtin keyword */
+        /* Don't do anything */
+      #endif
+    #endif
+#endif
 
 /* exception keywords
  */
@@ -235,7 +269,7 @@ struct ex_prt {
 
 /* extern declaration
 */
-extern __thread struct ex_cxt* ex_cxt;
+extern thread_local struct ex_cxt *ex_cxt;
 extern void ex_init(void);
 
 /* pointer protection

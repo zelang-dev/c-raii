@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "exception.h"
+#include "../exception.h"
 
 EXCEPTION(division_by_zero);
 
@@ -27,7 +27,7 @@ int main(void)
 
     p1 = malloc(sizeof("p1"));
     if (p1) strcpy(p1,"p1");
-    
+
     p2 = malloc(sizeof("p2"));
     if (p2) strcpy(p2,"p2");
 
