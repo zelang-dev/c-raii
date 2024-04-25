@@ -37,84 +37,74 @@
 #include "exception.h"
 
 /* Some common exception */
-EXCEPTION(bad_exit );
+EXCEPTION(bad_exit);
 EXCEPTION(bad_alloc);
-EXCEPTION(bad_type );
+EXCEPTION(bad_type);
 
-static __thread struct ex_cxt cxt0;
-__thread struct ex_cxt *ex_cxt = 0;
+static thread_local struct ex_cxt cxt0;
+thread_local struct ex_cxt *ex_cxt = 0;
 
-static void
-unwind_stack(struct ex_cxt *cxt)
-{
-  struct ex_prt *p = cxt->stk;
+static void unwind_stack(struct ex_cxt *cxt) {
+    struct ex_prt *p = cxt->stk;
 
-  cxt->unstk = 1;
+    cxt->unstk = 1;
 
-  while(p) {
-    if (*p->ptr) p->fun(*p->ptr);
-    p = p->nxt;
-  }
+    while (p) {
+        if (*p->ptr) p->fun(*p->ptr);
+        p = p->nxt;
+    }
 
-  cxt->unstk = 0;
-  cxt->stk   = 0;
+    cxt->unstk = 0;
+    cxt->stk = 0;
 }
 
-void
-ex_init(void)
-{
-  ex_cxt = &cxt0;
+void ex_init(void) {
+    ex_cxt = &cxt0;
 }
 
-int
-ex_uncaught_exception(void)
-{
-  if (!ex_cxt) ex_init();
+int ex_uncaught_exception(void) {
+    if (!ex_cxt) ex_init();
 
-  return ex_cxt->unstk;
+    return ex_cxt->unstk;
 }
 
-void
-ex_terminate(void)
-{
-  fflush(stdout);
-  if (ex_uncaught_exception()) {
-    fprintf(stderr,
-            "EX-lib: exception %s thrown at (%s:%d) during stack unwinding "
-            "leading to an undefined behavior\n",
-            ex_cxt->ex, ex_cxt->file, ex_cxt->line);
-    abort();
-  } else {
-    fprintf(stderr,
-            "EX-lib: exiting with uncaught exception %s thrown at (%s:%d)\n",
-            ex_cxt->ex, ex_cxt->file, ex_cxt->line);
-    exit(EXIT_FAILURE);
-  }
+void ex_terminate(void) {
+    fflush(stdout);
+    if (ex_uncaught_exception()) {
+        fprintf(stderr,
+                "EX-lib: exception %s thrown at (%s:%d) during stack unwinding "
+                "leading to an undefined behavior\n",
+                ex_cxt->ex, ex_cxt->file, ex_cxt->line);
+        abort();
+    } else {
+        fprintf(stderr,
+                "EX-lib: exiting with uncaught exception %s thrown at (%s:%d)\n",
+                ex_cxt->ex, ex_cxt->file, ex_cxt->line);
+        exit(EXIT_FAILURE);
+    }
 }
 
-void
-ex_throw(const char* ex, const char* file, int line)
-{
-  struct ex_cxt *cxt = ex_cxt;
+void ex_throw(const char *ex, const char *file, int line) {
+    struct ex_cxt *cxt = ex_cxt;
 
-  if (!cxt) {
-    ex_init();
-    cxt = ex_cxt;
-  }
+    if (!cxt) {
+        ex_init();
+        cxt = ex_cxt;
+    }
 
-  cxt->ex   = ex;
-  cxt->file = file;
-  cxt->line = line;
+    cxt->ex = ex;
+    cxt->file = file;
+    cxt->line = line;
 
-  if (cxt->unstk)
-    ex_terminate();
+    if (cxt->unstk)
+        ex_terminate();
 
-  unwind_stack(cxt);
+    unwind_stack(cxt);
 
-  if (cxt == &cxt0)
-    ex_terminate();
+    if (cxt == &cxt0)
+        ex_terminate();
 
-  ex_lngjmp(cxt->buf, cxt->st | ex_throw_st);
+    ex_lngjmp(cxt->buf, cxt->st | ex_throw_st);
 }
 
 /* --------------------------------------------------------------------------*/
@@ -122,10 +112,10 @@ ex_throw(const char* ex, const char* file, int line)
 /* Some signal exception */
 EXCEPTION(sig_abrt);
 EXCEPTION(sig_alrm);
-EXCEPTION(sig_bus );
-EXCEPTION(sig_fpe );
-EXCEPTION(sig_ill );
-EXCEPTION(sig_int );
+EXCEPTION(sig_bus);
+EXCEPTION(sig_fpe);
+EXCEPTION(sig_ill);
+EXCEPTION(sig_int);
 EXCEPTION(sig_quit);
 EXCEPTION(sig_segv);
 EXCEPTION(sig_term);
@@ -133,97 +123,91 @@ EXCEPTION(sig_term);
 enum { max_ex_sig = 32 };
 
 static struct {
-  const char *ex;
-  int sig;
+    const char *ex;
+    int sig;
 } ex_sig[max_ex_sig];
 
-static void
-ex_handler(int sig)
-{
-  void (*old)(int) = signal(sig, ex_handler);
-  const char *ex = 0;
-  int i;
+static void ex_handler(int sig) {
+    void (*old)(int) = signal(sig, ex_handler);
+    const char *ex = 0;
+    int i;
 
-  for (i = 0; i < max_ex_sig; i++)
-    if (ex_sig[i].sig == sig) {
-      ex = ex_sig[i].ex;
-      break;
+    for (i = 0; i < max_ex_sig; i++)
+        if (ex_sig[i].sig == sig) {
+            ex = ex_sig[i].ex;
+            break;
+        }
+
+    if (old == SIG_ERR)
+        fprintf(stderr, "EX-lib: cannot reinstall handler for signal no %d (%s)\n",
+                sig, ex);
+
+    ex_throw(ex, "unknown", 0);
+}
+
+void (*ex_signal(int sig, const char *ex))(int) {
+    void (*old)(int);
+    int i;
+
+    for (i = 0; i < max_ex_sig; i++)
+        if (!ex_sig[i].ex || ex_sig[i].sig == sig)
+            break;
+
+    if (i == max_ex_sig) {
+        fprintf(stderr,
+                "EX-lib: cannot install exception handler for signal no %d (%s), "
+                "too many signal exception handlers installed (max %d)\n",
+                sig, ex, max_ex_sig);
+        return SIG_ERR;
     }
 
-  if (old == SIG_ERR)
-    fprintf(stderr,"EX-lib: cannot reinstall handler for signal no %d (%s)\n",
-            sig, ex);
+    old = signal(sig, ex_handler);
 
-  ex_throw(ex,"unknown",0);
+    if (old == SIG_ERR)
+        fprintf(stderr, "EX-lib: cannot install handler for signal no %d (%s)\n",
+                sig, ex);
+    else
+        ex_sig[i].ex = ex, ex_sig[i].sig = sig;
+
+    return old;
 }
 
-void (*
-ex_signal(int sig, const char *ex))(int)
-{
-  void (*old)(int);
-  int i;
-
-  for (i = 0; i < max_ex_sig; i++)
-    if (!ex_sig[i].ex || ex_sig[i].sig == sig)
-      break;
-
-  if (i == max_ex_sig) {
-    fprintf(stderr,
-            "EX-lib: cannot install exception handler for signal no %d (%s), "
-            "too many signal exception handlers installed (max %d)\n",
-            sig, ex, max_ex_sig);
-    return SIG_ERR;
-  }
-
-  old = signal(sig, ex_handler);
-
-  if (old == SIG_ERR)
-    fprintf(stderr, "EX-lib: cannot install handler for signal no %d (%s)\n",
-            sig, ex);
-  else
-    ex_sig[i].ex = ex, ex_sig[i].sig = sig;
-
-  return old;
-}
-
-void
-ex_signal_std(void)
-{
+void ex_signal_std(void) {
 #if SIGABRT
-  ex_signal(SIGABRT, EX_NAME(sig_abrt));
+    ex_signal(SIGABRT, EX_NAME(sig_abrt));
 #endif
 
 #if SIGALRM
-  ex_signal(SIGALRM, EX_NAME(sig_alrm));
+    ex_signal(SIGALRM, EX_NAME(sig_alrm));
 #endif
 
 #if SIGBUS
-  ex_signal(SIGBUS , EX_NAME(sig_bus ));
+    ex_signal(SIGBUS, EX_NAME(sig_bus));
 #elif SIG_BUS
-  ex_signal(SIG_BUS, EX_NAME(sig_bus ));
+    ex_signal(SIG_BUS, EX_NAME(sig_bus));
 #endif
 
 #if SIGFPE
-  ex_signal(SIGFPE , EX_NAME(sig_fpe ));
+    ex_signal(SIGFPE, EX_NAME(sig_fpe));
 #endif
 
 #if SIGILL
-  ex_signal(SIGILL , EX_NAME(sig_ill ));
+    ex_signal(SIGILL, EX_NAME(sig_ill));
 #endif
 
 #if SIGINT
-  ex_signal(SIGINT , EX_NAME(sig_int ));
+    ex_signal(SIGINT, EX_NAME(sig_int));
 #endif
 
 #if SIGQUIT
-  ex_signal(SIGQUIT, EX_NAME(sig_quit));
+    ex_signal(SIGQUIT, EX_NAME(sig_quit));
 #endif
 
 #if SIGSEGV
-  ex_signal(SIGSEGV, EX_NAME(sig_segv));
+    ex_signal(SIGSEGV, EX_NAME(sig_segv));
 #endif
 
 #if SIGTERM
-  ex_signal(SIGTERM, EX_NAME(sig_term));
+    ex_signal(SIGTERM, EX_NAME(sig_term));
 #endif
 }
