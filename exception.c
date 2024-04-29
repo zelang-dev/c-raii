@@ -193,6 +193,9 @@ ex_context_t *ex_init(void) {
     if (exception_terminate_func)
         ex_context->terminate_func = exception_terminate_func;
 
+    if (exception_ctrl_c_func)
+        ex_context->ctrl_c_func = exception_ctrl_c_func;
+
     ex_context->type = ex_context_st;
     ex_signal_unblock(all);
 
@@ -204,15 +207,15 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
-    if (got_ctrl_c) {
-        got_ctrl_c = false;
-        coroutine_info();
-    }
-
     if (ex_uncaught_exception() || got_uncaught_exception)
         ex_print(ex_context, "Exception during stack unwinding leading to an undefined behavior");
     else
         ex_print(ex_context, "Exiting with uncaught exception");
+
+    if (got_ctrl_c && ex_context->ctrl_c_func) {
+        got_ctrl_c = false;
+        ex_context->ctrl_c_func();
+    }
 
     if (can_terminate && ex_context->terminate_func) {
         can_terminate = false;

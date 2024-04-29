@@ -1,11 +1,12 @@
 #ifndef EXCEPTION_H
 #define EXCEPTION_H
 
+#include <errno.h>
 #include <signal.h>
 #include <setjmp.h>
 #include <stdbool.h>
+#include <string.h>
 #include "printf.h"
-
 
 /* exception config
  */
@@ -329,6 +330,7 @@ struct ex_context_s {
     bool is_unwind;
     ex_unwind_func unwind_func;
     ex_terminate_func terminate_func;
+    ex_terminate_func ctrl_c_func;
     ex_setup_func setup_func;
 
     /* The handler in the stack (which is a FILO container). */
@@ -374,6 +376,7 @@ C_API thread_local char ex_message[256];
 C_API ex_setup_func exception_setup_func;
 C_API ex_unwind_func exception_unwind_func;
 C_API ex_terminate_func exception_terminate_func;
+C_API ex_terminate_func exception_ctrl_c_func;
 
 /* pointer protection
 */
