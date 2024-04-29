@@ -1,38 +1,11 @@
 #ifndef EXCEPTION_H
 #define EXCEPTION_H
 
-/*
- o---------------------------------------------------------------------o
- |
- | Exception in C
- |
- | Copyright (c) 2001+ Laurent Deniau, laurent.deniau@cern.ch
- |
- | For more information, see:
- | http://cern.ch/laurent.deniau/oopc.html
- |
- o---------------------------------------------------------------------o
- |
- | Exception in C is free software; you can redistribute it and/or
- | modify it under the terms of the GNU Lesser General Public License
- | as published by the Free Software Foundation; either version 2.1 of
- | the License, or (at your option) any later version.
- |
- | The C Object System is distributed in the hope that it will be
- | useful, but WITHOUT ANY WARRANTY; without even the implied warranty
- | of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- | Lesser General Public License for more details.
- |
- | You should have received a copy of the GNU Lesser General Public
- | License along with this library; if not, write to the Free
- | Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- | Boston, MA 02110-1301 USA
- |
- o---------------------------------------------------------------------o
- |
- | $Id$
- |
-*/
+#include <signal.h>
+#include <setjmp.h>
+#include <stdbool.h>
+#include "printf.h"
+
 
 /* exception config
  */
@@ -40,10 +13,50 @@
     #define _GNU_SOURCE
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_WIN32) || defined(_WIN64)
+    #include <windows.h>
     #if !defined(__cplusplus)
         #define __STDC__ 1
     #endif
+#endif
+
+#if !defined(RAII_MALLOC) || !defined(RAII_FREE) || !defined(RAII_REALLOC)|| !defined(RAII_CALLOC)
+  #include <stdlib.h>
+  #define RAII_MALLOC malloc
+  #define RAII_FREE free
+  #define RAII_REALLOC realloc
+  #define RAII_CALLOC calloc
+#endif
+
+#ifndef RAII_INLINE
+  #ifdef _MSC_VER
+    #define RAII_INLINE __forceinline
+  #elif defined(__GNUC__)
+    #if defined(__STRICT_ANSI__)
+      #define RAII_INLINE __inline__ __attribute__((always_inline))
+    #else
+      #define RAII_INLINE inline __attribute__((always_inline))
+    #endif
+  #elif defined(__BORLANDC__) || defined(__DMC__) || defined(__SC__) || defined(__WATCOMC__) || defined(__LCC__) ||  defined(__DECC)
+    #define RAII_INLINE __inline
+  #else /* No inline support. */
+    #define RAII_INLINE
+  #endif
+#endif
+
+#ifndef __builtin_expect
+    #define __builtin_expect(x, y) (x)
+#endif
+
+#ifndef LIKELY_IS
+    #define LIKELY_IS(x, y) __builtin_expect((x), (y))
+    #define LIKELY(x) LIKELY_IS(!!(x), 1)
+    #define UNLIKELY(x) LIKELY_IS((x), 0)
+#endif
+
+ /* Public API qualifier. */
+#ifndef C_API
+    #define C_API extern
 #endif
 
 #if !defined(thread_local) /* User can override thread_local for obscure compilers */
@@ -77,220 +90,305 @@
     #endif
 #endif
 
-/* exception keywords
- */
-#ifdef  EX_DISABLE_ALL
-#define EX_DISABLE_EXCEPTION
-#define EX_DISABLE_TRY
-#define EX_DISABLE_CATCH
-#define EX_DISABLE_CATCH_ANY
-#define EX_DISABLE_FINALLY
-#define EX_DISABLE_ENDTRY
-#define EX_DISABLE_THROW
-#define EX_DISABLE_THROWLOC
-#define EX_DISABLE_RETHROW
-#define EX_DISABLE_PRT
-#define EX_DISABLE_UNPRT
-#endif
-
-#ifndef EX_DISABLE_EXCEPTION
-#define EXCEPTION(E) EX_EXCEPTION(E)
-#endif
-
-#ifndef EX_DISABLE_TRY
-#define TRY EX_TRY
-#endif
-
-#ifndef EX_DISABLE_CATCH
-#define CATCH(E) EX_CATCH(E)
-#endif
-
-#ifndef EX_DISABLE_CATCH_ANY
-#define CATCH_ANY() EX_CATCH_ANY()
-#endif
-
-#ifndef EX_DISABLE_FINALLY
-#define FINALLY() EX_FINALLY()
-#endif
-
-#ifndef EX_DISABLE_ENDTRY
-#define ENDTRY EX_ENDTRY
-#endif
-
-#ifndef EX_DISABLE_THROW
-#define THROW(E) EX_THROW(E)
-#endif
-
-#ifndef EX_DISABLE_THROWLOC
-#define THROWLOC(E,F,L) EX_THROWLOC(E,F,L)
-#endif
-
-#ifndef EX_DISABLE_RETHROW
-#define RETHROW() EX_RETHROW()
-#endif
-
-#ifndef EX_DISABLE_PRT
-#define PRT(P,F) EX_PRT(P,F)
-#endif
-
-#ifndef EX_DISABLE_UNPRT
-#define UNPRT(P) EX_UNPRT(P)
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+typedef struct ex_ptr_s ex_ptr_t;
+typedef struct ex_context_s ex_context_t;
+typedef void (*ex_setup_func)(ex_context_t *, const char *, const char *);
+typedef void (*ex_terminate_func)(void);
+typedef void (*ex_unwind_func)(void *);
+typedef struct memory_s {
+    void *arena;
+    ex_ptr_t *protector;
+    ex_unwind_func dtor;
+} memory_t;
+
 /* low-level api
  */
-void   ex_throw(const char* ex, const char* file, int line);
-int    ex_uncaught_exception(void);
-void   ex_terminate(void);
-void (*ex_signal(int sig, const char *ex))(int);
-void   ex_signal_std(void);
+C_API void ex_throw(const char *ex, const char *file, int, const char *line, const char *message);
+C_API int ex_uncaught_exception(void);
+C_API void ex_terminate(void);
+C_API ex_context_t *ex_init(void);
+C_API void ex_unwind_set(ex_context_t *ctx, bool flag);
+C_API void ex_data_set(ex_context_t *ctx, void *data);
+C_API void *ex_data_get(ex_context_t *ctx, void *data);
+C_API void ex_flags_reset(void);
+C_API void ex_signal(int sig, const char *ex);
+
+/* Convert signals into exceptions */
+C_API void ex_signal_setup(void);
+
+#ifdef _WIN32
+#define EXCEPTION_PANIC 0xE0000001
+C_API void ex_signal_seh(DWORD sig, const char *ex);
+C_API int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep);
+C_API int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep);
+#endif
 
 /***********************************************************
  * Implementation
  */
 
-#include <setjmp.h>
-
 /* states
 */
-enum { ex_try_st, ex_throw_st, ex_catch_st };
+enum {
+    ex_try_st,
+    ex_throw_st,
+    ex_catch_st,
+    ex_protected_st,
+    ex_context_st
+};
+
+
+/* some useful macros
+*/
+#define EX_CAT(a, b) a ## b
+
+#define EX_STR_(a) #a
+#define EX_STR(a) EX_STR_(a)
+
+#define EX_NAME(e) EX_CAT(ex_err_, e)
+#define EX_PNAME(p) EX_CAT(ex_protected_, p)
+
+#define EX_MAKE()                                              \
+    const char *const err = ((void)err, ex_err.ex);             \
+    const char *const err_file = ((void)err_file, ex_err.file); \
+    const int err_line = ((void)err_line, ex_err.line)
 
 /* macros
  */
 #define EX_EXCEPTION(E) \
         const char EX_NAME(E)[] = EX_STR(E)
 
-#define EX_TRY                            \
-  {                                       \
-    /* local context */                   \
-    struct ex_cxt ex_lcxt;                \
-    if (!ex_cxt) ex_init();               \
-    ex_lcxt.nxt   = ex_cxt;               \
-    ex_lcxt.stk   = 0;                    \
-    ex_lcxt.ex    = 0;                    \
-    ex_lcxt.unstk = 0;                    \
-    /* gobal context updated */           \
-    ex_cxt = &ex_lcxt;                    \
-    /* save jump location */              \
-    ex_lcxt.st = ex_setjmp(ex_lcxt.buf);  \
-    if (ex_lcxt.st == ex_try_st) {{
-
-#define EX_CATCH(E)                       \
-    }}                                    \
-    if (ex_lcxt.st == ex_throw_st) {      \
-      extern const char EX_NAME(E)[];     \
-      if (ex_lcxt.ex == EX_NAME(E)) {     \
-        EX_MAKE();                        \
-        ex_lcxt.st = ex_catch_st;
-
-#define EX_CATCH_ANY()                    \
-    }}                                    \
-    if (ex_lcxt.st == ex_throw_st) {{     \
-      EX_MAKE();                          \
-      ex_lcxt.st = ex_catch_st;
-
-#define EX_FINALLY()                      \
-    }} {{                                 \
-      EX_MAKE();                          \
-      /* gobal context updated */         \
-      ex_cxt = ex_lcxt.nxt;
-
-#define EX_ENDTRY                         \
-    }}                                    \
-    if (ex_cxt == &ex_lcxt)               \
-      /* gobal context updated */         \
-      ex_cxt = ex_lcxt.nxt;               \
-    if ((ex_lcxt.st & ex_throw_st) != 0)  \
-      EX_RETHROW();                       \
-  }
-
-#define EX_THROW(E) \
-        EX_THROWLOC(E,__FILE__,__LINE__)
-
-#define EX_RETHROW() \
-        ex_throw(ex_lcxt.ex,ex_lcxt.file,ex_lcxt.line)
-
-#define EX_THROWLOC(E,F,L)                  \
-        do {                                \
-          extern const char EX_NAME(E)[];   \
-          ex_throw(EX_NAME(E),F,L);         \
-        } while(0)
-
-#define EX_MAKE() \
-  const char* const ex      = ((void)ex     ,ex_lcxt.ex  ); \
-  const char* const ex_file = ((void)ex_file,ex_lcxt.file); \
-  const int         ex_line = ((void)ex_line,ex_lcxt.line)
-
-/* some useful macros
-*/
-#define EX_CAT( a,b) EX_CAT_(a,b)
-#define EX_CAT_(a,b) a ## b
-
-#define EX_STR( a) EX_STR_(a)
-#define EX_STR_(a) # a
-
-#define EX_NAME(e)  EX_CAT(ex_exception_,e)
-#define EX_PNAME(p) EX_CAT(ex_protected_,p)
-
-/* context savings
+ /* context savings
 */
 #ifdef sigsetjmp
-#define ex_jmpbuf         sigjmp_buf
-#define ex_setjmp(buf)    sigsetjmp (buf,1)
-#define ex_lngjmp(buf,st) siglongjmp(buf,st)
+#define ex_jmp_buf         sigjmp_buf
+#define ex_setjmp(buf)    sigsetjmp(buf,1)
+#define ex_longjmp(buf,st) siglongjmp(buf,st)
 #else
-#define ex_jmpbuf         jmp_buf
-#define ex_setjmp(buf)    setjmp (buf)
-#define ex_lngjmp(buf,st) longjmp(buf,st)
+#define ex_jmp_buf         jmp_buf
+#define ex_setjmp(buf)    setjmp(buf)
+#define ex_longjmp(buf,st) longjmp(buf,st)
 #endif
+
+
+#define rethrow() \
+    ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, "rethrow")
+
+#ifdef _WIN32
+#define ex_signal_block(ctrl)                  \
+    CRITICAL_SECTION ctrl##__FUNCTION__; \
+    InitializeCriticalSection(&ctrl##__FUNCTION__); \
+    EnterCriticalSection(&ctrl##__FUNCTION__);
+
+#define ex_signal_unblock(ctrl)                  \
+    LeaveCriticalSection(&ctrl##__FUNCTION__); \
+    DeleteCriticalSection(&ctrl##__FUNCTION__);
+
+#define ex_try                                \
+    {                                         \
+        /* local context */                   \
+        ex_context_t ex_err;                  \
+        if (!ex_context)                      \
+            ex_init();                        \
+        ex_err.next = ex_context;             \
+        ex_err.stack = 0;                     \
+        ex_err.ex = 0;                        \
+        ex_err.unstack = 0;                   \
+        /* global context updated */          \
+        ex_context = &ex_err;                 \
+        /* save jump location */              \
+        ex_err.state = ex_setjmp(ex_err.buf); \
+    __try                                     \
+    {                                         \
+        if (ex_err.state == ex_try_st)        \
+            {
+
+#define ex_catch_any                    \
+    }                                \
+    }                                \
+    __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {\
+    if (ex_err.state == ex_throw_st) \
+        {                            \
+            EX_MAKE();               \
+            ex_err.state = ex_catch_st;
+
+#define ex_finally                          \
+    }                                      \
+    }                                    \
+        {                                \
+            EX_MAKE();                   \
+            /* global context updated */ \
+            ex_context = ex_err.next;
+
+#define ex_end_try                            \
+    }                                      \
+    if (ex_context == &ex_err)             \
+        /* global context updated */       \
+        ex_context = ex_err.next;          \
+    if ((ex_err.state & ex_throw_st) != 0) \
+        rethrow();                         \
+    }
+
+#else
+#define ex_signal_block(ctrl)                  \
+    sigset_t ctrl##__FUNCTION__, ctrl_all##__FUNCTION__; \
+    sigfillset(&ctrl##__FUNCTION__); \
+    pthread_sigmask(SIG_SETMASK, &ctrl##__FUNCTION__, &ctrl_all##__FUNCTION__);
+
+#define ex_signal_unblock(ctrl)                  \
+    pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
+
+#define ex_try                               \
+    {                                         \
+        /* local context */                   \
+        ex_context_t ex_err;                  \
+        if (!ex_context)                      \
+            ex_init();                        \
+        ex_err.next = ex_context;             \
+        ex_err.stack = 0;                     \
+        ex_err.ex = 0;                        \
+        ex_err.unstack = 0;                   \
+        /* global context updated */          \
+        ex_context = &ex_err;                 \
+        /* save jump location */              \
+        ex_err.state = ex_setjmp(ex_err.buf); \
+        if (ex_err.state == ex_try_st)        \
+        {                                     \
+            {
+
+#define ex_catch_any                    \
+    }                                \
+    }                                \
+    if (ex_err.state == ex_throw_st) \
+    {                                \
+        {                            \
+            EX_MAKE();               \
+            ex_err.state = ex_catch_st;
+
+#define ex_finally                          \
+    }                                    \
+    }                                    \
+    {                                    \
+        {                                \
+            EX_MAKE();                   \
+            /* global context updated */ \
+            ex_context = ex_err.next;
+
+#define ex_end_try                            \
+    }                                      \
+    }                                      \
+    if (ex_context == &ex_err)             \
+        /* global context updated */       \
+        ex_context = ex_err.next;          \
+    if ((ex_err.state & ex_throw_st) != 0) \
+        rethrow();                         \
+    }
+#endif
+
+#define ex_catch(E)                        \
+    }                                   \
+    }                                   \
+    if (ex_err.state == ex_throw_st)    \
+    {                                   \
+        C_API const char EX_NAME(E)[]; \
+        if (ex_err.ex == EX_NAME(E))    \
+        {                               \
+            EX_MAKE();                  \
+            ex_err.state = ex_catch_st;
+
+#define ex_throw_loc(E, F, L, C)           \
+    do                                  \
+    {                                   \
+        C_API const char EX_NAME(E)[]; \
+        ex_throw(EX_NAME(E), F, L, C, NULL);     \
+    } while (0)
+
+#define throw(E) \
+    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__)
+
+ /* An macro that stops the ordinary flow of control and begins panicking,
+ throws an exception of given message. */
+#define raii_panic(message)                                                     \
+    do                                                                          \
+    {                                                                           \
+        C_API const char EX_NAME(panic)[];                                      \
+        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message));  \
+    } while (0)
 
 /* types
 */
-struct ex_cxt {
-  struct ex_cxt* nxt;
-  struct ex_prt* stk;
-  const char* volatile ex;
-  const char* volatile file;
-  int volatile line;
-  int volatile st;
-  int unstk;
-  ex_jmpbuf buf;
+
+/* stack of exception */
+struct ex_context_s {
+    int type;
+    void *data;
+    bool is_unwind;
+    ex_unwind_func unwind_func;
+    ex_terminate_func terminate_func;
+    ex_setup_func setup_func;
+
+    /* The handler in the stack (which is a FILO container). */
+    ex_context_t *next;
+    ex_ptr_t *stack;
+
+    /** The panic error message throw */
+    const char *volatile panic;
+
+    /** The function from which the exception was thrown */
+    const char *volatile function;
+
+    /** The name of this exception */
+    const char *volatile ex;
+
+    /* The file from whence this handler was made, in order to backtrace it later (if we want to). */
+    const char *volatile file;
+
+    /* The line from whence this handler was made, in order to backtrace it later (if we want to). */
+    int volatile line;
+
+    /* Which is our active state? */
+    int volatile state;
+
+    int unstack;
+
+    /* The program state in which the handler was created, and the one to which it shall return. */
+    ex_jmp_buf buf;
 };
 
-struct ex_prt {
-  struct ex_prt* nxt;
-  void (*fun)(void*);
-  void** ptr;
+/* stack of protected pointer */
+struct ex_ptr_s {
+    int type;
+    ex_ptr_t *next;
+    ex_unwind_func func;
+    void **ptr;
 };
 
 /* extern declaration
 */
-extern thread_local struct ex_cxt *ex_cxt;
-extern void ex_init(void);
+C_API thread_local ex_context_t *ex_context;
+C_API thread_local char ex_message[256];
+C_API ex_setup_func exception_setup_func;
+C_API ex_unwind_func exception_unwind_func;
+C_API ex_terminate_func exception_terminate_func;
 
 /* pointer protection
 */
-#define EX_PRT(p,f) \
-        struct ex_prt EX_PNAME(p) =	ex_prt(&EX_PNAME(p),&p,f)
+C_API ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *));
+C_API void ex_unprotected_ptr(ex_ptr_t *const_ptr);
 
-#define EX_UNPRT(p) \
-        (ex_cxt->stk = EX_PNAME(p).nxt)
+/* Protects dynamically allocated memory against exceptions.
+If the object pointed by `ptr` changes before `unprotected()`,
+the new object will be automatically protected.
 
-static struct ex_prt
-ex_prt(struct ex_prt *pp, void *p, void (*f)(void*))
-{
-  if (!ex_cxt) ex_init();
-  pp->nxt = ex_cxt->stk;
-  pp->fun = f;
-  pp->ptr = p;
-  ex_cxt->stk = pp;
-  return *pp;
-  (void)ex_prt;
-}
+If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
+#define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_protect_ptr(&EX_PNAME(ptr), &ptr, func)
+
+/* Remove memory pointer protection, does not free the memory. */
+#define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
 
 #ifdef __cplusplus
 }
