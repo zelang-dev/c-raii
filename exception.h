@@ -328,16 +328,12 @@ struct ex_context_s {
     int type;
     void *data;
     bool is_unwind;
-    ex_unwind_func unwind_func;
-    ex_terminate_func terminate_func;
-    ex_terminate_func ctrl_c_func;
-    ex_setup_func setup_func;
 
     /* The handler in the stack (which is a FILO container). */
     ex_context_t *next;
     ex_ptr_t *stack;
 
-    /** The panic error message throw */
+    /** The panic error message thrown */
     const char *volatile panic;
 
     /** The function from which the exception was thrown */

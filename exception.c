@@ -80,13 +80,19 @@ EX_EXCEPTION(stack_overflow);
 EX_EXCEPTION(invalid_handle);
 
 static thread_local ex_context_t ex_context_buffer;
-thread_local ex_context_t *ex_context = 0;
+thread_local ex_context_t *ex_context = NULL;
 thread_local char ex_message[256] = {0};
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
 static volatile sig_atomic_t got_ctrl_c = false;
 static volatile sig_atomic_t can_terminate = true;
 
+ex_setup_func exception_setup_func = NULL;
+ex_unwind_func exception_unwind_func = NULL;
+ex_terminate_func exception_ctrl_c_func = NULL;
+ex_terminate_func exception_terminate_func = NULL;
+
+static void ex_handler(int sig);
 #if !defined(_WIN32)
 static struct sigaction ex_sig_sa = {0}, ex_sig_osa = {0};
 #endif
@@ -124,8 +130,8 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 
     ctx->unstack = 1;
 
-    if (ctx->is_unwind) {
-        ctx->unwind_func(ctx->data);
+    if (ctx->is_unwind && exception_unwind_func) {
+        exception_unwind_func(ctx->data);
     } else {
         while (p && p->type == ex_protected_st) {
             if (got_uncaught_exception = (temp == *p->ptr))
@@ -138,7 +144,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 
             temp = *p->ptr;
             p = p->next;
-}
+        }
     }
 
     ctx->unstack = 0;
@@ -146,11 +152,11 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 }
 
 static void ex_print(ex_context_t *exception, const char *message) {
-#ifndef CO_DEBUG
+#ifndef NDEBUG
     printf_stderr("\nFatal Error: %s in function(%s)\n\n",
                   ((void *)exception->panic != NULL ? exception->panic : exception->ex), exception->function);
 #else
-    printf_stderr("\n%s: %s\n", message, ((void *)exception->panic != NULL ? exception->panic : exception->ex));
+    printf_stderr("\n%s: %s\n", message, (exception->panic != NULL ? exception->panic : exception->ex));
     if (exception->file != NULL) {
         if (exception->function != NULL) {
             printf_stderr("    thrown at %s (%s:%d)\n\n", exception->function, exception->file, exception->line);
@@ -179,23 +185,12 @@ void ex_flags_reset(void) {
 }
 
 ex_context_t *ex_init(void) {
-    if (ex_context)
+    if (ex_context != NULL)
         return ex_context;
 
     ex_signal_block(all);
     ex_context = &ex_context_buffer;
-    if (exception_setup_func)
-        ex_context->setup_func = exception_setup_func;
-
-    if (exception_unwind_func)
-        ex_context->unwind_func = exception_unwind_func;
-
-    if (exception_terminate_func)
-        ex_context->terminate_func = exception_terminate_func;
-
-    if (exception_ctrl_c_func)
-        ex_context->ctrl_c_func = exception_ctrl_c_func;
-
+    ex_context->is_unwind = false;
     ex_context->type = ex_context_st;
     ex_signal_unblock(all);
 
@@ -212,14 +207,14 @@ void ex_terminate(void) {
     else
         ex_print(ex_context, "Exiting with uncaught exception");
 
-    if (got_ctrl_c && ex_context->ctrl_c_func) {
+    if (got_ctrl_c && exception_ctrl_c_func) {
         got_ctrl_c = false;
-        ex_context->ctrl_c_func();
+        exception_ctrl_c_func();
     }
 
-    if (can_terminate && ex_context->terminate_func) {
+    if (can_terminate && exception_terminate_func) {
         can_terminate = false;
-        ex_context->terminate_func();
+        exception_terminate_func();
     }
 
     if (got_signal)
@@ -244,9 +239,8 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ex_rethrow = (message != NULL && strcmp(message, "rethrow") == 0);
     ctx->panic = ex_rethrow ? NULL : message;
 
-    ctx->is_unwind = false;
-    if (ctx->setup_func)
-        ctx->setup_func(ctx, ctx->ex, ctx->panic);
+    if (exception_setup_func)
+        exception_setup_func(ctx, ctx->ex, ctx->panic);
 
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
@@ -291,8 +285,9 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
             ctx->file = "unknown";
             ctx->line = 0;
             ctx->function = NULL;
-            if (ctx->setup_func)
-                ctx->setup_func(ctx, ctx->ex, NULL);
+
+            if (exception_setup_func)
+                exception_setup_func(ctx, ctx->ex, NULL);
             return EXCEPTION_EXECUTE_HANDLER;
         }
     }
@@ -331,7 +326,7 @@ void ex_handler(int sig) {
      */
     if (signal(sig, ex_handler) == SIG_ERR)
         printf_stderr("Cannot reinstall handler for signal no %d (%s)\n",
-                      sig, ex);
+                sig, ex);
 #endif
 
     for (i = 0; i < max_ex_sig; i++) {
@@ -354,9 +349,9 @@ void ex_signal(int sig, const char *ex) {
 
     if (i == max_ex_sig) {
         printf_stderr(
-            "Cannot install exception handler for signal no %d (%s), "
-            "too many signal exception handlers installed (max %d)\n",
-            sig, ex, max_ex_sig);
+                "Cannot install exception handler for signal no %d (%s), "
+                "too many signal exception handlers installed (max %d)\n",
+                sig, ex, max_ex_sig);
         return;
     }
 
@@ -377,7 +372,7 @@ void ex_signal(int sig, const char *ex) {
                       sig, ex);
     else if (sigaction(sig, &ex_sig_sa, NULL) != 0)
         printf_stderr("Cannot install handler for signal no %d (%s)\n",
-                      sig, ex);
+                sig, ex);
     else
         ex_sig[i].ex = ex, ex_sig[i].sig = sig;
 #endif
