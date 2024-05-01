@@ -127,7 +127,7 @@ void *try_malloc(size_t size) {
 
 memory_t *raii_malloc_full(size_t size, func_t func) {
     memory_t *raii = try_malloc(sizeof(memory_t));
-    if (UNLIKELY(raii_deferred_array_init(&raii->defer) < 0))
+    if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
         raii_panic("Deferred initialization failed!");
 
     raii->arena = try_malloc(size);
@@ -162,7 +162,7 @@ RAII_INLINE void *new_arena(memory_t *scope, size_t size) {
 
 memory_t *raii_calloc_full(int count, size_t size, func_t func) {
     memory_t *raii = try_calloc(1, sizeof(memory_t));
-    if (UNLIKELY(raii_deferred_array_init(&raii->defer) < 0))
+    if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
         raii_panic("Deferred initialization failed!");
 
     raii->arena = try_calloc(count, size);
