@@ -4,8 +4,18 @@
 #include <errno.h>
 #include <signal.h>
 #include <setjmp.h>
-#include <stdbool.h>
+#include <stddef.h>
 #include <string.h>
+#include <stdint.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <inttypes.h>
+#if !defined(_WIN32)
+    #include <sys/time.h>
+    #include <sys/resource.h> /* setrlimit() */
+#endif
+
 #include "printf.h"
 
 /* exception config
@@ -53,7 +63,9 @@
     #define LIKELY_IS(x, y) __builtin_expect((x), (y))
     #define LIKELY(x) LIKELY_IS(!!(x), 1)
     #define UNLIKELY(x) LIKELY_IS((x), 0)
-    #define INCREMENT 16
+    #ifndef INCREMENT
+        #define INCREMENT 16
+    #endif
 #endif
 
 #ifndef RAII_ASSERT
@@ -156,7 +168,6 @@ enum {
     ex_protected_st,
     ex_context_st
 };
-
 
 /* some useful macros
 */

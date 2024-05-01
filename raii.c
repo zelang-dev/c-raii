@@ -216,7 +216,7 @@ static void raii_array_free(void *data) {
 }
 
 raii_array_t *raii_array_new(memory_t *scope) {
-    raii_array_t *array = raii_calloc_full(scope, 1, sizeof(*array), raii_array_free);
+    raii_array_t *array = calloc_full(scope, 1, sizeof(raii_array_t), raii_array_free);
     raii_array_init(array);
 
     return array;
@@ -327,7 +327,7 @@ static void raii_deferred_run(memory_t *scope, size_t generation) {
     }
 }
 
-size_t raii_deferred_count(const memory_t *scope) {
+size_t raii_deferred_count(memory_t *scope) {
     const raii_array_t *array = (raii_array_t *)&scope->defer;
 
     return array->elements;

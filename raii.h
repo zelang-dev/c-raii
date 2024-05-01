@@ -125,7 +125,7 @@ C_API const char *raii_message(void);
 /* Defer execution `LIFO` of given function with argument,
 to when scope exits. */
 C_API size_t raii_deferred(memory_t *, func_t, void *);
-C_API size_t raii_deferred_count(const memory_t *);
+C_API size_t raii_deferred_count(memory_t *);
 
 C_API memory_t *raii_malloc_full(size_t size, func_t func);
 C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
@@ -161,7 +161,7 @@ C_API bool is_str_empty(const char *str);
 C_API void *try_calloc(int, size_t);
 C_API void *try_malloc(size_t);
 
-C_API thread_local memory_t raii_context;
+C_API thread_local memory_t *raii_context;
 
 #ifdef __cplusplus
     }
