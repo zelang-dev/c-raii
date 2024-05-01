@@ -53,6 +53,26 @@
     #define LIKELY_IS(x, y) __builtin_expect((x), (y))
     #define LIKELY(x) LIKELY_IS(!!(x), 1)
     #define UNLIKELY(x) LIKELY_IS((x), 0)
+    #define INCREMENT 16
+#endif
+
+#ifndef RAII_ASSERT
+  #if defined(NDEBUG)
+    #include <assert.h>
+    #define RAII_ASSERT(c) assert(c)
+  #else
+    #define RAII_ASSERT(c)
+  #endif
+#endif
+
+#ifdef NDEBUG
+    #define RAII_LOG(s) puts_(s)
+    #define RAII_INFO(s, ...) printf_(s, __VA_ARGS__ )
+    #define RAII_HERE() printf_stderr("Here %s:%d\n", __FILE__, __LINE__)
+#else
+    #define RAII_LOG(s) (void)s
+    #define RAII_INFO(s, ...)  (void)s
+    #define RAII_HERE()  (void)0
 #endif
 
  /* Public API qualifier. */
@@ -100,11 +120,6 @@ typedef struct ex_context_s ex_context_t;
 typedef void (*ex_setup_func)(ex_context_t *, const char *, const char *);
 typedef void (*ex_terminate_func)(void);
 typedef void (*ex_unwind_func)(void *);
-typedef struct memory_s {
-    void *arena;
-    ex_ptr_t *protector;
-    ex_unwind_func dtor;
-} memory_t;
 
 /* low-level api
  */
