@@ -1,0 +1,37 @@
+name: riscv64 & s390x by ucontext  .
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-qemu:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: riscv64
+            arch: riscv64
+          - target: s390x
+            arch: s390x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.arch }}
+          distro:  ubuntu_latest
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y --no-install-recommends cmake build-essential
+          env: |
+            # Valgrind on arm will fail if the stack size is larger than 8MB.
+            # Set QEMUs stack size to 8MB since Github runners use 16MB default.
+            QEMU_STACK_SIZE: 8388608
+          run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON ..
+            cmake --build .
