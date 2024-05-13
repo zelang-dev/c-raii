@@ -7,6 +7,7 @@
 EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(divide_by_zero);
+EX_EXCEPTION(division_by_zero);
 EX_EXCEPTION(out_of_memory);
 EX_EXCEPTION(panic);
 
@@ -355,11 +356,9 @@ void ex_signal_reset(int sig) {
      */
     ex_sig_sa.sa_handler = SIG_DFL;
     if (sigemptyset(&ex_sig_sa.sa_mask) != 0)
-        fprintf(stderr, "Cannot setup handler for signal no %d (%s)\n",
-                sig, ex);
+        fprintf(stderr, "Cannot setup handler for signal no %d\n", sig);
     else if (sigaction(sig, &ex_sig_sa, NULL) != 0)
-        fprintf(stderr, "Cannot restore handler for signal no %d (%s)\n",
-                sig, ex);
+        fprintf(stderr, "Cannot restore handler for signal no %d\n", sig);
 #endif
     exception_signal_set = false;
 }

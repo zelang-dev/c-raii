@@ -24,7 +24,7 @@ int f_print(void *args) {
 void g(int i) {
     if (i > 3) {
         puts("Panicking!\n");
-        snprintf(number, 20, "%ld", i);
+        snprintf(number, 20, "%d", i);
         _panic(number);
     }
 

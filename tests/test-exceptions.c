@@ -31,10 +31,11 @@ int test_types(void) {
 
     try {
         test_types_pt2(&caught);
-    } catch (sig_segv) {
+    } catch (sig_ill) {
     } end_trying;
 
     /* Different type: should not be caught */
+    ASSERT_EQ(0, caught);
     return 0;
 }
 
@@ -43,7 +44,7 @@ int test_subtypes(void) {
     int caught = 0;
 
     try {
-        raise(SIGBREAK);
+        raise(SIGABRT);
     } catch_any {
         caught = 1;
     } end_trying;
@@ -159,7 +160,6 @@ int test_finally(void) {
     } finality {
         ran_finally = 1;
     } end_try;
-
     ASSERT_EQ(1, ran_finally);
 
     /* If we catch an exception, finally should run */
