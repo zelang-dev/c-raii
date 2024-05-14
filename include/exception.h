@@ -416,6 +416,7 @@ struct ex_context_s {
     bool is_unwind;
     bool is_rethrown;
     bool is_guarded;
+    bool is_raii;
     int volatile caught;
 
     /* The handler in the stack (which is a FILO container). */

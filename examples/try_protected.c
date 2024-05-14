@@ -13,7 +13,6 @@ static void pfree(void *p) {
 }
 
 int main(int argc, char **argv) {
-    raii_setup();
     try {
         char *p = 0;
 

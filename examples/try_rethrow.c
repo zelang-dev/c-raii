@@ -8,7 +8,6 @@ static int idiv(int a, int b) {
 }
 
 int main(void) {
-    raii_setup();
     try {
         idiv(1, 0);
         printf("never reached\n");

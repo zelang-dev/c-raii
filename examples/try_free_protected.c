@@ -10,7 +10,6 @@ static void pfree(void *p) {
 }
 
 int main(void) {
-    raii_setup();
     try {
         char *p1 = 0; protected(p1, pfree);
         char *p2 = 0; protected(p2, pfree);

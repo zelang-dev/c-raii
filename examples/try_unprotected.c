@@ -1,7 +1,7 @@
 #include "raii.h"
 
 static int div_err(int a, int b) {
-    return a / b;
+    *(int *)0 = b;
 }
 
 static void pfree(void *p) {

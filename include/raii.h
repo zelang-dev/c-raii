@@ -36,7 +36,7 @@
     extern "C" {
 #endif
 
-/* Smart memory pointer, the alloacted memory requested in `arena` field,
+/* Smart memory pointer, the allocated memory requested in `arena` field,
 all other fields private, this object binds any additional requests to it's lifetime. */
 typedef struct memory_s memory_t;
 typedef memory_t unique_t;
@@ -171,14 +171,16 @@ struct memory_s {
     size_t mid;
 };
 
+/* Return current `thread` smart memory pointer. */
 C_API memory_t *raii_init(void);
+C_API void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API int raii_deferred_init(defer_t *array);
 
 C_API size_t raii_mid(void);
 C_API size_t raii_last_mid(memory_t *scope);
 
 /* Defer execution `LIFO` of given function with argument,
-to when current scope exits. */
+to current `thread` scope lifetime/destruction. */
 C_API size_t raii_defer(func_t, void *);
 
 C_API void raii_defer_cancel(size_t index);
@@ -187,19 +189,19 @@ C_API void raii_deferred_cancel(memory_t *scope, size_t index);
 C_API void raii_defer_fire(size_t index);
 C_API void raii_deferred_fire(memory_t *scope, size_t index);
 
-/* Same as `defer` but allows recover from an Error condition throw/panic,
-you must call `raii_catch` inside function to mark Error condition handled. */
+/* Same as `raii_defer` but allows recover from an Error condition throw/panic,
+you must call `raii_caught` inside function to mark Error condition handled. */
 C_API void raii_recover(func_t, void *);
 
 /* Same as `defer` but allows recover from an Error condition throw/panic,
-you must call `raii_catch` inside function to mark Error condition handled. */
+you must call `raii_is_caught` inside function to mark Error condition handled. */
 C_API void raii_recover_by(memory_t *, func_t, void *);
 
 /* Compare `err` to current error condition, will mark exception handled, if `true`. */
 C_API bool raii_caught(const char *err);
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-C_API bool raii_is_caught(unique_t *scope, const char *err);
+C_API bool raii_is_caught(memory_t *scope, const char *err);
 
 /* Get current error condition string. */
 C_API const char *raii_message(void);
@@ -208,34 +210,66 @@ C_API const char *raii_message(void);
 C_API const char *raii_message_by(memory_t *scope);
 
 /* Defer execution `LIFO` of given function with argument,
-to the given `scoped smart pointer` destruction. */
+to the given `scoped smart pointer` lifetime/destruction. */
 C_API size_t raii_deferred(memory_t *, func_t, void *);
 C_API size_t raii_deferred_count(memory_t *);
 
+/* Smart memory pointer, the allocated `size` memory requested in **->arena** field,
+all other fields private, this object binds any additional requests to it's lifetime.
+Will be freed with given `func`. */
 C_API memory_t *raii_malloc_full(size_t size, func_t func);
-C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
-C_API memory_t *raii_new(size_t size);
-C_API void *new_arena(memory_t *scope, size_t size);
 
+/* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
+DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
+C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
+
+/* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
+DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
+C_API void *malloc_by(memory_t *scope, size_t size);
+
+/* Smart memory pointer, the allocated `size` memory requested in **->arena** field,
+all other fields private, this object binds any additional requests to it's lifetime.
+Will be freed with given `func`. */
 C_API memory_t *raii_calloc_full(int count, size_t size, func_t func);
+
+/* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
+DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
 C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
-C_API memory_t *raii_calloc(int count, size_t size);
+
+/* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
+DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
 C_API void *calloc_by(memory_t *scope, int count, size_t size);
 
+/* Same as `raii_deferred_free`, but also destroy smart pointer. */
 C_API void raii_delete(memory_t *ptr);
+
+/* Same as `raii_deferred_clean`, but also
+reset/clear current `thread` smart pointer. */
 C_API void raii_destroy(void);
 
+/* Begin `unwinding`, executing given scope smart pointer `raii_deferred` statements. */
 C_API void raii_deferred_free(memory_t *);
+
+/* Begin `unwinding`, executing current `thread` scope `raii_defer` statements. */
 C_API void raii_deferred_clean(void);
 
-
+/* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
+for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
 
-C_API void *malloc_arena(size_t size);
-C_API void *calloc_arena(int count, size_t size);
+/* Request/return raw memory of given `size`,
+uses current `thread` smart pointer,
+DO NOT `free`, will be `RAII_FREE`
+when `raii_deferred_clean` is called. */
+C_API void *malloc_default(size_t size);
+
+/* Request/return raw memory of given `size`,
+uses current `thread` smart pointer,
+DO NOT `free`, will be `RAII_FREE`
+when `raii_deferred_clean` is called. */
+C_API void *calloc_default(int count, size_t size);
 
 C_API values_type *raii_value(void *);
-C_API void raii_setup(void);
 C_API raii_type type_of(void *);
 C_API bool is_type(void *, raii_type);
 C_API bool is_instance_of(void *, void *);
@@ -280,6 +314,9 @@ DO NOT PUT `err` in quote's like "err". */
 
 /* Get scoped error condition string. */
 #define _get_message()  raii_message_by(raii_init()->arena)
+
+/* Stops the ordinary flow of control and begins panicking,
+throws an exception of given message. */
 #define _panic          raii_panic
 
 /* Makes a reference assignment of current scoped smart pointer. */
@@ -295,13 +332,11 @@ return given `value` when done, use `NONE` for no return. */
         ex_context = ex_err.next;   \
     return value;
 
-
-/* This creates an scoped guard section, it replaces `{`.
-Usage of: `_defer`, `_malloc`, `_calloc`, `_assign_ptr`
-    - Macros are only valid between these sections.
-    - Use `_return();` macro, or `break;` to exit early.
-    - Use `_assign_ptr` macro, for scope pointer for `_defer`
-to pass scope to `_recover`. */
+/* Creates an scoped guard section, it replaces `{`.
+Usage of: `_defer`, `_malloc`, `_calloc`, `_assign_ptr` macros
+are only valid between these sections.
+    - Use `_return(x);` macro, or `break;` to exit early.
+    - Use `_assign_ptr(var)` macro, to make assignment of block scoped smart pointer. */
 #define guard                                           \
 {                                                       \
     if (!exception_signal_set)                          \
@@ -334,9 +369,7 @@ return given `result` when done, use `NONE` for no return. */
 }
 
 /* This ends an scoped guard section, it replaces `}`.
-On exit will begin executing deferred functions.
-    if (scope->is_recovered = is_str_eq(err, exception))
-        ex_init()->state = ex_catch_st; */
+On exit will begin executing deferred functions. */
 #define guarded                                                     \
         } while (false);                                            \
         raii_deferred_free(_$##__FUNCTION__);                       \

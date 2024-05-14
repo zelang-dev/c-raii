@@ -13,7 +13,6 @@ static void pfree(void *p) {
 }
 
 int main(int argc, char **argv) {
-    raii_setup();
     void *p = 0;
 
     p = calloc_full(raii_init(), 1, 3, pfree);
