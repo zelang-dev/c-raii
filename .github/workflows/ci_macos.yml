@@ -22,3 +22,5 @@ jobs:
       - name: Run test examples
         run: |
             cd build
+            ./test-defer
+            ./test-exceptions

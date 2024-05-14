@@ -32,6 +32,8 @@ jobs:
       - name: Run test examples
         run: |
             cd build
+            ./test-defer
+            ./test-exceptions
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -55,3 +57,5 @@ jobs:
         shell: cmd
         run: |
             cd build\Debug
+            .\test-defer.exe
+            .\test-exceptions.exe

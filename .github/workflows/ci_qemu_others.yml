@@ -37,3 +37,5 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON ..
             cmake --build .
+            ./test-defer
+            ./test-exceptions
