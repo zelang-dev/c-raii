@@ -201,7 +201,7 @@ int test_list(void)
     test_throw_in_finally();
     test_assert();
 
-    return 1;
+    return 0;
 }
 
 int main(int argc, char **argv) {

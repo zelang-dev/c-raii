@@ -46,7 +46,7 @@ guard {
 int test_main() {
     f();
     puts("Returned normally from f.");
-    return 1;
+    return 0;
 }
 
 int main(int argc, char **argv) {

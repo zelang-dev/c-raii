@@ -250,13 +250,13 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     const char *ex = 0;
     int i;
 
-    if (!is_str_eq(ctx->panic, exception))
+    if (!is_str_eq(ctx->ex, exception))
         return EXCEPTION_EXECUTE_HANDLER;
 
     for (i = 0; i < max_ex_sig; i++) {
         if (ex_sig[i].seh == code
             || ctx->caught == ex_sig[i].seh
-            || is_str_eq(ctx->panic, exception)
+            || is_str_eq(ctx->ex, exception)
             ) {
             ctx->state = ex_throw_st;
             ctx->is_rethrown = true;
