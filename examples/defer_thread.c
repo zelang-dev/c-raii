@@ -61,7 +61,6 @@ static void cleanup_threads(void) {
 int main(int argc, char **argv) {
     // install the overall cleanup handlers
     atexit(cleanup_threads);
-    at_quick_exit(cleanup_threads);
     // compliant solution using threads array
     guard{
       puts("main: starting main guarded block");

@@ -21,7 +21,7 @@ int raii_array_reset(raii_array_t *a) {
     RAII_FREE(a->base);
     a->base = NULL;
     a->elements = 0;
-    memset(a, 0, sizeof(a));
+    memset(a, 0, sizeof(raii_array_t));
 
     return 0;
 }
@@ -237,7 +237,7 @@ void raii_delete(memory_t *ptr) {
 
     raii_deferred_free(ptr);
     if (ptr != &raii_context_buffer) {
-        memset(ptr, -1, sizeof(ptr));
+        memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }
 
@@ -252,7 +252,7 @@ static void raii_array_free(void *data) {
     raii_array_t *array = data;
 
     raii_array_reset(array);
-    memset(array, 0, sizeof(array));
+    memset(array, 0, sizeof(raii_array_t));
     data = NULL;
 }
 
@@ -430,7 +430,7 @@ bool raii_caught(const char *err) {
         return true;
     }
 
-    if (scope->is_recovered = is_str_eq(err, exception))
+    if ((scope->is_recovered = is_str_eq(err, exception)))
         ex_init()->state = ex_catch_st;
 
     return scope->is_recovered;
@@ -438,7 +438,7 @@ bool raii_caught(const char *err) {
 
 bool raii_is_caught(memory_t *scope, const char *err) {
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    if (scope->is_recovered = is_str_eq(err, exception))
+    if ((scope->is_recovered = is_str_eq(err, exception)))
         ex_init()->state = ex_catch_st;
 
     return scope->is_recovered;

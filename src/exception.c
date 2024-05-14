@@ -107,7 +107,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
         raii_deferred_clean();
     } else {
         while (p && p->type == ex_protected_st) {
-            if (got_uncaught_exception = (temp == *p->ptr))
+            if ((got_uncaught_exception = (temp == *p->ptr)))
                 break;
 
             if (*p->ptr) {
