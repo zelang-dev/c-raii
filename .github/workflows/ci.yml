@@ -1,4 +1,4 @@
-name: windows & linux
+name: windows & linux & macos
 on:
   pull_request:
     branches: [ main ]
@@ -59,3 +59,23 @@ jobs:
             cd build\Debug
             .\test-defer.exe
             .\test-exceptions.exe
+
+  build-macos:
+    name: macOS
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: |
+          brew install cmake
+      - name: Configure & build
+        run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON ..
+            cmake --build .
+      - name: Run test examples
+        run: |
+            cd build
+            ./test-defer
+            ./test-exceptions
