@@ -1,4 +1,4 @@
-name: windows & linux & macos
+name: Windows & Linux & macOS
 on:
   pull_request:
     branches: [ main ]

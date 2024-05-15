@@ -1,5 +1,8 @@
 # c-raii
-An robust high-level Defer, RAII implementation for C89, auto smart memory safety.
+
+[![windows & linux & macos](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml)
+
+An robust high-level **Defer**, _RAII_ implementation for `C89`, with automatic smart memory safety.
 
 * [Synopsis](#synopsis)
 * [Installation](#installation)
@@ -361,8 +364,8 @@ return given `value` when done, use `NONE` for no return. */
 #define _return(value)
 ```
 
-The idea way of using this library, is to make a **new** _field_ for `unique_t` into your current type object,
-mainly one held throughout application, and setup wrapper functions to above **raii_*()** ones.
+The idea way of using this library, is to make a **new** _field_ for `unique_t` into your current _typedef_ **object**,
+mainly one held throughout application, and setup your wrapper functions to above **raii_** functions.
 
 There are also `2 global callback` functions that need to be setup for complete integration.
 
