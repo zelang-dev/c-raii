@@ -381,7 +381,7 @@ ex_unwind_func exception_unwind_func;
 
 ## Installation
 
-The build system uses **cmake**, that produces _single_ **static** library stored under `raii-built`, and the complete `include` folder is needed.
+The build system uses **cmake**, by default produces **static** library stored under `built`, and the complete `include` folder is needed.
 
 **Linux**
 

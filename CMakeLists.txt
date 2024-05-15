@@ -9,21 +9,24 @@ include(GNUInstallDirs)
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
-set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
+set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/raii-built")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
 
-option(BUILD_TESTING "Enable Test code and Examples build" False)
+cmake_dependent_option(BUILD_TESTING
+  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
+  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
+
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 
-file(GLOB lib_files
-    ${CMAKE_SOURCE_DIR}/src/*.c
+file(GLOB raii_files
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 )
 
 if(BUILD_SHARED_LIBS)
-    add_library(raii SHARED ${lib_files})
+    add_library(raii SHARED ${raii_files})
 else()
-    add_library(raii STATIC ${lib_files})
+    add_library(raii STATIC ${raii_files})
 endif()
 
 set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
