@@ -245,7 +245,7 @@ throws an exception of given message. */
         if (ex_err.caught > -1 || ex_err.is_rethrown) { \
             ex_err.is_rethrown = false;                         \
             ex_longjmp(ex_err.buf, ex_err.state | ex_throw_st); \
-        } else {                                                \
+        } else if (true) {                                                \
             ex_throw(ex_err.ex, ex_err.file, ex_err.line, ex_err.function, ex_err.panic); \
         }
 

@@ -13,7 +13,7 @@ set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/raii-built")
 
-option(BUILD_TESTS          "Build test/example programs for the library" OFF)
+option(BUILD_TESTING "Enable Test code and Examples build" False)
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 
 file(GLOB lib_files
@@ -28,8 +28,10 @@ endif()
 
 set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
 
-target_include_directories(raii
-    AFTER PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(raii PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D NDEBUG")
@@ -45,7 +47,7 @@ endif()
 find_package(Threads)
 target_link_libraries(raii PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 
-if (BUILD_TESTS)
+if (BUILD_TESTING)
 	enable_testing()
 	add_subdirectory(tests)
 	add_subdirectory(examples)

@@ -388,7 +388,7 @@ The build system uses **cmake**, that produces _single_ **static** library store
 ```shell
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTS=ON/OFF # use to build examples/tests files
+cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON # use to build tests and examples
 cmake --build .
 ```
 
@@ -397,7 +397,7 @@ cmake --build .
 ```shell
 mkdir build
 cd build
-cmake .. -D BUILD_TESTS=ON/OFF # use to build files examples folder
+cmake .. -D BUILD_TESTING=ON # use to build tests and examples
 cmake --build . --config Debug/Release
 ```
 
