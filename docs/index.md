@@ -2,16 +2,23 @@
 
 [![windows & linux & macos](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml)
 
-An robust high-level **Defer**, _RAII_ implementation for `C89`, with automatic smart memory safety.
+An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety, _smarty!_
 
 * [Synopsis](#synopsis)
+    - [There are _3 ways_ to create an smart memory pointer.](#there-are-3-ways-to-create-an-smart-memory-pointer)
+    - [The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.](#the-following-malloccalloc-wrapper-functions-are-used-to-get-an-raw-memory-pointer)
+    - [Thereafter, an smart pointer can be use with these _raii__* functions.](#thereafter-an-smart-pointer-can-be-use-with-these-raii_-functions)
+    - [Using `thread local storage` for an default smart pointer, the following functions always available.](#using-thread-local-storage-for-an-default-smart-pointer-the-following-functions-always-available)
+    - [Fully automatic memory safety, using `guard/unguarded/guarded` macro.](#fully-automatic-memory-safety-using-guardunguardedguarded-macro)
 * [Installation](#installation)
 * [Contributing](#contributing)
 * [License](#license)
 
-This library has been decoupled from [c-coroutine](https://github.com/zelang-dev/c-coroutine) to be independently developed.
+This library has been decoupled from [c-coroutine](https://zelang-dev.github.io/c-coroutine) to be independently developed.
 
-In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [c-coroutine](https://github.com/zelang-dev/c-coroutine). The behavior here is as in **Go** and **Zig** _languages_, simple syntax.
+In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), and [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [c-coroutine](https://github.com/zelang-dev/c-coroutine).
+
+- The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's C** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
 
 The planned implementation from [defer reference implementation for C](https://gustedt.gitlabpages.inria.fr/defer/):
 
@@ -86,13 +93,13 @@ There example from [source](https://gitlab.inria.fr/gustedt/defer/-/blob/master/
 ```c
 #include "raii.h"
 
+char number[20];
 void g_print(void *ptr) {
     int i = raii_value(ptr)->integer;
     printf("Defer in g = %d.\n", i);
 }
 
 void g(int i) {
-    char number[20];
     if (i > 3) {
         puts("Panicking!");
         snprintf(number, 20, "%ld", i);
@@ -248,7 +255,7 @@ C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
 Note the above functions will **panic/throw** if request fails, is `NULL`,
 and begin **unwinding**, executing _deferred_ statements.
 
-### Thereafter, an smart pointer can be use with these _raii___*_ functions.
+### Thereafter, an smart pointer can be use with these _raii__* functions.
 
 ```c
 /* Defer execution `LIFO` of given function with argument,
