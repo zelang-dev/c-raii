@@ -7,7 +7,7 @@ An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memor
 * [Synopsis](#synopsis)
     - [There are _3 ways_ to create an smart memory pointer.](#there-are-3-ways-to-create-an-smart-memory-pointer)
     - [The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.](#the-following-malloccalloc-wrapper-functions-are-used-to-get-an-raw-memory-pointer)
-    - [Thereafter, an smart pointer can be use with these _raii__* functions.](#thereafter-an-smart-pointer-can-be-use-with-these-raii_-functions)
+    - [Thereafter, an smart pointer can be use with these _raii_* functions](#thereafter-an-smart-pointer-can-be-use-with-these-raii-functions)
     - [Using `thread local storage` for an default smart pointer, the following functions always available.](#using-thread-local-storage-for-an-default-smart-pointer-the-following-functions-always-available)
     - [Fully automatic memory safety, using `guard/unguarded/guarded` macro.](#fully-automatic-memory-safety-using-guardunguardedguarded-macro)
 * [Installation](#installation)
@@ -30,7 +30,7 @@ The planned implementation from [defer reference implementation for C](https://g
 <tr>
 <td>
 
-```c
+<pre><code>
 // includes "cthread.h" emulated C11 threads
 #include "raii.h"
 
@@ -46,11 +46,10 @@ guard {
 
     // all resources acquired
 } unguarded(0);
-```
+</code></pre>
 </td>
 <td>
-
-```c
+<pre><code>
 guard {
   void * const p = malloc(25);
   if (!p) break;
@@ -65,7 +64,7 @@ guard {
 
   // all resources acquired
 }
-```
+</code></pre>
 </td>
 </tr>
 </table>
@@ -89,8 +88,7 @@ There example from [source](https://gitlab.inria.fr/gustedt/defer/-/blob/master/
 </tr>
 <tr>
 <td>
-
-```c
+<pre><code>
 #include "raii.h"
 
 char number[20];
@@ -134,12 +132,12 @@ int main(int argc, char **argv) {
     puts("Returned normally from f.");
     return EXIT_SUCCESS;
 }
-```
+</code></pre>
 
 </td>
 <td>
 
-```c
+<pre><code>
 #include <stdio.h>
 #include <stddef.h>
 #include <threads.h>
@@ -181,7 +179,7 @@ int main(int argc, char* argv[static argc+1]) {
   puts("Returned normally from f.");
   return EXIT_SUCCESS;
 }
-```
+</code></pre>
 </td>
 </tr>
 </table>
@@ -255,7 +253,7 @@ C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
 Note the above functions will **panic/throw** if request fails, is `NULL`,
 and begin **unwinding**, executing _deferred_ statements.
 
-### Thereafter, an smart pointer can be use with these _raii__* functions.
+### Thereafter, an smart pointer can be use with these _raii_* functions.
 
 ```c
 /* Defer execution `LIFO` of given function with argument,
