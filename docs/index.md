@@ -48,6 +48,7 @@ guard {
 } unguarded(0);
 </code></pre>
 </td>
+
 <td>
 <pre><code>
 guard {
@@ -79,7 +80,7 @@ There C Standard implementation states: **The important interfaces of this tool 
 - `panic` starts global unwinding of all guarded blocks
 - `recover` inside a defer clause stops a panic and provides an error code
 
-There example from [source](https://gitlab.inria.fr/gustedt/defer/-/blob/master/defer4.c?ref_type=heads) - **gitlab**, outlined in [C Standard WG14 meeting](http://www.open-std.org/jtc1/sc22/wg14/www/docs/n2542.pdf) - **pdf**
+**Planned C11** example from [source](https://gitlab.inria.fr/gustedt/defer/-/blob/master/defer4.c?ref_type=heads) - **gitlab**, outlined in [C Standard WG14 meeting](http://www.open-std.org/jtc1/sc22/wg14/www/docs/n2542.pdf) - **pdf**
 
 <table>
 <tr>
@@ -88,6 +89,7 @@ There example from [source](https://gitlab.inria.fr/gustedt/defer/-/blob/master/
 </tr>
 <tr>
 <td>
+
 <pre><code>
 #include "raii.h"
 
@@ -138,9 +140,9 @@ int main(int argc, char **argv) {
 <td>
 
 <pre><code>
-#include <stdio.h>
-#include <stddef.h>
-#include <threads.h>
+#include "stdio.h"
+#include "stddef.h"
+#include "threads.h"
 #include "stddefer.h"
 
 void g(int i) {
