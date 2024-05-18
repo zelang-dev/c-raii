@@ -194,6 +194,7 @@ C_API void args_free(args_t *params);
 * Creates an scoped container for arbitrary arguments passing to an single `args` function.
 * Use `get_args()` or `args_in()` for retrieval.
 *
+* @param scope callers context to bind `allocated` arguments to
 * @param desc format, similar to `printf()`:
 * * `i` unsigned integer,
 * * `d` signed integer,
