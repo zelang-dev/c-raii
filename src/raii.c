@@ -527,11 +527,11 @@ void args_free(args_t *params) {
     }
 }
 
-values_type get_args(void **params, int item) {
+values_type get_args(void *params, int item) {
     args_t *args = (args_t *)params;
     if (!args->defer_set) {
         args->defer_set = true;
-        raii_deferred(args->context, args_free, args);
+        raii_deferred(args->context, (func_t)args_free, args);
     }
 
     return args_in(args, item);
