@@ -133,7 +133,7 @@ void *try_calloc(int count, size_t size) {
     void *ptr = RAII_CALLOC(count, size);
     if (ptr == NULL) {
         errno = ENOMEM;
-        raii_panic("Memory allocation failed!");
+        raii_panic("Calloc failed!");
     }
 
     return ptr;
@@ -143,7 +143,17 @@ void *try_malloc(size_t size) {
     void *ptr = RAII_MALLOC(size);
     if (ptr == NULL) {
         errno = ENOMEM;
-        raii_panic("Memory allocation failed!");
+        raii_panic("Malloc failed!");
+    }
+
+    return ptr;
+}
+
+void *try_realloc(void *old_ptr, size_t size) {
+    void *ptr = RAII_REALLOC(old_ptr, size);
+    if (ptr == NULL) {
+        errno = ENOMEM;
+        raii_panic("Realloc failed!");
     }
 
     return ptr;

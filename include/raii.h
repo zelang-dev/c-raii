@@ -95,6 +95,7 @@ typedef enum {
     RAII_UNION,
     RAII_VALUE,
     RAII_NO_INSTANCE,
+    RAII_ARENA,
     RAII_GUARDED_STATUS
 } raii_type;
 
@@ -341,6 +342,7 @@ C_API bool is_guard(void *self);
 
 C_API void *try_calloc(int, size_t);
 C_API void *try_malloc(size_t);
+C_API void *try_realloc(void *, size_t);
 
 C_API void guard_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind);
@@ -466,6 +468,32 @@ On exit will begin executing deferred functions. */
 #endif
 
 C_API thread_local memory_t *raii_context;
+
+typedef struct arena_s *arena_t;
+
+/* Allocates, initializes, and returns a new arena. */
+C_API arena_t arena_new(void);
+
+/* Deallocates all of the space in arena, deallocates the arena itself, and
+clears arena. */
+C_API void arena_dispose(arena_t arena);
+
+/* Allocates nbytes bytes in arena and returns a pointer to the first byte.
+The bytes are uninitialized. Will `Panic` if allocations fails. */
+C_API void *arena_alloc(arena_t arena, long nbytes);
+
+/* Allocates space in arena for an array of count elements, each occupying nbytes,
+and returns a pointer to the first element.
+The bytes are initialized to zero. Will `Panic` if allocations fails. */
+C_API void *arena_calloc(arena_t arena, long count, long nbytes);
+
+/* Deallocates all of the space in arena — all of the space allocated since
+the last call to `arena_free`. */
+C_API void arena_free(arena_t arena);
+
+C_API size_t arena_capacity(const arena_t arena);
+C_API size_t arena_total(const arena_t arena);
+C_API void arena_print(const arena_t arena);
 
 #ifdef __cplusplus
     }

@@ -61,6 +61,7 @@ jobs:
             .\test-defer.exe
             .\test-exceptions.exe
             .\test-cthread.exe
+            .\test-arena.exe
 
   build-macos:
     name: macOS
@@ -82,3 +83,4 @@ jobs:
             ./test-defer
             ./test-exceptions
             ./test-cthread
+            ./test-arena
