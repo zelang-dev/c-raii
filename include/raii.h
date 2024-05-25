@@ -168,6 +168,7 @@ struct memory_s {
     void *volatile err;
     const char *volatile panic;
     bool is_protected;
+    bool is_arena;
     ex_ptr_t *protector;
     defer_t defer;
     size_t mid;
@@ -271,11 +272,6 @@ to the given `scoped smart pointer` lifetime/destruction. */
 C_API size_t raii_deferred(memory_t *, func_t, void *);
 C_API size_t raii_deferred_count(memory_t *);
 
-/* Smart memory pointer, the allocated `size` memory requested in **->arena** field,
-all other fields private, this object binds any additional requests to it's lifetime.
-Will be freed with given `func`. */
-C_API memory_t *raii_malloc_full(size_t size, func_t func);
-
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
 C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
@@ -283,11 +279,6 @@ C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
 C_API void *malloc_by(memory_t *scope, size_t size);
-
-/* Smart memory pointer, the allocated `size` memory requested in **->arena** field,
-all other fields private, this object binds any additional requests to it's lifetime.
-Will be freed with given `func`. */
-C_API memory_t *raii_calloc_full(int count, size_t size, func_t func);
 
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
@@ -347,6 +338,14 @@ C_API void *try_realloc(void *, size_t);
 C_API void guard_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind);
 C_API void guard_delete(memory_t *ptr);
+
+#ifndef MAX
+# define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MIN
+# define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 #define NONE
 
@@ -472,24 +471,24 @@ C_API thread_local memory_t *raii_context;
 typedef struct arena_s *arena_t;
 
 /* Allocates, initializes, and returns a new arena. */
-C_API arena_t arena_new(void);
+C_API arena_t arena_init(void);
 
 /* Deallocates all of the space in arena, deallocates the arena itself, and
 clears arena. */
-C_API void arena_dispose(arena_t arena);
+C_API void arena_free(arena_t arena);
 
 /* Allocates nbytes bytes in arena and returns a pointer to the first byte.
-The bytes are uninitialized. Will `Panic` if allocations fails. */
-C_API void *arena_alloc(arena_t arena, long nbytes);
+The bytes are uninitialized. Will `Panic` if allocation fails. */
+C_API void *malloc_arena(arena_t arena, long nbytes);
 
 /* Allocates space in arena for an array of count elements, each occupying nbytes,
 and returns a pointer to the first element.
-The bytes are initialized to zero. Will `Panic` if allocations fails. */
-C_API void *arena_calloc(arena_t arena, long count, long nbytes);
+The bytes are initialized to zero. Will `Panic` if allocation fails. */
+C_API void *calloc_arena(arena_t arena, long count, long nbytes);
 
 /* Deallocates all of the space in arena — all of the space allocated since
-the last call to `arena_free`. */
-C_API void arena_free(arena_t arena);
+the last call to `arena_clear`. */
+C_API void arena_clear(arena_t arena);
 
 C_API size_t arena_capacity(const arena_t arena);
 C_API size_t arena_total(const arena_t arena);

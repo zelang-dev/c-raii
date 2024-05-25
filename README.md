@@ -5,7 +5,7 @@
 An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety, _smarty!_
 
 * [Synopsis](#synopsis)
-    - [There are _3 ways_ to create an smart memory pointer.](#there-are-3-ways-to-create-an-smart-memory-pointer)
+    - [There is _1 way_ to create an smart memory pointer.](#there-is-1-way-to-create-an-smart-memory-pointer)
     - [The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.](#the-following-malloccalloc-wrapper-functions-are-used-to-get-an-raw-memory-pointer)
     - [Thereafter, an smart pointer can be use with these _raii__* functions.](#thereafter-an-smart-pointer-can-be-use-with-these-raii_-functions)
     - [Using `thread local storage` for an default smart pointer, the following functions always available.](#using-thread-local-storage-for-an-default-smart-pointer-the-following-functions-always-available)
@@ -211,22 +211,12 @@ Returned normally from f.
 
 Here too the same process is in effect through an **new** _typedef_ `unique_t` aka `memory_t` _structure_.
 
-### There are _3 ways_ to create an smart memory pointer.
+### There is _1 way_ to create an smart memory pointer.
 
 ```c
 /* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
 for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
-
-/* Creates smart memory pointer, the allocated `size` memory requested in **arena** field,
-all other fields private, this object binds any additional requests to it's lifetime.
-The **arena** field will be freed with given `func`. */
-C_API memory_t *raii_malloc_full(size_t size, func_t func);
-
-/* Creates smart memory pointer, the allocated `size` memory requested in **arena** field,
-all other fields private, this object binds any additional requests to it's lifetime.
-The **arena** field will be freed with given `func`. */
-C_API memory_t *raii_calloc_full(int count, size_t size, func_t func);
 ```
 
 > This system use macros `RAII_MALLOC`, `RAII_FREE`, `RAII_REALLOC`, and `RAII_CALLOC`.

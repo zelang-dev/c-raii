@@ -10,6 +10,7 @@ struct arena_s {
     char *avail;
     char *limit;
     void *base;
+    size_t bytes;
     size_t total;
 };
 
@@ -18,25 +19,25 @@ union header {
     values_type slot;
 };
 
-static arena_t free_list;
-static int num_free;
+static arena_t free_list = NULL;
+static int num_free = 0;
 
-arena_t arena_new(void) {
+arena_t arena_init(void) {
     arena_t arena = try_malloc(sizeof(*arena));
     arena->prev = NULL;
     arena->limit = arena->avail = NULL;
     arena->base = NULL;
     arena->total = 0;
+    arena->bytes = 0;
     arena->type = RAII_ARENA + RAII_STRUCT;
     return arena;
 }
 
-void arena_dispose(arena_t arena) {
+void arena_free(arena_t arena) {
     if (is_empty(arena))
         return;
 
     if (is_type(arena, RAII_ARENA + RAII_STRUCT)) {
-        arena_free(arena);
         memset(arena, -1, sizeof(arena_t));
         RAII_FREE(arena->base);
         RAII_FREE(arena);
@@ -44,11 +45,11 @@ void arena_dispose(arena_t arena) {
     }
 }
 
-void *arena_alloc(arena_t arena, long nbytes) {
+void *malloc_arena(arena_t arena, long nbytes) {
     RAII_ASSERT(arena);
     RAII_ASSERT(nbytes > 0);
-    nbytes = ((nbytes + sizeof(values_type) - 1) /
-              (sizeof(values_type))) * (sizeof(values_type));
+    nbytes = ((nbytes + sizeof(union header) - 1) /
+              (sizeof(union header))) * (sizeof(union header));
     while (nbytes > arena->limit - arena->avail) {
         arena_t ptr;
         char *limit;
@@ -68,22 +69,23 @@ void *arena_alloc(arena_t arena, long nbytes) {
         arena->avail = (char *)((union header *)ptr + 1);
         arena->limit = limit;
         arena->prev = ptr;
+        ptr->bytes = arena->bytes;
         ptr->type = RAII_ARENA;
     }
 
+    arena->bytes = nbytes;
     arena->avail += nbytes;
     return arena->avail - nbytes;
 }
 
-void *arena_calloc(arena_t arena, long count, long nbytes) {
+void *calloc_arena(arena_t arena, long count, long nbytes) {
     RAII_ASSERT(count > 0);
-    void *ptr;
-    ptr = arena_alloc(arena, count * nbytes);
-    memset(ptr, '\0', count * nbytes);
+    void *ptr = malloc_arena(arena, count * nbytes);
+    memset(ptr, 0, count * nbytes);
     return ptr;
 }
 
-void arena_free(arena_t arena) {
+void arena_clear(arena_t arena) {
     if (is_empty(arena))
         return;
 
@@ -93,11 +95,14 @@ void arena_free(arena_t arena) {
             arena->prev->prev = free_list;
             free_list = arena->prev;
             num_free++;
-            free_list->limit = arena->limit;
+            if (is_zero(free_list->bytes))
+                arena->avail -= arena->bytes;
+            else
+                arena->avail -= free_list->bytes;
         } else {
-            free_list = arena;
             arena->avail = (char *)((union header *)arena->base + 1);
             arena->limit = (char *)arena->base + arena->total;
+            arena->bytes = 0;
             arena->prev = NULL;
         }
 
@@ -114,5 +119,5 @@ RAII_INLINE size_t arena_capacity(const arena_t arena) {
 }
 
 RAII_INLINE size_t arena_total(const arena_t arena) {
-    return !is_empty(arena) && is_type(arena, RAII_ARENA + RAII_STRUCT) ? arena->total : 0;
+    return !is_empty(arena) && is_type(arena, RAII_ARENA + RAII_STRUCT) ? MAX(arena->total, sizeof(union header)) - sizeof(union header) : 0;
 }
