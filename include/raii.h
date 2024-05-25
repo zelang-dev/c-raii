@@ -124,7 +124,7 @@ typedef union {
     char **array;
     void *object;
     raii_func_t func;
-    const char const_char[256];
+    const char const_char[128];
 } values_type;
 
 typedef struct {

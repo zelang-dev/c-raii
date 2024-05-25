@@ -14,8 +14,8 @@ struct arena_s {
 };
 
 union header {
-    arena_t b;
-    values_type a;
+    arena_t tag;
+    values_type slot;
 };
 
 static arena_t free_list;
@@ -61,7 +61,7 @@ void *arena_alloc(arena_t arena, long nbytes) {
             arena->total += m;
             ptr = try_realloc(arena->base, arena->total);
             arena->base = ptr;
-            limit = (char *)ptr + m;
+            limit = (char *)arena->base + arena->total;
         }
 
         *ptr = *arena;
@@ -94,8 +94,10 @@ void arena_free(arena_t arena) {
             free_list = arena->prev;
             num_free++;
             free_list->limit = arena->limit;
-        } else if (is_type(arena->prev, RAII_ARENA)) {
-            memset(arena->prev, -1, sizeof(arena_t));
+        } else {
+            arena->avail = (char *)((union header *)arena->base + 1);
+            arena->limit = (char *)arena->base + arena->total;
+            arena->prev = NULL;
         }
 
         arena = tmp;
