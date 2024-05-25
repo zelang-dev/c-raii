@@ -95,6 +95,7 @@ void arena_free(arena_t arena) {
             num_free++;
             free_list->limit = arena->limit;
         } else {
+            free_list = arena;
             arena->avail = (char *)((union header *)arena->base + 1);
             arena->limit = (char *)arena->base + arena->total;
             arena->prev = NULL;
