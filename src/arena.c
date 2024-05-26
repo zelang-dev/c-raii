@@ -48,6 +48,9 @@ void arena_free(arena_t arena) {
 void *malloc_arena(arena_t arena, long nbytes) {
     RAII_ASSERT(arena);
     RAII_ASSERT(nbytes > 0);
+    if (arena_capacity(arena) == arena_total(arena))
+        num_free = 0;
+
     nbytes = ((nbytes + sizeof(union header) - 1) /
               (sizeof(union header))) * (sizeof(union header));
     while (nbytes > arena->limit - arena->avail) {
@@ -69,12 +72,15 @@ void *malloc_arena(arena_t arena, long nbytes) {
         arena->avail = (char *)((union header *)ptr + 1);
         arena->limit = limit;
         arena->prev = ptr;
-        ptr->bytes = arena->bytes;
         ptr->type = RAII_ARENA;
     }
 
+    if (arena->prev)
+        arena->prev->bytes = arena->bytes;
+
     arena->bytes = nbytes;
     arena->avail += nbytes;
+
     return arena->avail - nbytes;
 }
 
