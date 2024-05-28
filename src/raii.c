@@ -1,7 +1,7 @@
 #include "raii.h"
 
-static thread_local memory_t raii_context_buffer;
-thread_local memory_t *raii_context = NULL;
+static thread_local memory_t raii_tls_buffer;
+thrd_local_init(memory_t *, raii)
 
 int raii_array_init(raii_array_t *a) {
     if (UNLIKELY(!a))
@@ -97,28 +97,43 @@ void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
     ex_unwind_set(ctx, scope->is_protected);
 }
 
+RAII_INLINE memory_t *raii_local(void) {
+#ifdef emulate_tls
+    return tss_get(thrd_raii_tss);
+#else
+    return thrd_raii_tls;
+#endif
+}
+
 memory_t *raii_init(void) {
-    if (raii_context == NULL) {
-        raii_context = &raii_context_buffer;
-        raii_context->arena = NULL;
-        raii_context->protector = NULL;
-        raii_context->panic = NULL;
-        raii_context->err = NULL;
-        raii_context->is_protected = false;
-        raii_context->is_recovered = false;
-        raii_context->mid = -1;
-        if (UNLIKELY(raii_deferred_init(&raii_context->defer) < 0))
+    if (is_empty(raii_local())) {
+#ifdef emulate_tls
+        thrd_raii_tls = unique_init();
+        thrd_tls_buffer = thrd_raii_tls;
+        if (tss_set(thrd_raii_tss, thrd_raii_tls) != thrd_success)
+            raii_panic("Raii `tss_set` failed!");
+#else
+        thrd_raii_tls = &raii_tls_buffer;
+        thrd_raii_tls->arena = NULL;
+        thrd_raii_tls->protector = NULL;
+        thrd_raii_tls->panic = NULL;
+        thrd_raii_tls->err = NULL;
+        thrd_raii_tls->is_protected = false;
+        thrd_raii_tls->is_recovered = false;
+        thrd_raii_tls->mid = -1;
+        if (UNLIKELY(raii_deferred_init(&thrd_raii_tls->defer) < 0))
             raii_panic("Deferred initialization failed!");
+#endif
 
         ex_context_t *ctx = ex_init();
-        ctx->data = (void *)raii_context;
-        ctx->prev = (void *)raii_context;
+        ctx->data = (void *)thrd_raii_tls;
+        ctx->prev = (void *)thrd_raii_tls;
         ctx->is_raii = true;
         if (!exception_signal_set)
             ex_signal_setup();
     }
 
-    return raii_context;
+    return raii_local();
 }
 
 RAII_INLINE size_t raii_mid(void) {
@@ -171,17 +186,10 @@ unique_t *unique_init(void) {
     return raii;
 }
 
-memory_t *raii_malloc_full(size_t size, func_t func) {
-    memory_t *raii = try_malloc(sizeof(memory_t));
-    if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
-        raii_panic("Deferred initialization failed!");
-
-    raii->arena = try_malloc(size);
-    raii->protector = try_malloc(sizeof(ex_ptr_t));
-
-    ex_protect_ptr(raii->protector, raii->arena, func);
-    raii->is_protected = true;
-    raii->mid = raii_deferred(raii, func, raii->arena);
+unique_t *unique_init_arena(void) {
+    unique_t *raii = unique_init();
+    raii->arena = (void *)arena_init(0);
+    raii->is_arena = true;
 
     return raii;
 }
@@ -202,23 +210,15 @@ RAII_INLINE void *malloc_default(size_t size) {
     return malloc_full(raii_init(), size, RAII_FREE);
 }
 
-RAII_INLINE void *malloc_by(memory_t *scope, size_t size) {
+void *malloc_by(memory_t *scope, size_t size) {
+    if (scope->is_arena)
+        return arena_alloc(scope->arena, size);
+
     return malloc_full(scope, size, RAII_FREE);
 }
 
-memory_t *raii_calloc_full(int count, size_t size, func_t func) {
-    memory_t *raii = try_calloc(1, sizeof(memory_t));
-    if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
-        raii_panic("Deferred initialization failed!");
-
-    raii->arena = try_calloc(count, size);
-    raii->protector = try_calloc(1, sizeof(ex_ptr_t));
-
-    ex_protect_ptr(raii->protector, raii->arena, func);
-    raii->is_protected = true;
-    raii->mid = raii_deferred(raii, func, raii->arena);
-
-    return raii;
+RAII_INLINE void *malloc_arena(memory_t *scope, size_t size) {
+    return arena_alloc(scope->arena, size);
 }
 
 void *calloc_full(memory_t *scope, int count, size_t size, func_t func) {
@@ -237,8 +237,15 @@ RAII_INLINE void *calloc_default(int count, size_t size) {
     return calloc_full(raii_init(), count, size, RAII_FREE);
 }
 
-RAII_INLINE void *calloc_by(memory_t *scope, int count, size_t size) {
+void *calloc_by(memory_t *scope, int count, size_t size) {
+    if (scope->is_arena)
+        return arena_calloc(scope->arena, (long)count, (long)size);
+
     return calloc_full(scope, count, size, RAII_FREE);
+}
+
+RAII_INLINE void *calloc_arena(memory_t *scope, int count, size_t size) {
+    return arena_calloc(scope->arena, (long)count, (long)size);
 }
 
 void raii_delete(memory_t *ptr) {
@@ -246,7 +253,7 @@ void raii_delete(memory_t *ptr) {
         return;
 
     raii_deferred_free(ptr);
-    if (ptr != &raii_context_buffer) {
+    if (ptr != &raii_tls_buffer) {
         memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }
@@ -254,8 +261,24 @@ void raii_delete(memory_t *ptr) {
     ptr = NULL;
 }
 
+void raii_delete_arena(memory_t *ptr) {
+    if (ptr == NULL)
+        return;
+
+    arena_t arena = NULL;
+    if (!is_empty(ptr->arena))
+        arena = (arena_t)ptr->arena;
+
+    raii_delete(ptr);
+    if (!is_empty(arena))
+        arena_free(arena);
+
+    ptr = NULL;
+    arena = NULL;
+}
+
 RAII_INLINE void raii_destroy(void) {
-    raii_delete(raii_init());
+    raii_delete(raii_local());
 }
 
 static void raii_array_free(void *data) {
@@ -359,20 +382,16 @@ static void raii_deferred_run(memory_t *scope, size_t generation) {
     }
 
     if (scope->is_protected && !is_empty(scope->protector) && !is_empty(scope->err)) {
-        if (!ex_context)
-            ex_init();
-
         scope->is_protected = false;
         if (!defer_ran) {
             scope->protector->func(*scope->protector->ptr);
             *scope->protector->ptr = NULL;
         }
-
-        ex_unprotected_ptr(scope->protector);
     }
 
     array->elements = generation;
     if (!is_empty(scope->protector)) {
+        ex_unprotected_ptr(scope->protector);
         RAII_FREE(scope->protector);
         scope->protector = NULL;
     }

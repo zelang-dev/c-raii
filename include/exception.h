@@ -110,6 +110,7 @@
           #define thread_local __thread
         #else /* Otherwise, we ignore the directive (unless user provides their own) */
           #define thread_local
+          #define emulate_tls 1
         #endif
       #elif __APPLE__ && __MACH__
         #define thread_local __thread
@@ -126,6 +127,7 @@
           #define thread_local __thread
         #else /* Otherwise, we ignore the directive (unless user provides their own) */
           #define thread_local
+          #define emulate_tls 1
         #endif
       #else /* In C++ >= 11, thread_local in a builtin keyword */
         /* Don't do anything */
@@ -151,6 +153,8 @@ C_API void ex_throw(const char *ex, const char *file, int, const char *line, con
 C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API ex_context_t *ex_init(void);
+C_API ex_context_t *ex_local(void);
+C_API void ex_update(ex_context_t *);
 C_API void ex_unwind_set(ex_context_t *ctx, bool flag);
 C_API void ex_data_set(ex_context_t *ctx, void *data);
 C_API void ex_swap_set(ex_context_t *ctx, void *data);
@@ -264,15 +268,15 @@ throws an exception of given message. */
         ex_signal_setup();                  \
     /* local context */                     \
     ex_context_t ex_err;                    \
-    if (!ex_context)                        \
+    if (!ex_local())                        \
         ex_init();                          \
-    ex_err.next = ex_context;               \
+    ex_err.next = ex_local();               \
     ex_err.stack = 0;                       \
     ex_err.ex = 0;                          \
     ex_err.unstack = 0;                     \
     ex_err.is_rethrown = false;             \
     /* global context updated */            \
-    ex_context = &ex_err;                   \
+    ex_update(&ex_err);                     \
     /* save jump location */                \
     ex_err.state = ex_setjmp(ex_err.buf);   \
     if (ex_err.state == ex_try_st) {		\
@@ -291,13 +295,13 @@ throws an exception of given message. */
         {                               \
             EX_MAKE_IF();               \
             /* global context updated */\
-            ex_context = ex_err.next;
+            ex_update(ex_err.next);
 
 #define ex_end_try                          \
     }										\
-    if (ex_context == &ex_err)              \
+    if (ex_local() == &ex_err)              \
         /* global context updated */        \
-        ex_context = ex_err.next;           \
+        ex_update(ex_err.next);             \
     ex_err.caught = -1;                     \
     ex_err.is_rethrown = false;             \
     if ((ex_err.state & ex_throw_st) != 0)  \
@@ -319,7 +323,7 @@ throws an exception of given message. */
         } __finally {						\
 			EX_MAKE_IF();					\
 			/* global context updated */	\
-			ex_context = ex_err.next;
+			ex_update(ex_err.next);
 
 #define ex_end_trying	 ex_finally ex_end_try
 
@@ -343,14 +347,14 @@ throws an exception of given message. */
         ex_signal_setup();                  \
     /* local context */                     \
     ex_context_t ex_err;                    \
-    if (!ex_context)                        \
+    if (!ex_local())                        \
         ex_init();                          \
-    ex_err.next = ex_context;               \
+    ex_err.next = ex_local();               \
     ex_err.stack = 0;                       \
     ex_err.ex = 0;                          \
     ex_err.unstack = 0;                     \
     /* global context updated */            \
-    ex_context = &ex_err;                   \
+    ex_update(&ex_err);                     \
     /* save jump location */                \
     ex_err.state = ex_setjmp(ex_err.buf);   \
     if (ex_err.state == ex_try_st)          \
@@ -381,14 +385,14 @@ throws an exception of given message. */
         {                                \
             EX_MAKE();                   \
             /* global context updated */ \
-            ex_context = ex_err.next;
+            ex_update(ex_err.next);
 
 #define ex_end_try                            \
     }                                      \
     }                                      \
-    if (ex_context == &ex_err)             \
+    if (ex_local() == &ex_err)             \
         /* global context updated */       \
-        ex_context = ex_err.next;          \
+        ex_update(ex_err.next);            \
     if ((ex_err.state & ex_throw_st) != 0) \
         rethrow();                         \
     }
@@ -457,8 +461,7 @@ struct ex_ptr_s {
 
 /* extern declaration
 */
-C_API thread_local ex_context_t *ex_context;
-C_API thread_local char ex_message[256];
+
 C_API ex_setup_func exception_setup_func;
 C_API ex_unwind_func exception_unwind_func;
 C_API ex_terminate_func exception_terminate_func;
@@ -478,7 +481,7 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 #define protected(ptr, func) ex_ptr_t EX_PNAME(ptr) = ex_protect_ptr(&EX_PNAME(ptr), &ptr, func)
 
 /* Remove memory pointer protection, does not free the memory. */
-#define unprotected(p) (ex_context->stack = EX_PNAME(p).next)
+#define unprotected(p) (ex_local()->stack = EX_PNAME(p).next)
 
 #ifdef __cplusplus
 }

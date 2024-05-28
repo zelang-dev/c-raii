@@ -49,9 +49,9 @@ EX_EXCEPTION(stack_overflow);
 EX_EXCEPTION(invalid_handle);
 EX_EXCEPTION(bad_alloc);
 
-static thread_local ex_context_t ex_context_buffer;
-thread_local ex_context_t *ex_context = NULL;
-thread_local char ex_message[256] = {0};
+static thread_local ex_context_t thrd_except_buffer;
+thrd_local_init(ex_context_t *, except)
+
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
 static volatile sig_atomic_t got_ctrl_c = false;
@@ -92,7 +92,7 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
     const_ptr->type = -1;
-    ex_context->stack = const_ptr->next;
+    ex_local()->stack = const_ptr->next;
 }
 
 static void ex_unwind_stack(ex_context_t *ctx) {
@@ -103,7 +103,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 
     if (ctx->is_unwind && exception_unwind_func) {
         exception_unwind_func(ctx->data);
-    } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_context) {
+    } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_local()) {
         raii_deferred_clean();
     } else {
         while (p && p->type == ex_protected_st) {
@@ -168,21 +168,42 @@ void ex_flags_reset(void) {
     got_ctrl_c = false;
 }
 
+RAII_INLINE ex_context_t *ex_local(void) {
+#ifdef emulate_tls
+    return tss_get(thrd_except_tss);
+#else
+    return thrd_except_tls;
+#endif
+}
+
+RAII_INLINE void ex_update(ex_context_t *context) {
+#ifdef emulate_tls
+    if (tss_set(thrd_except_tss, context) != thrd_success)
+        raii_panic("Except `tss_set` failed!");
+#else
+    thrd_except_tls = context;
+#endif
+}
+
 ex_context_t *ex_init(void) {
-    if (ex_context != NULL)
-        return ex_context;
+    if (is_empty(ex_local())) {
+        ex_signal_block(all);
+#ifdef emulate_tls
+        thrd_except_tls = try_calloc(1, sizeof(ex_context_t));
+        thrd_except_buffer = thrd_except_tls;
+#else
+        ex_update(&thrd_except_buffer);
+#endif
+        thrd_except_tls->is_unwind = false;
+        thrd_except_tls->is_rethrown = false;
+        thrd_except_tls->is_guarded = false;
+        thrd_except_tls->is_raii = false;
+        thrd_except_tls->caught = -1;
+        thrd_except_tls->type = ex_context_st;
+        ex_signal_unblock(all);
+    }
 
-    ex_signal_block(all);
-    ex_context = &ex_context_buffer;
-    ex_context->is_unwind = false;
-    ex_context->is_rethrown = false;
-    ex_context->is_guarded = false;
-    ex_context->is_raii = false;
-    ex_context->caught = -1;
-    ex_context->type = ex_context_st;
-    ex_signal_unblock(all);
-
-    return ex_context;
+    return ex_local();
 }
 
 int ex_uncaught_exception(void) {
@@ -190,13 +211,13 @@ int ex_uncaught_exception(void) {
 }
 
 void ex_terminate(void) {
-    if (ex_init()->is_raii)
+    if (ex_local()->is_raii)
         raii_destroy();
 
     if (ex_uncaught_exception() || got_uncaught_exception)
-        ex_print(ex_context, "\nException during stack unwinding leading to an undefined behavior");
+        ex_print(ex_local(), "\nException during stack unwinding leading to an undefined behavior");
     else
-        ex_print(ex_context, "\nExiting with uncaught exception");
+        ex_print(ex_local(), "\nExiting with uncaught exception");
 
     if (got_ctrl_c && exception_ctrl_c_func) {
         got_ctrl_c = false;
@@ -235,7 +256,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
 
-    if (ctx == &ex_context_buffer)
+    if (ctx == &thrd_except_buffer)
         ex_terminate();
 
 #ifdef _WIN32
