@@ -1,7 +1,6 @@
 #include "raii.h"
 
-static thread_local memory_t raii_tls_buffer;
-thrd_local_init(memory_t *, raii)
+thrd_local(memory_t, raii)
 
 int raii_array_init(raii_array_t *a) {
     if (UNLIKELY(!a))
@@ -98,42 +97,38 @@ void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
 }
 
 RAII_INLINE memory_t *raii_local(void) {
-#ifdef emulate_tls
-    return tss_get(thrd_raii_tss);
-#else
-    return thrd_raii_tls;
-#endif
+    thrd_local_return(memory_t, raii)
 }
 
 memory_t *raii_init(void) {
-    if (is_empty(raii_local())) {
+    memory_t *scope;
+    if (is_empty(scope = raii_local())) {
 #ifdef emulate_tls
-        thrd_raii_tls = unique_init();
-        thrd_tls_buffer = thrd_raii_tls;
-        if (tss_set(thrd_raii_tss, thrd_raii_tls) != thrd_success)
-            raii_panic("Raii `tss_set` failed!");
+        thrd_raii_buffer = raii();
 #else
-        thrd_raii_tls = &raii_tls_buffer;
-        thrd_raii_tls->arena = NULL;
-        thrd_raii_tls->protector = NULL;
-        thrd_raii_tls->panic = NULL;
-        thrd_raii_tls->err = NULL;
-        thrd_raii_tls->is_protected = false;
-        thrd_raii_tls->is_recovered = false;
-        thrd_raii_tls->mid = -1;
-        if (UNLIKELY(raii_deferred_init(&thrd_raii_tls->defer) < 0))
-            raii_panic("Deferred initialization failed!");
+        thrd_raii_tls = &thrd_raii_buffer;
 #endif
+        scope = raii_local();
+        if (UNLIKELY(raii_deferred_init(&scope->defer) < 0))
+            raii_panic("Deferred initialization failed!");
+
+        scope->arena = NULL;
+        scope->protector = NULL;
+        scope->panic = NULL;
+        scope->err = NULL;
+        scope->is_protected = false;
+        scope->is_recovered = false;
+        scope->mid = -1;
 
         ex_context_t *ctx = ex_init();
-        ctx->data = (void *)thrd_raii_tls;
-        ctx->prev = (void *)thrd_raii_tls;
+        ctx->data = (void *)scope;
+        ctx->prev = (void *)scope;
         ctx->is_raii = true;
         if (!exception_signal_set)
             ex_signal_setup();
     }
 
-    return raii_local();
+    return scope;
 }
 
 RAII_INLINE size_t raii_mid(void) {
@@ -196,8 +191,10 @@ unique_t *unique_init_arena(void) {
 
 void *malloc_full(memory_t *scope, size_t size, func_t func) {
     void *arena = try_malloc(size);
-    if (is_empty(scope->protector))
+    if (is_empty(scope->protector)) {
         scope->protector = try_malloc(sizeof(ex_ptr_t));
+        scope->protector->is_emulated = scope->is_emulated;
+    }
 
     ex_protect_ptr(scope->protector, arena, func);
     scope->is_protected = true;
@@ -223,8 +220,10 @@ RAII_INLINE void *malloc_arena(memory_t *scope, size_t size) {
 
 void *calloc_full(memory_t *scope, int count, size_t size, func_t func) {
     void *arena = try_calloc(count, size);
-    if (is_empty(scope->protector))
+    if (is_empty(scope->protector)) {
         scope->protector = try_calloc(1, sizeof(ex_ptr_t));
+        scope->protector->is_emulated = scope->is_emulated;
+    }
 
     ex_protect_ptr(scope->protector, arena, func);
     scope->is_protected = true;
@@ -253,7 +252,13 @@ void raii_delete(memory_t *ptr) {
         return;
 
     raii_deferred_free(ptr);
-    if (ptr != &raii_tls_buffer) {
+
+#ifdef emulate_tls
+    bool self = true;
+#else
+    bool self = ptr != &thrd_raii_buffer;
+#endif
+    if (self) {
         memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }

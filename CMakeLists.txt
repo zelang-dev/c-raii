@@ -4,8 +4,13 @@ project(c-raii LANGUAGES C)
 
 set(C_STANDARD 89)
 
+include(CMakePackageConfigHelpers)
 include(CMakeDependentOption)
+include(CheckCCompilerFlag)
 include(GNUInstallDirs)
+include(CTest)
+
+enable_testing()
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
@@ -15,9 +20,12 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
 
 cmake_dependent_option(BUILD_TESTING
   "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
-  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
+  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" ON)
 
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 file(GLOB raii_files
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
@@ -29,8 +37,6 @@ else()
     add_library(raii STATIC ${raii_files})
 endif()
 
-set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
-
 target_include_directories(raii PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -39,22 +45,15 @@ target_include_directories(raii PUBLIC
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
-endif()
-
-if(WIN32)
+else()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG ")
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
 
-find_package(Threads)
-target_link_libraries(raii PUBLIC ${CMAKE_THREAD_LIBS_INIT})
-
-if (BUILD_TESTING)
-	enable_testing()
-	add_subdirectory(tests)
-	add_subdirectory(examples)
-endif()
+add_subdirectory(deps)
+target_link_libraries(raii PUBLIC cthread)
+set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
 
 set(_fmt TGZ)
 if(WIN32)
@@ -78,3 +77,8 @@ include(CPack)
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 install(TARGETS ${raii} DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include)
+
+if(BUILD_TESTING)
+	add_subdirectory(tests)
+	add_subdirectory(examples)
+endif()

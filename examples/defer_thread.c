@@ -18,7 +18,7 @@ static unsigned int names[max_threads];
 static thrd_t threads[max_threads];
 
 void defer_capture(void *arg) {
-    thrd_t thrd = (thrd_t)raii_value(arg).max_size;
+    thrd_t thrd = raii_value(arg).thread;
     if (thrd_success != thrd_join(thrd, NULL)) {
         puts("main: thrd_join failure");
         thrd_exit(EXIT_FAILURE);
@@ -55,7 +55,6 @@ int do_work(void *namep) {
 
 static void cleanup_threads(void) {
     printf(".cleanup: %p\n", (void *)threads);
-    *threads = 0;
 }
 
 int main(int argc, char **argv) {

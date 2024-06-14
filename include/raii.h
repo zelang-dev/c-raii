@@ -25,12 +25,9 @@
 #endif
 
 #include "exception.h"
+#include "cthread.h"
 #include <stdio.h>
 #include <time.h>
-
-#ifndef HAS_C11_THREADS
-    #include "cthread.h"
-#endif
 
 #ifdef __cplusplus
     extern "C" {
@@ -112,6 +109,7 @@ typedef union {
     unsigned long u_long;
     long long long_long;
     size_t max_size;
+    thrd_t thread;
     float point;
     double precision;
     bool boolean;
@@ -169,6 +167,7 @@ struct memory_s {
     const char *volatile panic;
     bool is_protected;
     bool is_arena;
+    bool is_emulated;
     ex_ptr_t *protector;
     defer_t defer;
     size_t mid;
@@ -471,26 +470,10 @@ are only valid between these sections.
     #define end_trying ex_end_try
 #endif
 
-#ifdef __TINYC__
-    #undef emulate_tls
-    #define emulate_tls 1
-#endif
+thrd_local_create(memory_t, raii)
+thrd_local_create(ex_context_t, except)
+thread_storage_create(ex_context_t, local_except)
 
-#ifdef emulate_tls
-    #define thrd_local_init(type, var)          \
-        static type thrd_##var##_tls = NULL;    \
-        tss_t thrd_##var##_tss = 0;
-    #define thrd_local(type, var, prefix)       \
-        prefix tss_t thrd_##var##_tss;
-    #define thrd_local_api(type, var) thrd_local(type, var, C_API)
-#else
-    #define thrd_local_init(type, var)  thread_local type thrd_##var##_tls = NULL;
-    #define thrd_local(type, var, prefix)   prefix thread_local type thrd_##var##_tls;
-    #define thrd_local_api(type, var)    thrd_local(type, var, C_API)
-#endif
-
-thrd_local_api(memory_t*, raii)
-thrd_local_api(ex_context_t *, except)
 typedef struct arena_s *arena_t;
 struct arena_s {
     raii_type type;
@@ -535,6 +518,8 @@ C_API void thrd_defer(func_t, void *);
 C_API void *thrd_unique(size_t);
 C_API void *thrd_get(void);
 C_API void *thrd_alloc(size_t);
+C_API void *thrd_malloc(size_t);
+C_API unique_t *thrd_scope(void);
 
 #ifdef __cplusplus
     }

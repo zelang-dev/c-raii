@@ -29,8 +29,8 @@
     #endif
 #endif
 
+#include "rpmalloc.h"
 #if !defined(RAII_MALLOC) || !defined(RAII_FREE) || !defined(RAII_REALLOC)|| !defined(RAII_CALLOC)
-  #include <stdlib.h>
   #define RAII_MALLOC malloc
   #define RAII_FREE free
   #define RAII_REALLOC realloc
@@ -100,7 +100,10 @@
     #define C_API extern
 #endif
 
-#if !defined(thread_local) /* User can override thread_local for obscure compilers */
+#ifdef __TINYC__
+    #undef emulate_tls
+    #define emulate_tls 1
+#elif !defined(thread_local) /* User can override thread_local for obscure compilers */
      /* Running in multi-threaded environment */
     #if defined(__STDC__) /* Compiling as C Language */
       #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
@@ -200,13 +203,13 @@ enum {
 #define EX_NAME(e) EX_CAT(ex_err_, e)
 #define EX_PNAME(p) EX_CAT(ex_protected_, p)
 
-#define EX_MAKE()                                              \
+#define EX_MAKE()                                               \
     const char *const err = ((void)err, ex_err.ex);             \
     const char *const err_file = ((void)err_file, ex_err.file); \
     const int err_line = ((void)err_line, ex_err.line)
 
-#define EX_MAKE_IF()                                              \
-    const char *const err = ((void)err, !is_empty((void *)ex_err.panic) ? ex_err.panic : ex_err.ex);             \
+#define EX_MAKE_IF()                                            \
+    const char *const err = ((void)err, !is_empty((void *)ex_err.panic) ? ex_err.panic : ex_err.ex);    \
     const char *const err_file = ((void)err_file, ex_err.file); \
     const int err_line = ((void)err_line, ex_err.line)
 
@@ -218,27 +221,25 @@ enum {
  /* context savings
 */
 #ifdef sigsetjmp
-#define ex_jmp_buf         sigjmp_buf
-#define ex_setjmp(buf)    sigsetjmp(buf,1)
-#define ex_longjmp(buf,st) siglongjmp(buf,st)
+    #define ex_jmp_buf  sigjmp_buf
+    #define ex_setjmp(buf)  sigsetjmp(buf,1)
+    #define ex_longjmp(buf,st)  siglongjmp(buf,st)
 #else
-#define ex_jmp_buf         jmp_buf
-#define ex_setjmp(buf)    setjmp(buf)
-#define ex_longjmp(buf,st) longjmp(buf,st)
+    #define ex_jmp_buf  jmp_buf
+    #define ex_setjmp(buf)  setjmp(buf)
+    #define ex_longjmp(buf,st)  longjmp(buf,st)
 #endif
 
-#define ex_throw_loc(E, F, L, C)           \
-    do                                  \
-    {                                   \
-        C_API const char EX_NAME(E)[]; \
-        ex_throw(EX_NAME(E), F, L, C, NULL);     \
+#define ex_throw_loc(E, F, L, C)        \
+    do {                                \
+        C_API const char EX_NAME(E)[];  \
+        ex_throw(EX_NAME(E), F, L, C, NULL);    \
     } while (0)
 
 /* An macro that stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */
 #define raii_panic(message)                                                     \
-    do                                                                          \
-    {                                                                           \
+    do {                                                                        \
         C_API const char EX_NAME(panic)[];                                      \
         ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message));  \
     } while (0)
@@ -421,6 +422,7 @@ struct ex_context_s {
     bool is_rethrown;
     bool is_guarded;
     bool is_raii;
+    bool is_emulated;
     int volatile caught;
 
     /* The handler in the stack (which is a FILO container). */
@@ -454,6 +456,7 @@ struct ex_context_s {
 /* stack of protected pointer */
 struct ex_ptr_s {
     int type;
+    bool is_emulated;
     ex_ptr_t *next;
     ex_unwind_func func;
     void **ptr;

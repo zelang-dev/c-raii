@@ -49,8 +49,8 @@ EX_EXCEPTION(stack_overflow);
 EX_EXCEPTION(invalid_handle);
 EX_EXCEPTION(bad_alloc);
 
-static thread_local ex_context_t thrd_except_buffer;
-thrd_local_init(ex_context_t *, except)
+thrd_local(ex_context_t, except)
+thread_storage(ex_context_t, local_except)
 
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
@@ -62,6 +62,28 @@ ex_unwind_func exception_unwind_func = NULL;
 ex_terminate_func exception_ctrl_c_func = NULL;
 ex_terminate_func exception_terminate_func = NULL;
 bool exception_signal_set = false;
+
+static RAII_INLINE ex_context_t *ex_local_thrd(void) {
+    return (ex_context_t *)rpmalloc_tls_get(rpmalloc_local_except_tss);
+}
+
+static ex_context_t *ex_init_local(void) {
+    ex_context_t *context = ex_local_thrd();
+    if (is_empty(context)) {
+        ex_signal_block(all);
+        context = local_except();
+        context->is_unwind = false;
+        context->is_rethrown = false;
+        context->is_guarded = false;
+        context->is_raii = false;
+        context->is_emulated = true;
+        context->caught = -1;
+        context->type = ex_context_st;
+        ex_signal_unblock(all);
+    }
+
+    return context;
+}
 
 static void ex_handler(int sig);
 #if !defined(_WIN32)
@@ -81,7 +103,7 @@ static struct {
 } ex_sig[max_ex_sig];
 
 ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
-    ex_context_t *ctx = ex_init();
+    ex_context_t *ctx = const_ptr->is_emulated ? ex_init_local() : ex_init();
     const_ptr->next = ctx->stack;
     const_ptr->func = func;
     const_ptr->ptr = ptr;
@@ -92,7 +114,10 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
     const_ptr->type = -1;
-    ex_local()->stack = const_ptr->next;
+    if (const_ptr->is_emulated)
+        ex_local_thrd()->stack = const_ptr->next;
+    else
+        ex_local()->stack = const_ptr->next;
 }
 
 static void ex_unwind_stack(ex_context_t *ctx) {
@@ -105,6 +130,8 @@ static void ex_unwind_stack(ex_context_t *ctx) {
         exception_unwind_func(ctx->data);
     } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_local()) {
         raii_deferred_clean();
+    } else if (ctx->is_emulated) {
+        raii_deferred_free(thrd_scope());
     } else {
         while (p && p->type == ex_protected_st) {
             if ((got_uncaught_exception = (temp == *p->ptr)))
@@ -142,15 +169,15 @@ static void ex_print(ex_context_t *exception, const char *message) {
     fflush(stderr);
 }
 
-void ex_unwind_set(ex_context_t *ctx, bool flag) {
+RAII_INLINE void ex_unwind_set(ex_context_t *ctx, bool flag) {
     ctx->is_unwind = flag;
 }
 
-void ex_data_set(ex_context_t *ctx, void *data) {
+RAII_INLINE void ex_data_set(ex_context_t *ctx, void *data) {
     ctx->data = data;
 }
 
-void *ex_data_get(ex_context_t *ctx, void *data) {
+RAII_INLINE void *ex_data_get(ex_context_t *ctx, void *data) {
     return ctx->data;
 }
 
@@ -159,7 +186,7 @@ void ex_swap_set(ex_context_t *ctx, void *data) {
     ctx->data = data;
 }
 
-void ex_swap_reset(ex_context_t *ctx) {
+RAII_INLINE void ex_swap_reset(ex_context_t *ctx) {
     ctx->data = ctx->prev;
 }
 
@@ -169,41 +196,46 @@ void ex_flags_reset(void) {
 }
 
 RAII_INLINE ex_context_t *ex_local(void) {
-#ifdef emulate_tls
-    return tss_get(thrd_except_tss);
-#else
-    return thrd_except_tls;
-#endif
+    thrd_local_return(ex_context_t, except)
 }
 
-RAII_INLINE void ex_update(ex_context_t *context) {
+void ex_update(ex_context_t *context) {
+    if (context->is_emulated) {
+        if (rpmalloc_tls_set(rpmalloc_local_except_tss, context) != thrd_success)
+            raii_panic("Except `tss_set` failed!");
+    } else if (!context->is_emulated) {
 #ifdef emulate_tls
-    if (tss_set(thrd_except_tss, context) != thrd_success)
-        raii_panic("Except `tss_set` failed!");
+        if (tss_set(thrd_except_tss, context) != thrd_success)
+            raii_panic("Except `tss_set` failed!");
 #else
-    thrd_except_tls = context;
+        thrd_except_tls = context;
 #endif
+    }
 }
 
 ex_context_t *ex_init(void) {
-    if (is_empty(ex_local())) {
-        ex_signal_block(all);
+    ex_context_t *context = ex_local_thrd();
+    if (is_empty(context)) {
+        if (is_empty(context = ex_local())) {
+            ex_signal_block(all);
 #ifdef emulate_tls
-        thrd_except_tls = try_calloc(1, sizeof(ex_context_t));
-        thrd_except_buffer = thrd_except_tls;
+            thrd_except_buffer = except();
 #else
-        ex_update(&thrd_except_buffer);
+            thrd_except_tls = &thrd_except_buffer;
 #endif
-        thrd_except_tls->is_unwind = false;
-        thrd_except_tls->is_rethrown = false;
-        thrd_except_tls->is_guarded = false;
-        thrd_except_tls->is_raii = false;
-        thrd_except_tls->caught = -1;
-        thrd_except_tls->type = ex_context_st;
-        ex_signal_unblock(all);
+            context = ex_local();
+            context->is_unwind = false;
+            context->is_rethrown = false;
+            context->is_guarded = false;
+            context->is_raii = false;
+            context->is_emulated = false;
+            context->caught = -1;
+            context->type = ex_context_st;
+            ex_signal_unblock(all);
+        }
     }
 
-    return ex_local();
+    return context;
 }
 
 int ex_uncaught_exception(void) {
@@ -256,7 +288,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
 
-    if (ctx == &thrd_except_buffer)
+    if (ctx == (ctx->is_emulated ? ex_local_thrd() : &thrd_except_buffer))
         ex_terminate();
 
 #ifdef _WIN32

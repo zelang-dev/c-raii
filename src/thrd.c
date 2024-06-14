@@ -14,8 +14,12 @@ static void thrd_arena_delete(void) {
     thrd_arena_tss = 0;
 }
 
-void thrd_defer(func_t func, void *arg) {
-    raii_deferred(raii_local(), func, arg);
+RAII_INLINE unique_t *thrd_scope(void) {
+    return (unique_t *)tss_get(thrd_arena_tss);
+}
+
+RAII_INLINE void thrd_defer(func_t func, void *arg) {
+    raii_deferred(thrd_scope(), func, arg);
 }
 
 void thrd_init(void) {
@@ -30,8 +34,10 @@ void thrd_init(void) {
             raii_panic("Thrd `tss_create` failed!");
 
         raii_deferred(thrd_arena_tls, (func_t)tss_delete, &thrd_arena_tss);
-        if (is_empty(thrd_arena_tls->protector))
+        if (is_empty(thrd_arena_tls->protector)) {
             thrd_arena_tls->protector = try_calloc(1, sizeof(ex_ptr_t));
+            thrd_arena_tls->protector->is_emulated = true;
+        }
 
         ex_protect_ptr(thrd_arena_tls->protector, thrd_arena_tls->arena, (func_t)arena_clear);
         atexit(thrd_arena_delete);
@@ -39,16 +45,20 @@ void thrd_init(void) {
 }
 
 void *thrd_unique(size_t size) {
-    if (is_empty(tss_get(thrd_arena_tss))) {
+    unique_t *scope;
+    if (is_empty(scope = tss_get(thrd_arena_tss))) {
         if (is_empty(thrd_arena_tls))
             raii_panic("Failed! Thrd not `thrd_init`");
 
-        raii_init()->arena = thrd_alloc(size);
-        if (tss_set(thrd_arena_tss, raii_local()) != thrd_success)
+        scope = unique_init();
+        scope->is_emulated = true;
+        if (tss_set(thrd_arena_tss, (void *)scope) != thrd_success)
             raii_panic("Thrd `tss_set` failed!");
+
+        scope->arena = thrd_alloc(size);
     }
 
-    return raii_local()->arena;
+    return scope->arena;
 }
 
 void *thrd_alloc(size_t size) {
@@ -60,6 +70,10 @@ void *thrd_alloc(size_t size) {
         raii_panic("Thrd `mtx_unlock` failed!");
 
     return block;
+}
+
+RAII_INLINE void *thrd_malloc(size_t size) {
+    return malloc_full(thrd_scope(), size, RAII_FREE);
 }
 
 void *thrd_get(void) {
