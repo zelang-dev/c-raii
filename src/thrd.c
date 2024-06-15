@@ -8,8 +8,15 @@ static void thrd_arena_delete(void) {
     if (is_empty(thrd_arena_tls))
         return;
 
-    raii_delete_arena(thrd_arena_tls);
+    local_except_delete();
+    if (!is_empty(thrd_arena_tls->arena))
+        arena_free((arena_t)thrd_arena_tls->arena);
+
     mtx_destroy(thrd_arena_mtx);
+
+    thrd_arena_tls->arena = NULL;
+    memset(thrd_arena_tls, -1, sizeof(thrd_arena_tls));
+    RAII_FREE(thrd_arena_tls);
     thrd_arena_tls = NULL;
     thrd_arena_tss = 0;
 }
@@ -23,6 +30,13 @@ RAII_INLINE void thrd_defer(func_t func, void *arg) {
 }
 
 void thrd_init(void) {
+    if (rpmalloc_local_except_tls == 0) {
+            rpmalloc_local_except_tls = sizeof(ex_context_t);
+            rpmalloc_initialize();
+            if (rpmalloc_tls_create(rpmalloc_local_except_tss, rp_free) != 0)
+                raii_panic("Thrd `rpmalloc_tls_create` failed!");
+    }
+
     if (is_empty(thrd_arena_tls)) {
         if (mtx_init(thrd_arena_mtx, mtx_plain) != thrd_success)
             raii_panic("Thrd `mtx_init` failed!");
@@ -34,11 +48,10 @@ void thrd_init(void) {
             raii_panic("Thrd `tss_create` failed!");
 
         raii_deferred(thrd_arena_tls, (func_t)tss_delete, &thrd_arena_tss);
-        if (is_empty(thrd_arena_tls->protector)) {
+        if (is_empty(thrd_arena_tls->protector))
             thrd_arena_tls->protector = try_calloc(1, sizeof(ex_ptr_t));
-            thrd_arena_tls->protector->is_emulated = true;
-        }
 
+        thrd_arena_tls->protector->is_emulated = true;
         ex_protect_ptr(thrd_arena_tls->protector, thrd_arena_tls->arena, (func_t)arena_clear);
         atexit(thrd_arena_delete);
     }

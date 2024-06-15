@@ -191,11 +191,10 @@ unique_t *unique_init_arena(void) {
 
 void *malloc_full(memory_t *scope, size_t size, func_t func) {
     void *arena = try_malloc(size);
-    if (is_empty(scope->protector)) {
+    if (is_empty(scope->protector))
         scope->protector = try_malloc(sizeof(ex_ptr_t));
-        scope->protector->is_emulated = scope->is_emulated;
-    }
 
+    scope->protector->is_emulated = scope->is_emulated;
     ex_protect_ptr(scope->protector, arena, func);
     scope->is_protected = true;
     scope->mid = raii_deferred(scope, func, arena);
@@ -220,11 +219,10 @@ RAII_INLINE void *malloc_arena(memory_t *scope, size_t size) {
 
 void *calloc_full(memory_t *scope, int count, size_t size, func_t func) {
     void *arena = try_calloc(count, size);
-    if (is_empty(scope->protector)) {
+    if (is_empty(scope->protector))
         scope->protector = try_calloc(1, sizeof(ex_ptr_t));
-        scope->protector->is_emulated = scope->is_emulated;
-    }
 
+    scope->protector->is_emulated = scope->is_emulated;
     ex_protect_ptr(scope->protector, arena, func);
     scope->is_protected = true;
     scope->mid = raii_deferred(scope, func, arena);
@@ -252,11 +250,10 @@ void raii_delete(memory_t *ptr) {
         return;
 
     raii_deferred_free(ptr);
-
 #ifdef emulate_tls
     bool self = true;
 #else
-    bool self = ptr != &thrd_raii_buffer;
+    bool self = ptr != (ptr->is_emulated ?  thrd_scope() : &thrd_raii_buffer);
 #endif
     if (self) {
         memset(ptr, -1, sizeof(memory_t));
