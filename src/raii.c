@@ -103,12 +103,7 @@ RAII_INLINE memory_t *raii_local(void) {
 memory_t *raii_init(void) {
     memory_t *scope;
     if (is_empty(scope = raii_local())) {
-#ifdef emulate_tls
-        thrd_raii_buffer = raii();
-#else
-        thrd_raii_tls = &thrd_raii_buffer;
-#endif
-        scope = raii_local();
+        scope = raii();
         if (UNLIKELY(raii_deferred_init(&scope->defer) < 0))
             raii_panic("Deferred initialization failed!");
 
@@ -456,13 +451,13 @@ bool raii_caught(const char *err) {
     memory_t *scope = raii_init();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
 
-    if (exception == NULL && is_str_eq(err, ex_init()->ex)) {
-        ex_init()->state = ex_catch_st;
+    if (exception == NULL && is_str_eq(err, ex_local()->ex)) {
+        ex_local()->state = ex_catch_st;
         return true;
     }
 
     if ((scope->is_recovered = is_str_eq(err, exception)))
-        ex_init()->state = ex_catch_st;
+        ex_local()->state = ex_catch_st;
 
     return scope->is_recovered;
 }
@@ -478,7 +473,7 @@ bool raii_is_caught(memory_t *scope, const char *err) {
 const char *raii_message(void) {
     memory_t *scope = raii_init();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
-    return exception == NULL ? ex_init()->ex : exception;
+    return exception == NULL ? ex_local()->ex : exception;
 }
 
 RAII_INLINE const char *raii_message_by(memory_t *scope) {
@@ -504,8 +499,8 @@ void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
 
 void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind) {
     raii_init()->arena = scope;
-    ex_swap_reset(ex_init());
-    ex_init()->is_guarded = false;
+    ex_swap_reset(ex_local());
+    ex_local()->is_guarded = false;
     exception_setup_func = set;
     exception_unwind_func = unwind;
 }
@@ -664,6 +659,14 @@ RAII_INLINE bool is_zero(size_t self) {
 
 RAII_INLINE bool is_empty(void *self) {
     return self == NULL;
+}
+
+RAII_INLINE bool is_true(bool self) {
+    return self == true;
+}
+
+RAII_INLINE bool is_false(bool self) {
+    return self == false;
 }
 
 RAII_INLINE bool is_str_in(const char *text, char *pattern) {

@@ -305,7 +305,7 @@ void rpmalloc_tls_delete(tls_t key) {
         key->terminated = 1;
         TlsFree(key->tss_key);
         if (key->fls_key != 0)
-        FlsFree(key->fls_key);
+            FlsFree(key->fls_key);
 
         key->fls_key = 0;
         key->tss_key = 0;

@@ -481,7 +481,9 @@ extern "C" {
 #else
 #   define thrd_local_return(type, var)    return (type *)thrd_##var##_tls;
 #   define thrd_local_get(type, var)        \
-        C11_INLINE type* var(void) {        \
+        type* var(void) {                   \
+            if (thrd_##var##_tls == NULL)   \
+                thrd_##var##_tls = &thrd_##var##_buffer;    \
             thrd_local_return(type, var)    \
         }
 

@@ -63,16 +63,15 @@ ex_terminate_func exception_ctrl_c_func = NULL;
 ex_terminate_func exception_terminate_func = NULL;
 bool exception_signal_set = false;
 
-static RAII_INLINE ex_context_t *ex_local_thrd(void) {
+RAII_INLINE ex_context_t *ex_local_emulated(void) {
     return (ex_context_t *)rpmalloc_tls_get(rpmalloc_local_except_tss);
 }
 
 static ex_context_t *ex_init_local(void) {
-    ex_context_t *context = ex_local_thrd();
+    ex_context_t *context = ex_local_emulated();
     if (is_empty(context)) {
         ex_signal_block(all);
         context = local_except();
-        context->is_unwind = false;
         context->is_rethrown = false;
         context->is_guarded = false;
         context->is_raii = false;
@@ -103,7 +102,7 @@ static struct {
 } ex_sig[max_ex_sig];
 
 ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
-    ex_context_t *ctx = const_ptr->is_emulated ? ex_init_local() : ex_init();
+    ex_context_t *ctx = is_true(const_ptr->is_emulated) ? ex_init_local() : ex_init();
     const_ptr->next = ctx->stack;
     const_ptr->func = func;
     const_ptr->ptr = ptr;
@@ -114,8 +113,8 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
     const_ptr->type = -1;
-    if (const_ptr->is_emulated)
-        ex_local_thrd()->stack = const_ptr->next;
+    if (is_true(const_ptr->is_emulated))
+        ex_local_emulated()->stack = const_ptr->next;
     else
         ex_local()->stack = const_ptr->next;
 }
@@ -130,7 +129,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
         exception_unwind_func(ctx->data);
     } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_local()) {
         raii_deferred_clean();
-    } else if (ctx->is_emulated) {
+    } else if (is_true(ctx->is_emulated)) {
         raii_deferred_free(thrd_scope());
     } else {
         while (p && p->type == ex_protected_st) {
@@ -214,17 +213,11 @@ void ex_update(ex_context_t *context) {
 }
 
 ex_context_t *ex_init(void) {
-    ex_context_t *context = ex_local_thrd();
+    ex_context_t *context = ex_local_emulated();
     if (is_empty(context)) {
         if (is_empty(context = ex_local())) {
             ex_signal_block(all);
-#ifdef emulate_tls
-            thrd_except_buffer = except();
-#else
-            thrd_except_tls = &thrd_except_buffer;
-#endif
-            context = ex_local();
-            context->is_unwind = false;
+            context = except();
             context->is_rethrown = false;
             context->is_guarded = false;
             context->is_raii = false;
@@ -288,7 +281,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
 
-    if (ctx == (ctx->is_emulated ? ex_local_thrd() : &thrd_except_buffer))
+    if (ctx == (is_true(ctx->is_emulated) ? ex_local_emulated() : &thrd_except_buffer))
         ex_terminate();
 
 #ifdef _WIN32

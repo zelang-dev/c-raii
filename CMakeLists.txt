@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 2.8...3.14)
 
-project(c-raii LANGUAGES C)
+project(
+    raii
+    VERSION 1.0.0
+    DESCRIPTION "An general RAII implementation for C, with Defer, and custom rpmalloc."
+    HOMEPAGE_URL "https://github.com/zelang-dev/c-raii"
+    LANGUAGES C
+)
 
 set(C_STANDARD 89)
 
@@ -37,11 +43,6 @@ else()
     add_library(raii STATIC ${raii_files})
 endif()
 
-target_include_directories(raii PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-
 if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
@@ -54,6 +55,15 @@ endif()
 add_subdirectory(deps)
 target_link_libraries(raii PUBLIC cthread)
 set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
+
+target_include_directories(raii PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/raii.h)
 
 set(_fmt TGZ)
 if(WIN32)
@@ -70,8 +80,8 @@ set(CPACK_NSIS_MODIFY_PATH ON)
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
 
-set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/c-raii")
-set(CPACK_PACKAGE_VERSION 0.0.0)
+set(CPACK_PACKAGE_VENDOR ${PROJECT_HOMEPAGE_URL})
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 include(CPack)
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})

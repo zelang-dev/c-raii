@@ -100,7 +100,7 @@
     #define C_API extern
 #endif
 
-#ifdef __TINYC__
+#if defined(__TINYC__) || defined(USE_EMULATED_TLS)
     #undef emulate_tls
     #define emulate_tls 1
 #elif !defined(thread_local) /* User can override thread_local for obscure compilers */
@@ -157,6 +157,7 @@ C_API int ex_uncaught_exception(void);
 C_API void ex_terminate(void);
 C_API ex_context_t *ex_init(void);
 C_API ex_context_t *ex_local(void);
+C_API ex_context_t *ex_local_emulated(void);
 C_API void ex_update(ex_context_t *);
 C_API void ex_unwind_set(ex_context_t *ctx, bool flag);
 C_API void ex_data_set(ex_context_t *ctx, void *data);
@@ -269,9 +270,7 @@ throws an exception of given message. */
         ex_signal_setup();                  \
     /* local context */                     \
     ex_context_t ex_err;                    \
-    if (!ex_local())                        \
-        ex_init();                          \
-    ex_err.next = ex_local();               \
+    ex_err.next = ex_init();               \
     ex_err.stack = 0;                       \
     ex_err.ex = 0;                          \
     ex_err.unstack = 0;                     \
@@ -300,7 +299,7 @@ throws an exception of given message. */
 
 #define ex_end_try                          \
     }										\
-    if (ex_local() == &ex_err)              \
+    if (ex_local() == &ex_err || ex_local_emulated() == &ex_err)  \
         /* global context updated */        \
         ex_update(ex_err.next);             \
     ex_err.caught = -1;                     \
@@ -348,9 +347,7 @@ throws an exception of given message. */
         ex_signal_setup();                  \
     /* local context */                     \
     ex_context_t ex_err;                    \
-    if (!ex_local())                        \
-        ex_init();                          \
-    ex_err.next = ex_local();               \
+    ex_err.next = ex_init();                \
     ex_err.stack = 0;                       \
     ex_err.ex = 0;                          \
     ex_err.unstack = 0;                     \
@@ -391,7 +388,7 @@ throws an exception of given message. */
 #define ex_end_try                            \
     }                                      \
     }                                      \
-    if (ex_local() == &ex_err)             \
+    if (ex_local() == &ex_err || ex_local_emulated() == &ex_err)  \
         /* global context updated */       \
         ex_update(ex_err.next);            \
     if ((ex_err.state & ex_throw_st) != 0) \

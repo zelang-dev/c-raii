@@ -1,13 +1,13 @@
 #include "raii.h"
 #include "test_assert.h"
 
-void some_function(void) {
+int some_function(void) {
     int *foo = thrd_get();
     ASSERT_NOTNULL(foo);
     ASSERT_EQ(10, *foo);
 }
 
-void some_defer_function(void *ptr) {
+int some_defer_function(void *ptr) {
     printf("thread #%d, running defer \n", *(int *)ptr);
     int *foo = thrd_get();
     ASSERT_NULL(foo);
@@ -18,10 +18,11 @@ void some_defer_function(void *ptr) {
 
 int run(void *arg) {
     int *foo = thrd_unique(8);
-    thrd_defer(some_defer_function, arg);
+    thrd_defer((func_t)some_defer_function, arg);
     ASSERT_NOTNULL(foo);
 
     *foo = 10;
+    thrd_sleep(time_spec(*(int*)arg + 1, 0));
     some_function();
 
     *foo++;

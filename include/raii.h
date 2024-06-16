@@ -330,6 +330,8 @@ C_API bool is_instance(void *);
 C_API bool is_valid(void *);
 C_API bool is_zero(size_t);
 C_API bool is_empty(void *);
+C_API bool is_true(bool);
+C_API bool is_false(bool);
 C_API bool is_str_in(const char *text, char *pattern);
 C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
@@ -469,6 +471,8 @@ are only valid between these sections.
     #define finality catch_any ex_finally
     #define end_trying ex_end_try
 #endif
+
+#define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }
 
 thrd_local_create(memory_t, raii)
 thrd_local_create(ex_context_t, except)

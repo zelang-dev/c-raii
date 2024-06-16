@@ -8,7 +8,6 @@ static void thrd_arena_delete(void) {
     if (is_empty(thrd_arena_tls))
         return;
 
-    local_except_delete();
     if (!is_empty(thrd_arena_tls->arena))
         arena_free((arena_t)thrd_arena_tls->arena);
 
@@ -19,6 +18,7 @@ static void thrd_arena_delete(void) {
     RAII_FREE(thrd_arena_tls);
     thrd_arena_tls = NULL;
     thrd_arena_tss = 0;
+    local_except_delete();
 }
 
 RAII_INLINE unique_t *thrd_scope(void) {
