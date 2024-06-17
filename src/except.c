@@ -199,10 +199,10 @@ RAII_INLINE ex_context_t *ex_local(void) {
 }
 
 void ex_update(ex_context_t *context) {
-    if (context->is_emulated) {
+    if (is_true(context->is_emulated)) {
         if (rpmalloc_tls_set(rpmalloc_local_except_tss, context) != thrd_success)
             raii_panic("Except `tss_set` failed!");
-    } else if (!context->is_emulated) {
+    } else {
 #ifdef emulate_tls
         if (tss_set(thrd_except_tss, context) != thrd_success)
             raii_panic("Except `tss_set` failed!");
@@ -296,7 +296,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     const char *ex = 0;
     int i;
 
-    if (!is_str_eq(ctx->ex, exception))
+    if (!is_str_eq(ctx->panic, exception))
         return EXCEPTION_EXECUTE_HANDLER;
 
     for (i = 0; i < max_ex_sig; i++) {
@@ -349,7 +349,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
             else if (ctx->is_raii)
                 raii_unwind_set(ctx, ctx->ex, ctx->panic);
 
-            if (!ctx->is_guarded)
+            if (!ctx->is_guarded || ctx->is_raii)
                 ex_unwind_stack(ctx);
             return EXCEPTION_EXECUTE_HANDLER;
         }
