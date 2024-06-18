@@ -337,6 +337,9 @@ C_API bool is_str_in(const char *text, char *pattern);
 C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void *self);
+C_API bool is_exception_emulated(ex_context_t *);
+C_API bool is_protection_emulated(ex_ptr_t *);
+C_API bool is_scope_emulated(memory_t *);
 
 C_API void *try_calloc(int, size_t);
 C_API void *try_malloc(size_t);

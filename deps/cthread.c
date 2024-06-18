@@ -152,14 +152,12 @@ int thrd_join(thrd_t thr, int *res) {
     return thrd_success;
 }
 
-int thrd_sleep(const struct timespec *ms) {
+int thrd_sleep(const struct timespec *duration, struct timespec *remaining) {
+    (void)remaining;
 #if !defined(_CTHREAD_WIN32_)
-    struct timespec req;
-    req.tv_sec = ms->tv_sec;
-    req.tv_nsec = ms->tv_nsec;
-    nanosleep(&req, NULL);
+    nanosleep(duration, NULL);
 #else
-    Sleep(time2msec(ms));
+    Sleep(time2msec(duration));
 #endif
 
     return thrd_success;

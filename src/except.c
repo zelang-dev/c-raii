@@ -102,7 +102,7 @@ static struct {
 } ex_sig[max_ex_sig];
 
 ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
-    ex_context_t *ctx = is_true(const_ptr->is_emulated) ? ex_init_local() : ex_init();
+    ex_context_t *ctx = is_protection_emulated(const_ptr) ? ex_init_local() : ex_init();
     const_ptr->next = ctx->stack;
     const_ptr->func = func;
     const_ptr->ptr = ptr;
@@ -113,7 +113,7 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
     const_ptr->type = -1;
-    if (is_true(const_ptr->is_emulated))
+    if (is_protection_emulated(const_ptr))
         ex_local_emulated()->stack = const_ptr->next;
     else
         ex_local()->stack = const_ptr->next;
@@ -129,7 +129,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
         exception_unwind_func(ctx->data);
     } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_local()) {
         raii_deferred_clean();
-    } else if (is_true(ctx->is_emulated)) {
+    } else if (is_exception_emulated(ctx)) {
         raii_deferred_free(thrd_scope());
     } else {
         while (p && p->type == ex_protected_st) {
@@ -199,7 +199,7 @@ RAII_INLINE ex_context_t *ex_local(void) {
 }
 
 void ex_update(ex_context_t *context) {
-    if (is_true(context->is_emulated)) {
+    if (is_exception_emulated(context)) {
         if (rpmalloc_tls_set(rpmalloc_local_except_tss, context) != thrd_success)
             raii_panic("Except `tss_set` failed!");
     } else {
@@ -213,7 +213,7 @@ void ex_update(ex_context_t *context) {
 }
 
 ex_context_t *ex_init(void) {
-    ex_context_t *context = ex_local_emulated();
+    ex_context_t *context = is_zero(thrd_arena_tss) ? NULL : ex_local_emulated();
     if (is_empty(context)) {
         if (is_empty(context = ex_local())) {
             ex_signal_block(all);
@@ -270,6 +270,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ctx->ex = exception;
     ctx->file = file;
     ctx->line = line;
+    ctx->is_unwind = false;
     ctx->function = function;
     ctx->panic = message;
 
@@ -281,7 +282,7 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
 
-    if (ctx == (is_true(ctx->is_emulated) ? ex_local_emulated() : &thrd_except_buffer))
+    if (ctx == (is_exception_emulated(ctx) ? ex_local_emulated() : &thrd_except_buffer))
         ex_terminate();
 
 #ifdef _WIN32
