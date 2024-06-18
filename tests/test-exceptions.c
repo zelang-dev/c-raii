@@ -138,8 +138,11 @@ int test_assert(void) {
     int caught = 0;
 
     try {
-        assert(1 == 2);
-        raise(SIGABRT);
+#ifdef _WIN32
+    raise(SIGABRT);
+#else
+    assert(1 == 2);
+#endif
     } catch (sig_abrt) {
         caught = 1;
     } end_trying;

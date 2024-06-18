@@ -1,6 +1,7 @@
 #ifndef RAII_H
 #define RAII_H
 
+#include "defines.h"
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/sys/time.h"
     #include <excpt.h>
