@@ -94,7 +94,9 @@ typedef enum {
     RAII_VALUE,
     RAII_NO_INSTANCE,
     RAII_ARENA,
-    RAII_GUARDED_STATUS
+    RAII_THREAD,
+    RAII_GUARDED_STATUS,
+    RAII_COUNT
 } raii_type;
 
 enum {

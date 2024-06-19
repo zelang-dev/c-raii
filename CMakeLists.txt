@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8...3.14)
 project(
     raii
     VERSION 1.0.0
-    DESCRIPTION "An general RAII implementation for C, with Defer, and custom rpmalloc."
+    DESCRIPTION "An general RAII implementation for C, with Defer, C11 Threads with Thread Pool, and custom malloc/heap allocation."
     HOMEPAGE_URL "https://github.com/zelang-dev/c-raii"
     LANGUAGES C
 )
@@ -14,9 +14,9 @@ include(CMakePackageConfigHelpers)
 include(CMakeDependentOption)
 include(CheckCCompilerFlag)
 include(GNUInstallDirs)
+include(GenerateExportHeader)
 include(CTest)
 
-enable_testing()
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
@@ -63,7 +63,6 @@ target_include_directories(raii PUBLIC
 
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
-set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/raii.h)
 
 set(_fmt TGZ)
 if(WIN32)
@@ -80,15 +79,95 @@ set(CPACK_NSIS_MODIFY_PATH ON)
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
 
-set(CPACK_PACKAGE_VENDOR ${PROJECT_HOMEPAGE_URL})
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-include(CPack)
+generate_export_header(${PROJECT_NAME})
+set(CPACK_SOURCE_IGNORE_FILES
+	"~$"
+	"\\\\.svn/"
+	"/CMakeFiles/"
+	"/CMakeCache*"
+	"/cmake_install\\\\.cmake$"
+	"/cmake_uninstall\\\\.cmake$"
+	"^_CPack_.*/"
+	"/CPack*"
+	"\\\\.o$"
+	"/m4/"
+	"/build/"
+	"/built/"
+)
+
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+    CACHE PATH "Location of header files" )
+
+set(SYSCONFIG_INSTALL_DIR ${CMAKE_INSTALL_SYSCONFDIR}/${PROJECT_NAME}
+    CACHE PATH "Location of configuration files" )
+
+configure_package_config_file(raiiConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/raiiConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+  PATH_VARS INCLUDE_INSTALL_DIR SYSCONFIG_INSTALL_DIR)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/raiiConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion )
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/raiiConfig.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/raiiConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME} )
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
-install(TARGETS ${raii} DESTINATION lib)
-install(DIRECTORY include/ DESTINATION include)
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+set(CPACK_PACKAGE_DIRECTORY "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/Package")
+set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME})
+set(CPACK_PACKAGE_INSTALL_DIRECTORY raii)
+
+set(CPACK_PACKAGE_CONTACT "lstubbs@zelang.dev")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Lawrence Stubbs <${CPACK_PACKAGE_CONTACT}>")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
+SET(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "Raii C library")
+SET(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "An general RAII implementation and memory/heap allocation for C.")
+
+set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
+set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
+
+set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION ${PROJECT_DESCRIPTION})
+
+set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
+install(
+    TARGETS ${PROJECT_NAME} cthread
+    EXPORT "${PROJECT_NAME}Targets"
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(
+    EXPORT "${PROJECT_NAME}Targets"
+    FILE "${PROJECT_NAME}Targets.cmake"
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+
+install(TARGETS ${PROJECT_NAME} DESTINATION lib)
+if(WIN32)
+    install(DIRECTORY include/ DESTINATION include)
+else()
+    install(FILES
+ include/cthread.h
+ include/defines.h
+ include/exception.h
+ include/raii.h
+ include/rpmalloc.h
+    DESTINATION include)
+endif()
+include(CPack)
 
 if(BUILD_TESTING)
-	add_subdirectory(tests)
-	add_subdirectory(examples)
+    enable_testing()
+    add_subdirectory(tests)
+    add_subdirectory(examples)
 endif()
