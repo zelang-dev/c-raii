@@ -29,12 +29,15 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
-      - name: Run test examples
+      - name: Run tests
         run: |
             cd build
             ./test-defer
             ./test-exceptions
             ./test-cthread
+            ./test-arena
+            ./test-thrd_tls.exe
+            ./test-tls.exe
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -54,7 +57,7 @@ jobs:
             cd build
             cmake .. -D BUILD_TESTING=ON -A ${{ matrix.arch }}
             cmake --build . --config Debug
-      - name: Run test examples
+      - name: Run tests
         shell: cmd
         run: |
             cd build\Debug
@@ -62,6 +65,8 @@ jobs:
             .\test-exceptions.exe
             .\test-cthread.exe
             .\test-arena.exe
+            .\test-thrd_tls.exe
+            .\test-ls.exe
 
   build-macos:
     name: macOS
@@ -77,10 +82,12 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON ..
             cmake --build .
-      - name: Run test examples
+      - name: Run tests
         run: |
             cd build
             ./test-defer
             ./test-exceptions
             ./test-cthread
             ./test-arena
+            ./test-thrd_tls.exe
+            ./test-tls.exe
