@@ -73,9 +73,6 @@ jobs:
     runs-on: macos-11
     steps:
       - uses: actions/checkout@v4
-      - name: Setup
-        run: |
-          brew install cmake
       - name: Configure & build
         run: |
             mkdir build
