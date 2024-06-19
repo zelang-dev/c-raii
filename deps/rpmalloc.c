@@ -2960,7 +2960,7 @@ rpmalloc_initialize_config(const rpmalloc_config_t* config) {
 	_memory_config.enable_huge_pages = _memory_huge_pages;
 
 #if defined(_WIN32) && (!defined(BUILD_DYNAMIC_LINK) || !BUILD_DYNAMIC_LINK)
-    if (rpmalloc_tls_create(_memory_thread_heap, _rpmalloc_thread_destructor) != 0)
+    if (rpmalloc_tls_create(_memory_thread_heap, (tls_dtor_t)_rpmalloc_thread_destructor) != 0)
         return -1;
 #else
     if (rpmalloc_tls_create(_memory_thread_heap, _rpmalloc_heap_release_raw_fc) != 0)
