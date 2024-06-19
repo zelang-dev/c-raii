@@ -17,8 +17,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 cmake_dependent_option(BUILD_TESTING
-  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" ON
-  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
+  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
+  "BUILD_TESTING;CMAKE_CURRENT_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" ON)
 
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 

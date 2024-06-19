@@ -23,8 +23,11 @@ void defer_capture(void *arg) {
         puts("main: thrd_join failure");
         thrd_exit(EXIT_FAILURE);
     }
-
+#ifdef _WIN32
+    printf("main: thread %lu joined.\n", (unsigned long)thrd.p);
+#else
     printf("main: thread %lu joined.\n", thrd);
+#endif
 }
 
 void do_print(void *name) {

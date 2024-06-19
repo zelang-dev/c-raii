@@ -213,7 +213,7 @@ void ex_update(ex_context_t *context) {
 }
 
 ex_context_t *ex_init(void) {
-    ex_context_t *context = is_zero(thrd_arena_tss) ? NULL : ex_local_emulated();
+    ex_context_t *context = is_zero((size_t)thrd_arena_tss) ? NULL : ex_local_emulated();
     if (is_empty(context)) {
         if (is_empty(context = ex_local())) {
             ex_signal_block(all);
