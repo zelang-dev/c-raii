@@ -36,8 +36,8 @@ jobs:
             ./test-exceptions
             ./test-cthread
             ./test-arena
-            ./test-thrd_tls.exe
-            ./test-tls.exe
+            ./test-thrd_tls
+            ./test-tls
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -89,5 +89,5 @@ jobs:
             ./test-exceptions
             ./test-cthread
             ./test-arena
-            ./test-thrd_tls.exe
-            ./test-tls.exe
+            ./test-thrd_tls
+            ./test-tls
