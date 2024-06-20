@@ -39,23 +39,36 @@ int mtx_timedlock(mtx_t *mtx, const struct timespec *ts) {
 #if defined(_WIN32) || (defined(_POSIX_TIMEOUTS) && (_POSIX_TIMEOUTS >= 200112L) && defined(_POSIX_THREADS) && (_POSIX_THREADS >= 200112L))
     rt = pthread_mutex_timedlock(mtx, &tts);
 #else
-    time_t expire = time(NULL);
-    expire += ts->tv_sec;
-    while (mtx_trylock(mtx) != thrd_success) {
-        time_t now = time(NULL);
-        if (expire < now)
-            return thrd_busy;
-        // busy loop!
-        thrd_yield();
-    }
+    struct timespec cur, dur;
 
-    return thrd_success;
+    /* Try to acquire the lock and, if we fail, sleep for 5ms. */
+    while ((rc = pthread_mutex_trylock(mtx)) == EBUSY) {
+        timespec_get(&cur, TIME_UTC);
+
+        if ((cur.tv_sec > ts->tv_sec) || ((cur.tv_sec == ts->tv_sec) && (cur.tv_nsec >= ts->tv_nsec))) {
+            break;
+        }
+
+        dur.tv_sec = ts->tv_sec - cur.tv_sec;
+        dur.tv_nsec = ts->tv_nsec - cur.tv_nsec;
+        if (dur.tv_nsec < 0) {
+            dur.tv_sec--;
+            dur.tv_nsec += 1000000000;
+        }
+
+        if ((dur.tv_sec != 0) || (dur.tv_nsec > 5000000)) {
+            dur.tv_sec = 0;
+            dur.tv_nsec = 5000000;
+        }
+
+        nanosleep(&dur, NULL);
+}
 #endif
 
     if (rt == 0)
         return thrd_success;
 
-    return (rt == ETIMEDOUT) ? thrd_timedout : thrd_error;
+    return (rt == ETIMEDOUT || rt == EBUSY) ? thrd_timedout : thrd_error;
 }
 
 int mtx_trylock(mtx_t *mtx) {

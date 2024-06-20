@@ -299,7 +299,7 @@ throws an exception of given message. */
 
 #define ex_end_try                          \
     }										\
-    if (ex_local() == &ex_err || ex_local_emulated() == &ex_err)  \
+    if (ex_init() == &ex_err)  \
         /* global context updated */        \
         ex_update(ex_err.next);             \
     ex_err.caught = -1;                     \
@@ -388,7 +388,7 @@ throws an exception of given message. */
 #define ex_end_try                            \
     }                                      \
     }                                      \
-    if (ex_local() == &ex_err || ex_local_emulated() == &ex_err)  \
+    if (ex_init() == &ex_err)  \
         /* global context updated */       \
         ex_update(ex_err.next);            \
     if ((ex_err.state & ex_throw_st) != 0) \
