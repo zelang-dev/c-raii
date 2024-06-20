@@ -35,7 +35,23 @@ int mtx_timedlock(mtx_t *mtx, const struct timespec *ts) {
     int rt;
     tts.tv_sec = ts->tv_sec;
     tts.tv_nsec = ts->tv_nsec;
+
+#if defined(_WIN32) || (defined(_POSIX_TIMEOUTS) && (_POSIX_TIMEOUTS >= 200112L) && defined(_POSIX_THREADS) && (_POSIX_THREADS >= 200112L))
     rt = pthread_mutex_timedlock(mtx, &tts);
+#else
+    time_t expire = time(NULL);
+    expire += ts->tv_sec;
+    while (mtx_trylock(mtx) != thrd_success) {
+        time_t now = time(NULL);
+        if (expire < now)
+            return thrd_busy;
+        // busy loop!
+        thrd_yield();
+    }
+
+    return thrd_success;
+#endif
+
     if (rt == 0)
         return thrd_success;
 
