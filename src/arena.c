@@ -92,7 +92,7 @@ void arena_clear(arena_t arena) {
 
     while (!arena->is_global && arena->prev && is_type(arena->prev, RAII_ARENA)) {
         arena_t tmp = arena->prev;
-        if (num_free < arena->threshold) {
+        if (num_free < (int)arena->threshold) {
             arena->prev->prev = free_list;
             free_list = arena->prev;
             num_free++;
