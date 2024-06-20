@@ -419,17 +419,13 @@ C_API int rpmalloc_tls_set(tls_t key, void *val);
             return NULL;                                \
         }
 
-#define thread_storage_delete(type, var)    \
-        void var##_delete(void) {           \
-            if(rpmalloc_##var##_tls != 0) { \
-                rpmalloc_##var##_tls = 0;   \
-                void *ptr = rpmalloc_tls_get(rpmalloc_##var##_tss);  \
-                if (ptr != NULL)            \
-                    rpfree(ptr);            \
-                rpmalloc_finalize();        \
-                if(rpmalloc_is_thread_initialized())            \
-                    rpmalloc_tls_delete(rpmalloc_##var##_tss);  \
-            }                               \
+#define thread_storage_delete(type, var)                        \
+        void var##_delete(void) {                               \
+            if(rpmalloc_##var##_tls != 0) {                     \
+                rpmalloc_##var##_tls = 0;                       \
+                rp_free(rpmalloc_tls_get(rpmalloc_##var##_tss)); \
+                rpmalloc_tls_delete(rpmalloc_##var##_tss);      \
+            }                                                   \
         }
 
 /* Initialize and setup thread local storage `var` name as functions. */
