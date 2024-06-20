@@ -42,7 +42,7 @@ int mtx_timedlock(mtx_t *mtx, const struct timespec *ts) {
     struct timespec cur, dur;
 
     /* Try to acquire the lock and, if we fail, sleep for 5ms. */
-    while ((rc = pthread_mutex_trylock(mtx)) == EBUSY) {
+    while ((rt = pthread_mutex_trylock(mtx)) == EBUSY) {
         timespec_get(&cur, TIME_UTC);
 
         if ((cur.tv_sec > ts->tv_sec) || ((cur.tv_sec == ts->tv_sec) && (cur.tv_nsec >= ts->tv_nsec))) {
@@ -62,7 +62,7 @@ int mtx_timedlock(mtx_t *mtx, const struct timespec *ts) {
         }
 
         nanosleep(&dur, NULL);
-}
+    }
 #endif
 
     if (rt == 0)
