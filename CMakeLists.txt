@@ -18,10 +18,6 @@ include(GenerateExportHeader)
 include(CTest)
 
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
-if(WIN32 AND $ENV{Platform} STREQUAL x86)
-    message("Building Windows x86-32bit")
-    add_definitions(-D_WIN32_PLATFORM_X86=1)
-endif()
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
@@ -36,6 +32,13 @@ option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) 
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
+if(WIN32)
+    if($ENV{Platform} STREQUAL x86)
+        message("Building Windows x86-32bit")
+        add_definitions(-D_WIN32_PLATFORM_X86=1)
+    endif()
+endif()
 
 file(GLOB raii_files
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
