@@ -33,7 +33,7 @@ void thrd_init(void) {
     if (rpmalloc_local_except_tls == 0) {
             rpmalloc_local_except_tls = sizeof(ex_context_t);
             rpmalloc_initialize();
-            if (rpmalloc_tls_create(rpmalloc_local_except_tss, rp_free) != 0)
+            if (rpmalloc_tls_create(&rpmalloc_local_except_tss, rp_free) != 0)
                 raii_panic("Thrd `rpmalloc_tls_create` failed!");
     }
 
