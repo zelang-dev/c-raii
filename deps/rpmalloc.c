@@ -854,31 +854,29 @@ static inline uintptr_t
 get_thread_id(void) {
 #if defined(_WIN32)
 	return (uintptr_t)((void*)NtCurrentTeb());
-#elif (defined(__GNUC__) || defined(__clang__)) && !defined(__CYGWIN__)
-	uintptr_t tid;
+#else
+    uintptr_t tid;
 #  if defined(__i386__)
-	__asm__("movl %%gs:0, %0" : "=r" (tid) : : );
+    __asm__("movl %%gs:0, %0" : "=r" (tid) : : );
 #  elif defined(__x86_64__)
 #    if defined(__MACH__)
-	__asm__("movq %%gs:0, %0" : "=r" (tid) : : );
+    __asm__("movq %%gs:0, %0" : "=r" (tid) : : );
 #    else
-	__asm__("movq %%fs:0, %0" : "=r" (tid) : : );
+    __asm__("movq %%fs:0, %0" : "=r" (tid) : : );
 #    endif
 #  elif defined(__arm__)
-	__asm__ volatile ("mrc p15, 0, %0, c13, c0, 3" : "=r" (tid));
+    __asm__ volatile ("mrc p15, 0, %0, c13, c0, 3" : "=r" (tid));
 #  elif defined(__aarch64__)
 #    if defined(__MACH__)
-	// tpidr_el0 likely unused, always return 0 on iOS
-	__asm__ volatile ("mrs %0, tpidrro_el0" : "=r" (tid));
+    // tpidr_el0 likely unused, always return 0 on iOS
+    __asm__ volatile ("mrs %0, tpidrro_el0" : "=r" (tid));
 #    else
-	__asm__ volatile ("mrs %0, tpidr_el0" : "=r" (tid));
+    __asm__ volatile ("mrs %0, tpidr_el0" : "=r" (tid));
 #    endif
 #  else
-#    error This platform needs implementation of get_thread_id()
+    tid = (uintptr_t)pthread_self();
 #  endif
 	return tid;
-#else
-#    error This platform needs implementation of get_thread_id()
 #endif
 }
 
