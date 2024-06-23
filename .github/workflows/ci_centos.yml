@@ -11,8 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    container: centos:stream9
     steps:
+      - uses: lkiesow/setup-lxc-container@v1
+        id: redhat
+        with:
+          dist: centos
+          release: 9-Stream
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Prepare
