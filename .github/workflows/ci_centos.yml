@@ -19,12 +19,9 @@ jobs:
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
           sed -i "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*
-          dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y
-          /usr/bin/crb enable
           dnf install centos-release-stream -y
-          dnf swap centos-{linux,stream}-repos -y
+          dnf --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos
           dnf distro-sync -y
-          dnf install https://rpms.remirepo.net/enterprise/remi-release-8.rpm -y
           dnf update -y
           dnf install yum-utils -y
           dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison re2c automake libxml2-devel sudo libuv-devel which -y
