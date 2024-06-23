@@ -11,16 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    container: centos:latest
+    container: centos:stream9
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Prepare
         run: |
-          dnf --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos
-          dnf distro-sync -y
-          dnf update -y
-          dnf install yum-utils -y
           dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison re2c automake libxml2-devel sudo libuv-devel which -y
       - name: Configure & build
         run: |
