@@ -29,6 +29,9 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           distro:  ubuntu_latest
+          githubToken: ${{ github.token }}
+          setup: |
+            mkdir -p "${PWD}/artifacts"
           install: |
             apt-get update -q -y
             apt-get install -q -y --no-install-recommends cmake build-essential
@@ -47,3 +50,6 @@ jobs:
             ./test-arena
             ./test-thrd_tls
             ./test-tls
+      - name: Show the artifact
+        run: |
+          ls -al "${PWD}/artifacts"
