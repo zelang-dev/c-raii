@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-ubuntu:
     name: Linux ${{ matrix.target }}
     runs-on: ubuntu-latest
     strategy:

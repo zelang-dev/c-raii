@@ -1,0 +1,35 @@
+name: CentOS Stream
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-centos:
+    name: CentOS
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    container: centos:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Prepare
+        run: |
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison re2c automake libxml2-devel sudo libuv-devel which -y
+      - name: Configure & build
+        run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON ..
+            cmake --build .
+      - name: Run tests
+        run: |
+            cd build
+            ./test-defer
+            ./test-exceptions
+            ./test-cthread
+            ./test-arena
+            ./test-thrd_tls
+            ./test-tls
