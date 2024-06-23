@@ -17,6 +17,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Prepare
         run: |
+          sed -i "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*
+          dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y
+          /usr/bin/crb enable
+          dnf install centos-release-stream -y
+          dnf swap centos-{linux,stream}-repos -y
+          dnf distro-sync -y
+          dnf install https://rpms.remirepo.net/enterprise/remi-release-8.rpm -y
+          dnf update -y
+          dnf install yum-utils -y
           dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison re2c automake libxml2-devel sudo libuv-devel which -y
       - name: Configure & build
         run: |
