@@ -4,7 +4,7 @@ project(
     raii
     VERSION 1.0.0
     DESCRIPTION "An general RAII implementation for C, with Defer, C11 Threads with Thread Pool, and custom malloc/heap allocation."
-    HOMEPAGE_URL "https://github.com/zelang-dev/c-raii"
+    HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
 )
 
@@ -144,6 +144,9 @@ set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_DESCRIPTION ${PROJECT_DESCRIPTION})
+
+set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+set(CPACK_RPM_PACKAGE_URL "https://zelang-dev.github.io/c-raii/")
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 install(

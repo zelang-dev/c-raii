@@ -1,0 +1,80 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-windows:
+    name: Windows (${{ matrix.config.target }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {target: x64,     build: win64 }
+          - {target: Win32,   build: win32 }
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.config.target }}
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: |
+            mkdir build
+            cd build
+            cmake .. -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -A ${{ matrix.config.target }}
+      - name: Build
+        run: |
+            cd build
+            cmake --build . --config Release
+      - name: Create NSIS Installer from Release
+        run: cpack -G NSIS . --config Release
+      - name: Upload the windows binary artifacts
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: built/Package/raii-${{ github.ref }}-${{ matrix.config.build }}.exe
+          asset_name: raii-${{ github.ref }}-${{ matrix.config.build }}.exe
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
+          body: "Windows NSIS ${{ matrix.config.build }} Raii libraries and header *.h files Installer."
+
+  build-linux:
+    name: Linux ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: amd64
+            flags: -m64
+          - target: i386
+            flags: -m32
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -q -y
+          sudo apt-get install -y gcc-multilib g++-multilib valgrind libc6-dbg libc6-dbg:i386
+      - name: Configure & build
+        run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake --build .
+            ls ../built/Package
+      - name: Create DEB Installer from Release
+        run: cpack -G DEB . --config Release
+      - name: Upload the windows binary artifacts
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: built/Package/raii_${{ github.ref }}_${{ matrix.target }}.deb
+          asset_name: raii_${{ github.ref }}_${{ matrix.target }}.deb
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
+          body: "Ubuntu/Debian $${{ matrix.target }} Raii libraries and header *.h files Installer."
