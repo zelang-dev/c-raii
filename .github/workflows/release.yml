@@ -8,6 +8,8 @@ jobs:
   build-windows:
     name: Windows (${{ matrix.config.target }})
     runs-on: windows-latest
+    permissions:
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +48,8 @@ jobs:
   build-linux:
     name: Linux ${{ matrix.config.target }}
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +67,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.config.flags }} -A ${{ matrix.config.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.config.flags }} ..
             cmake --build .
       - name: Create DEB Installer from Release
         run: |
