@@ -1,6 +1,8 @@
 # c-raii
 
 [![windows & linux & macos](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml)
+[![centos](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml)
+[![various cpu's](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml)
 
 An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety, _smarty!_
 
@@ -384,12 +386,12 @@ The build system uses **cmake**, by default produces **static** library stored u
 
 ```c
 if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D NDEBUG")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
 endif()
 
 if(WIN32)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D NDEBUG")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG")
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
@@ -403,7 +405,7 @@ target_link_libraries(project PUBLIC raii)
 ```shell
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -DBUILD_TESTING=ON # use to build tests and examples
+cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF # use to not build tests and examples
 cmake --build .
 ```
 
@@ -412,7 +414,7 @@ cmake --build .
 ```shell
 mkdir build
 cd build
-cmake .. -D BUILD_TESTING=ON # use to build tests and examples
+cmake .. -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF # use to not build tests and examples
 cmake --build . --config Debug/Release
 ```
 

@@ -1,4 +1,4 @@
-name: Windows & Linux & macOS
+name: Windows & Ubuntu & Apple macOS
 on:
   pull_request:
     branches: [ main ]
@@ -27,7 +27,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run tests
         run: |
@@ -55,7 +55,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -D BUILD_TESTING=ON -A ${{ matrix.arch }}
+            cmake .. -A ${{ matrix.arch }}
             cmake --build . --config Debug
       - name: Run tests
         shell: cmd
@@ -77,7 +77,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON ..
+            cmake -DCMAKE_BUILD_TYPE=Debug ..
             cmake --build .
       - name: Run tests
         run: |
