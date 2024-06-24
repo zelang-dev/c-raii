@@ -20,6 +20,8 @@ This library has been decoupled from [c-coroutine](https://zelang-dev.github.io/
 
 In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), and [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [c-coroutine](https://github.com/zelang-dev/c-coroutine).
 
+This library uses an custom version of [rpmalloc](https://github.com/mjansson/rpmalloc) for **malloc/heap** allocation, not **C11** compiler `thread local` dependant, nor **C++** focus, _removed_. The customization is merged with required [cthread](https://github.com/zelang-dev/cthread) for **C11** _thread like emulation_.
+
 - The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's C** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
 
 The planned implementation from [defer reference implementation for C](https://gustedt.gitlabpages.inria.fr/defer/):
@@ -223,6 +225,7 @@ C_API unique_t *unique_init(void);
 
 > This system use macros `RAII_MALLOC`, `RAII_FREE`, `RAII_REALLOC`, and `RAII_CALLOC`.
 > If not **defined**, the default __malloc/calloc/realloc/free__ are used when expanded.
+> The expansion thereto points to custom replacement allocation routines **rpmalloc**.
 
 ### The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.
 
