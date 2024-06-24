@@ -4,15 +4,13 @@ on:
   release:
     types: [published]
 
-permissions:
-    contents: write
-
 jobs:
   build-windows:
     name: Windows (${{ matrix.config.target }})
-    runs-on: windows-latest
     permissions:
-      packages: write
+        contents: write
+        packages: write
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
@@ -50,9 +48,10 @@ jobs:
 
   build-linux:
     name: Linux ${{ matrix.config.target }}
-    runs-on: ubuntu-latest
     permissions:
-      packages: write
+        contents: write
+        packages: write
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
