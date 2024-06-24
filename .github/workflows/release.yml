@@ -36,24 +36,22 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/raii-${{ github.ref }}-${{ matrix.config.build }}.exe
-          asset_name: raii-${{ github.ref }}-${{ matrix.config.build }}.exe
+          file: built/Package/raii-${{ github.event.release.tag_name }}-${{ matrix.config.build }}.exe
+          asset_name: raii-${{ github.event.release.tag_name }}-${{ matrix.config.build }}.exe
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
           body: "Windows NSIS ${{ matrix.config.build }} Raii libraries and header *.h files Installer."
 
   build-linux:
-    name: Linux ${{ matrix.target }}
+    name: Linux ${{ matrix.config.target }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: amd64
-            flags: -m64
-          - target: i386
-            flags: -m32
+        config:
+            - {target: amd64, flags: -m64 }
+            - {target: i386, flags: -m32 }
     steps:
       - uses: actions/checkout@v4
       - name: Prepare
@@ -65,7 +63,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.config.flags }} -A ${{ matrix.config.flags }} ..
             cmake --build .
       - name: Create DEB Installer from Release
         run: |
@@ -76,9 +74,9 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/raii_${{ github.ref }}_${{ matrix.target }}.deb
-          asset_name: raii_${{ github.ref }}_${{ matrix.target }}.deb
+          file: built/Package/raii_${{ github.event.release.tag_name }}_${{ matrix.config.target }}.deb
+          asset_name: raii_${{ github.event.release.tag_name }}_${{ matrix.config.target }}.deb
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Ubuntu/Debian $${{ matrix.target }} Raii libraries and header *.h files Installer."
+          body: "Ubuntu/Debian $${{ matrix.config.target }} Raii libraries and header *.h files Installer."
