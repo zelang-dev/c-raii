@@ -44,7 +44,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Windows NSIS ${{ matrix.config.build }} Raii libraries and header *.h files Installer."
+          body: "Variuos platform library/package installers, includes static libraries and needed header *.h files."
 
   build-linux:
     name: Linux ${{ matrix.config.target }}
@@ -57,7 +57,7 @@ jobs:
       matrix:
         config:
             - {target: amd64, flags: -m64 }
-            - {target: i386, flags: -m32 }
+         #   - {target: i386, flags: -m32 }
     steps:
       - uses: actions/checkout@v4
       - name: Prepare
@@ -69,13 +69,12 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.config.flags }} ..
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.config.flags }}
             cmake --build .
       - name: Create DEB Installer from Release
         run: |
             cd build
             cpack -G DEB
-            ls ../built/Package
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -85,4 +84,48 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Ubuntu/Debian $${{ matrix.config.target }} Raii libraries and header *.h files Installer."
+          body: "Variuos platform library/package installers, includes static libraries and needed header *.h files."
+
+  build-centos:
+    name: CentOS
+    permissions:
+        contents: write
+        packages: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    container: quay.io/centos/centos:stream9
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Prepare
+        run: |
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which -y
+      - name: Configure & build
+        run: |
+            mkdir build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF
+            cmake --build .
+      - name: Create RPM Installer from Release
+        run: |
+            cd build
+            cpack -G RPM
+            ls ../built/Package
+
+  build-macos:
+    name: macOS
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure & build
+        run: |
+            mkdir build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF
+            cmake --build .
+      - name: Create DMG Installer from Release
+        run: |
+            cd build
+            cpack -G DMG
+            ls ../built/Package
