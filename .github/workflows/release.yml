@@ -100,7 +100,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Prepare
         run: |
-          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which -y
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint -y
       - name: Configure & build
         run: |
             mkdir build
