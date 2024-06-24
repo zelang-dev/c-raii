@@ -31,7 +31,7 @@ jobs:
       - name: Create NSIS Installer from Release
         run: |
             cd build
-            cpack -G NSIS . --config Release
+            cpack -G NSIS
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -70,7 +70,7 @@ jobs:
       - name: Create DEB Installer from Release
         run: |
             cd build
-            cpack -G DEB . --config Release
+            cpack -G DEB
             ls ../built/Package
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
