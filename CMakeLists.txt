@@ -57,8 +57,8 @@ else()
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.1.zip
- URL_HASH MD5=d40bcbbae7827f1a60adbdab00dfe905
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.2.zip
+ URL_HASH MD5=9b56baae59d4642c5d102ef42409b8da
 )
 FetchContent_MakeAvailable(threads)
 
