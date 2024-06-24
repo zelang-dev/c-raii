@@ -163,7 +163,6 @@ install(
     NAMESPACE ${PROJECT_NAME}::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
-
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
 if(WIN32)
     install(DIRECTORY include/ DESTINATION include)
@@ -176,6 +175,8 @@ else()
  include/rpmalloc.h
     DESTINATION include)
 endif()
+
+set(CPACK_INSTALL_CMAKE_CONFIGURATIONS Release)
 include(CPack)
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
