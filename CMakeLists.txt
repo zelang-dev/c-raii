@@ -15,6 +15,7 @@ include(CMakeDependentOption)
 include(CheckCCompilerFlag)
 include(GNUInstallDirs)
 include(GenerateExportHeader)
+include(FetchContent)
 include(CTest)
 
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
@@ -23,10 +24,6 @@ set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/built")
-
-cmake_dependent_option(BUILD_TESTING
-  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" ON
-  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
 
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 
@@ -59,7 +56,15 @@ else()
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
 
-add_subdirectory(deps)
+FetchContent_Declare(threads URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.0.zip)
+FetchContent_MakeAvailable(threads)
+
+FetchContent_GetProperties(threads)
+if(NOT threads_POPULATED)
+  FetchContent_Populate(threads)
+  add_subdirectory(${threads_SOURCE_DIR})
+endif()
+
 target_link_libraries(raii PUBLIC cthread)
 set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
 
@@ -173,8 +178,15 @@ else()
 endif()
 include(CPack)
 
-if(BUILD_TESTING)
-    enable_testing()
-    add_subdirectory(tests)
-    add_subdirectory(examples)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    option(BUILD_EXAMPLES   "whether or not examples should be built" ON)
+    option(BUILD_TESTS      "whether or not tests should be built" ON)
+
+    if(BUILD_EXAMPLES)
+        add_subdirectory(examples)
+    endif()
+    if(BUILD_TESTS)
+        enable_testing()
+        add_subdirectory(tests)
+    endif()
 endif()
