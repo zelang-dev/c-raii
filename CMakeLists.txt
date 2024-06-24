@@ -56,14 +56,11 @@ else()
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
 endif()
 
-FetchContent_Declare(threads URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.0.zip)
+FetchContent_Declare(threads
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.0.zip
+ URL_HASH MD5=ed576f8fe76ba25d46b0c3226fda6395
+)
 FetchContent_MakeAvailable(threads)
-
-FetchContent_GetProperties(threads)
-if(NOT threads_POPULATED)
-  FetchContent_Populate(threads)
-  add_subdirectory(${threads_SOURCE_DIR})
-endif()
 
 target_link_libraries(raii PUBLIC cthread)
 set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
