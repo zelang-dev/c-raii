@@ -29,7 +29,9 @@ jobs:
             cd build
             cmake --build . --config Release
       - name: Create NSIS Installer from Release
-        run: cpack -G NSIS . --config Release
+        run: |
+            cd build
+            cpack -G NSIS . --config Release
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -65,9 +67,11 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
-            ls ../built/Package
       - name: Create DEB Installer from Release
-        run: cpack -G DEB . --config Release
+        run: |
+            cd build
+            cpack -G DEB . --config Release
+            ls ../built/Package
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
