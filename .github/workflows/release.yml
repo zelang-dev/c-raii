@@ -44,7 +44,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Variuos platform library/package installers, includes static libraries and needed header *.h files."
+          body: "Various platform library/package installers, includes static libraries and needed header *.h files."
 
   build-linux:
     name: Linux ${{ matrix.config.target }}
@@ -84,7 +84,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Variuos platform library/package installers, includes static libraries and needed header *.h files."
+          body: "Various platform library/package installers, includes static libraries and needed header *.h files."
 
   build-centos:
     name: CentOS
@@ -111,7 +111,6 @@ jobs:
         run: |
             cd build
             cpack -G RPM
-            ls ../built/Package
       - name: Upload RPM binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -121,10 +120,13 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Variuos platform library/package installers, includes static libraries and needed header *.h files."
+          body: "Various platform library/package installers, includes static libraries and needed header *.h files."
 
   build-macos:
     name: macOS
+    permissions:
+        contents: write
+        packages: write
     runs-on: macos-12
     steps:
       - uses: actions/checkout@v4
@@ -138,4 +140,58 @@ jobs:
         run: |
             cd build
             cpack -G DragNDrop
+      - name: Upload DMG binary artifacts
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: built/Package/raii-${{ github.event.release.tag_name }}-Darwin.dmg
+          asset_name: raii-${{ github.event.release.tag_name }}-Darwin.dmg
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
+          body: "Various platform library/package installers, includes static libraries and needed header *.h files."
+
+  build-qemu:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: arm
+            arch: armv7
+          - target: aarch64
+            arch: aarch64
+          - target: ppc64v2
+            arch: ppc64le
+          - target: riscv64
+            arch: riscv64
+          - target: s390x
+            arch: s390x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.arch }}
+          distro:  ubuntu_latest
+          githubToken: ${{ github.token }}
+          setup: |
+            mkdir -p "${PWD}/artifacts"
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y --no-install-recommends cmake build-essential
+          env: |
+            # Valgrind on arm will fail if the stack size is larger than 8MB.
+            # Set QEMUs stack size to 8MB since Github runners use 16MB default.
+            QEMU_STACK_SIZE: 8388608
+          run: |
+            mkdir build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF
+            cmake --build .
+            cpack -G DEB
             ls ../built/Package
+            cp -rf ../built/Package "${PWD}/artifacts"
+      - name: Show the artifact
+        run: |
+          ls -al "${PWD}/artifacts"
