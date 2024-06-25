@@ -35,7 +35,7 @@ jobs:
         run: |
             cd build
             cpack -G NSIS
-      - name: Upload the windows binary artifacts
+      - name: Upload NSIS binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -75,7 +75,7 @@ jobs:
         run: |
             cd build
             cpack -G DEB
-      - name: Upload the windows binary artifacts
+      - name: Upload DEB binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -153,16 +153,19 @@ jobs:
 
   build-qemu:
     name: ${{ matrix.target }}
+    permissions:
+        contents: write
+        packages: write
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: arm
+          - target: armhf
             arch: armv7
-          - target: aarch64
+          - target: arm64
             arch: aarch64
-          - target: ppc64v2
+          - target: ppc64el
             arch: ppc64le
           - target: riscv64
             arch: riscv64
@@ -176,7 +179,7 @@ jobs:
           distro:  ubuntu_latest
           githubToken: ${{ github.token }}
           setup: |
-            mkdir -p "${PWD}/artifacts"
+            mkdir -p built/Package
           install: |
             apt-get update -q -y
             apt-get install -q -y --no-install-recommends cmake build-essential
@@ -190,8 +193,13 @@ jobs:
             cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF
             cmake --build .
             cpack -G DEB
-            ls ../built/Package
-            cp -rf ../built/Package "${PWD}/artifacts"
-      - name: Show the artifact
-        run: |
-          ls -al "${PWD}/artifacts"
+      - name: Upload ${{ matrix.arch }} DEB binary artifacts
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: built/Package/raii_${{ github.event.release.tag_name }}_${{ matrix.target }}.deb
+          asset_name: raii_${{ github.event.release.tag_name }}_${{ matrix.target }}.deb
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
+          body: "Various platform library/package installers, includes `static` libraries and needed header `*.h` files."
