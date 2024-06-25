@@ -111,6 +111,7 @@ jobs:
         run: |
             cd build
             cpack -G RPM
+            ls ../built/Package
       - name: Upload RPM binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -136,5 +137,5 @@ jobs:
       - name: Create DMG Installer from Release
         run: |
             cd build
-            cpack -G DMG
+            cpack -G DragNDrop
             ls ../built/Package
