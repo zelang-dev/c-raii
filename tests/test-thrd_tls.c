@@ -35,16 +35,17 @@ int run(void *arg) {
 
 int main(void) {
     thrd_t t[THREAD_COUNT];
+    int i;
     thrd_init();
 
     ASSERT_NULL(thrd_get());
-    for (int i = 0; i < THREAD_COUNT; i++) {
+    for (i = 0; i < THREAD_COUNT; i++) {
         int *n = thrd_alloc(sizeof * n);  // Holds a thread serial number
         *n = i;
         thrd_create(t + i, run, n);
     }
 
-    for (int i = 0; i < THREAD_COUNT; i++) {
+    for (i = 0; i < THREAD_COUNT; i++) {
         thrd_join(t[i], NULL);
     }
 

@@ -46,20 +46,21 @@ static int thread_test_local_storage(void *aArg) {
 
 void run_emulated_tls(void) {
     thrd_t t[THREAD_COUNT];
+    int i;
     assert(rpmalloc_gLocalVar_tls == 0);
     /* Clear the TLS variable (it should keep this value after all
        threads are finished). */
     *gLocalVar() = 1;
     assert(rpmalloc_gLocalVar_tls == sizeof(int));
 
-    for (int i = 0; i < THREAD_COUNT; i++) {
+    for (i = 0; i < THREAD_COUNT; i++) {
         int *n = C11_MALLOC(sizeof * n);  // Holds a thread serial number
             *n = i;
         /* Start a child thread that modifies gLocalVar */
         thrd_create(t + i, thread_test_local_storage, n);
     }
 
-    for (int i = 0; i < THREAD_COUNT; i++) {
+    for (i = 0; i < THREAD_COUNT; i++) {
         thrd_join(t[i], NULL);
     }
 

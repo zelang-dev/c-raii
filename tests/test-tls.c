@@ -31,18 +31,19 @@ static int thread_test_local_storage(void *aArg) {
 
 void run_tls(void) {
     thrd_t t[THREAD_COUNT];
+    int i;
     /* Clear the TLS variable (it should keep this value after all
        threads are finished). */
     *gLocalVar() = 1;
 
-    for (int i = 0; i < THREAD_COUNT; i++) {
+    for (i = 0; i < THREAD_COUNT; i++) {
         int *n = C11_MALLOC(sizeof * n);  // Holds a thread serial number
             *n = i;
         /* Start a child thread that modifies gLocalVar */
         thrd_create(t + i, thread_test_local_storage, n);
     }
 
-    for (int i = 0; i < THREAD_COUNT; i++) {
+    for (i = 0; i < THREAD_COUNT; i++) {
         thrd_join(t[i], NULL);
     }
 

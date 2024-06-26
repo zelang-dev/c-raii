@@ -65,6 +65,7 @@ int main(int argc, char **argv) {
     atexit(cleanup_threads);
     // compliant solution using threads array
     guard{
+      unsigned int i;
       puts("main: starting main guarded block");
       if (thrd_success != mtx_init(&lock, mtx_plain)) {
           exit(EXIT_FAILURE);
@@ -73,7 +74,7 @@ int main(int argc, char **argv) {
       // In that case, a panic will be triggered, but
       // the above `mtx_destroy` should still be called, followed by the
       // atexit cleanup.
-      for (unsigned int i = 0; i < max_threads; i++) {
+      for (i = 0; i < max_threads; i++) {
         names[i] = i;
         if (thrd_success != thrd_create(&threads[i], do_work, &names[i])) {
           exit(EXIT_FAILURE);

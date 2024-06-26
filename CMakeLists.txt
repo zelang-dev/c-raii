@@ -8,7 +8,7 @@ project(
     LANGUAGES C
 )
 
-set(C_STANDARD 89)
+set(CMAKE_C_STANDARD 90)
 
 include(CMakePackageConfigHelpers)
 include(CMakeDependentOption)
@@ -57,8 +57,8 @@ else()
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.2.zip
- URL_HASH MD5=9b56baae59d4642c5d102ef42409b8da
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.0.3.zip
+ URL_MD5 d1ed1cfbf6026707bf662a377a87acc5
 )
 FetchContent_MakeAvailable(threads)
 

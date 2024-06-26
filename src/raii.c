@@ -566,13 +566,13 @@ RAII_INLINE values_type args_in(args_t *params, int index) {
 }
 
 args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
-    int count = (int)strlen(desc);
+    int i, count = (int)strlen(desc);
     args_t *params = try_calloc(1, sizeof(args_t));
     raii_values_t *args = try_calloc(count, sizeof(raii_values_t));
     va_list argp;
 
     va_start(argp, desc);
-    for (int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         switch (*desc++) {
             case 'i':
                 // unsigned integer argument
