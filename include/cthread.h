@@ -91,8 +91,8 @@ extern "C" {
 #elif defined(_CTHREAD_WIN32_)
     #include <windows.h>
     #include <sys/timeb.h>
-    #include <time.h>
 #endif
+#include <time.h>
 
 /* Compiler-specific information */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
@@ -381,6 +381,12 @@ int tss_set(tss_t key, void *val);
 #endif /* HAS_C11_THREADS */
 #endif /* _CTHREAD_H_ */
 
+#if defined(__APPLE__) || defined(__MACH__)
+#include <mach/clock.h>
+#include <mach/mach.h>
+int timespec_get(struct timespec *ts, int base);
+#endif
+
 #ifndef _CTHREAD_EXTRA_H_
 #define _CTHREAD_EXTRA_H_
 
@@ -403,32 +409,6 @@ extern "C" {
 /* Public API qualifier. */
 #ifndef C_API
     #define C_API extern
-#endif
-
-#ifndef C11_INLINE
-  #ifdef _MSC_VER
-    #define C11_INLINE __forceinline
-  #elif defined(__GNUC__)
-    #if defined(__STRICT_ANSI__)
-      #define C11_INLINE __inline__ __attribute__((always_inline))
-    #else
-      #define C11_INLINE inline __attribute__((always_inline))
-    #endif
-  #elif defined(__BORLANDC__) || defined(__DMC__) || defined(__SC__) || defined(__WATCOMC__) || defined(__LCC__) ||  defined(__DECC)
-    #define C11_INLINE __inline
-  #else /* No inline support. */
-    #define C11_INLINE
-  #endif
-#endif
-
-#ifndef C11_NO_INLINE
-  #ifdef __GNUC__
-    #define C11_NO_INLINE __attribute__((noinline))
-  #elif defined(_MSC_VER)
-    #define C11_NO_INLINE __declspec(noinline)
-  #else
-    #define C11_NO_INLINE
-  #endif
 #endif
 
 #ifndef thrd_local
@@ -548,7 +528,7 @@ int thrd_add(thrd_pool_t *pool, void (*routine)(void *), void *arg);
  * @param pool  Thread pool to destroy.
  * @param flags Flags for shutdown
  *
- * Known values for flags are 0 (default) and pool_graceful in
+ * Known values for flags are 0 (default) and `pool_graceful` in
  * which case the thread pool doesn't accept any new tasks but
  * processes all pending tasks before shutdown.
  */

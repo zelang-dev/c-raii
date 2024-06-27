@@ -38,29 +38,11 @@
 #endif
 
 #ifndef RAII_INLINE
-  #ifdef _MSC_VER
-    #define RAII_INLINE __forceinline
-  #elif defined(__GNUC__)
-    #if defined(__STRICT_ANSI__)
-      #define RAII_INLINE __inline__ __attribute__((always_inline))
-    #else
-      #define RAII_INLINE inline __attribute__((always_inline))
-    #endif
-  #elif defined(__BORLANDC__) || defined(__DMC__) || defined(__SC__) || defined(__WATCOMC__) || defined(__LCC__) ||  defined(__DECC)
-    #define RAII_INLINE __inline
-  #else /* No inline support. */
-    #define RAII_INLINE
-  #endif
+  #define RAII_INLINE FORCEINLINE
 #endif
 
 #ifndef RAII_NO_INLINE
-  #ifdef __GNUC__
-    #define RAII_NO_INLINE __attribute__((noinline))
-  #elif defined(_MSC_VER)
-    #define RAII_NO_INLINE __declspec(noinline)
-  #else
-    #define RAII_NO_INLINE
-  #endif
+  #define RAII_NO_INLINE NO_INLINE
 #endif
 
 #ifndef __builtin_expect

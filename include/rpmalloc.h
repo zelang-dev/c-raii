@@ -394,6 +394,7 @@ C_API int rpmalloc_tls_create(tls_t *key, tls_dtor_t dtor);
 C_API void rpmalloc_tls_delete(tls_t key);
 C_API void *rpmalloc_tls_get(tls_t key);
 C_API int rpmalloc_tls_set(tls_t key, void *val);
+C_API void rpmalloc_shutdown(void);
 
 #ifndef thread_storage
 #define thread_storage_get(type, var)                   \
@@ -426,6 +427,7 @@ C_API int rpmalloc_tls_set(tls_t key, void *val);
                 rp_free(rpmalloc_tls_get(rpmalloc_##var##_tss));    \
                 rpmalloc_tls_delete(rpmalloc_##var##_tss);   \
                 rpmalloc_##var##_tss = 0;   \
+                rpmalloc_shutdown();        \
             }                               \
         }
 
@@ -451,6 +453,35 @@ C_API int rpmalloc_tls_set(tls_t key, void *val);
 #undef calloc
 #undef realloc
 #undef free
+
+#ifndef FORCEINLINE
+  #undef inline
+  #define inline
+  #if defined(_MSC_VER) && !defined(__clang__)
+    #define FORCEINLINE __forceinline
+    #define _Static_assert
+  #elif defined(__GNUC__)
+    #if defined(__STRICT_ANSI__)
+      #define FORCEINLINE __inline__
+    #else
+      #define FORCEINLINE inline
+    #endif
+  #elif defined(__BORLANDC__) || defined(__DMC__) || defined(__SC__) || defined(__WATCOMC__) || defined(__LCC__) ||  defined(__DECC)
+    #define FORCEINLINE __inline
+  #else /* No inline support. */
+    #define FORCEINLINE
+  #endif
+#endif
+
+#ifndef NO_INLINE
+  #ifdef __GNUC__
+    #define C11_NO_INLINE __attribute__((noinline))
+  #elif defined(_MSC_VER)
+    #define NO_INLINE __declspec(noinline)
+  #else
+    #define NO_INLINE
+  #endif
+#endif
 
 C_API void *RPMALLOC_CDECL rp_malloc(size_t size);
 C_API void *RPMALLOC_CDECL rp_calloc(size_t count, size_t size);
