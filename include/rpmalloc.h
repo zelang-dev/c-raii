@@ -455,8 +455,6 @@ C_API void rpmalloc_shutdown(void);
 #undef free
 
 #ifndef FORCEINLINE
-  #undef inline
-  #define inline
   #if defined(_MSC_VER) && !defined(__clang__)
     #define FORCEINLINE __forceinline
     #define _Static_assert
