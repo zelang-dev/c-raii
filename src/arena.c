@@ -8,9 +8,15 @@ union header {
 static arena_t free_list = NULL;
 static int num_free = 0;
 
+/**
+ * Will allow to translate back and forth between the pointer
+ * and the container we use for managing the data.
+ */
+#define ARENA_HEADER_SZ offsetof(union header, tag->base)
+
 arena_t arena_init(size_t threshold) {
     arena_t arena = try_malloc(sizeof(*arena));
-    arena->prev = NULL;
+    arena->next = NULL;
     arena->limit = arena->avail = NULL;
     arena->base = NULL;
     arena->total = 0;
@@ -26,8 +32,8 @@ void arena_free(arena_t arena) {
         return;
 
     if (is_type(arena, RAII_ARENA + RAII_STRUCT)) {
+        arena_clear(arena);
         memset(arena, -1, sizeof(arena_t));
-        RAII_FREE(arena->base);
         RAII_FREE(arena);
         arena = NULL;
     }
@@ -41,37 +47,38 @@ void *arena_alloc(arena_t arena, long nbytes) {
     if (arena_capacity(arena) == arena_total(arena))
         num_free = 0;
 
-    nbytes = ((nbytes + sizeof(union header) - 1) /
-              (sizeof(union header))) * (sizeof(union header));
+    nbytes = align_up(nbytes, sizeof(u16));
     while (nbytes > arena->limit - arena->avail) {
         arena_t ptr;
         char *limit;
         if ((ptr = free_list) != NULL) {
-            free_list = free_list->prev;
+            free_list = free_list->next;
             num_free--;
             limit = ptr->limit;
         } else {
-            long m = sizeof(union header) + nbytes + arena->threshold * 1024;
+            long m = align_up(sizeof(union header) + nbytes + arena->threshold * 1024, sizeof(u16));
             arena->total += m;
-            ptr = RAII_REALLOC(arena->base, arena->total);
+            ptr = RAII_MALLOC(arena->total);
             if (ptr == NULL) {
                 errno = ENOMEM;
                 return NULL;
             }
 
-            arena->base = ptr;
-            limit = (char *)arena->base + arena->total;
+            if (is_empty(arena->base))
+                arena->base = ptr;
+
+            limit = (char *)ptr + arena->total;
         }
 
         *ptr = *arena;
         arena->avail = (char *)((union header *)ptr + 1);
         arena->limit = limit;
-        arena->prev = ptr;
+        arena->next = ptr;
         ptr->type = RAII_ARENA;
     }
 
-    if (arena->prev)
-        arena->prev->bytes = arena->bytes;
+    if (arena->next)
+        arena->next->bytes = arena->bytes;
 
     arena->bytes = nbytes;
     arena->avail += nbytes;
@@ -90,21 +97,21 @@ void arena_clear(arena_t arena) {
     if (is_empty(arena))
         return;
 
-    while (!arena->is_global && arena->prev && is_type(arena->prev, RAII_ARENA)) {
-        arena_t tmp = arena->prev;
+    while (!arena->is_global && arena->next && is_type(arena->next, RAII_ARENA)) {
+        arena_t tmp = arena->next;
         if (num_free < (int)arena->threshold) {
-            arena->prev->prev = free_list;
-            free_list = arena->prev;
+            arena->next->next = free_list;
+            free_list = arena->next;
             num_free++;
+            free_list->limit = arena->limit;
             if (is_zero(free_list->bytes))
                 arena->avail -= arena->bytes;
             else
                 arena->avail -= free_list->bytes;
         } else {
-            arena->avail = (char *)((union header *)arena->base + 1);
-            arena->limit = (char *)arena->base + arena->total;
-            arena->bytes = 0;
-            arena->prev = NULL;
+            memset(arena->next, -1, sizeof(arena_t));
+            RAII_FREE(arena->next);
+            arena->next = NULL;
         }
 
         arena = tmp;
