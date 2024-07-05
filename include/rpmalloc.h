@@ -226,10 +226,6 @@ rpmalloc_thread_statistics(rpmalloc_thread_statistics_t* stats);
 RPMALLOC_EXPORT void
 rpmalloc_global_statistics(rpmalloc_global_statistics_t* stats);
 
-//! Dump all statistics in human readable format to file (should be a FILE*)
-RPMALLOC_EXPORT void
-rpmalloc_dump_statistics(void* file);
-
 //! Allocate a memory block of at least the given size
 RPMALLOC_EXPORT RPMALLOC_ALLOCATOR void*
 rpmalloc(size_t size) RPMALLOC_ATTRIB_MALLOC RPMALLOC_ATTRIB_ALLOC_SIZE(1);
@@ -307,18 +303,20 @@ typedef void(__stdcall *tls_dtor_t)(PVOID lpFlsData);
 #endif
 #else
 #include <pthread.h>
-#include <stdlib.h>
 typedef pthread_key_t tls_t;
 typedef void (*tls_dtor_t)(void *);
 #endif
+#include <stdlib.h>
 
 C_API int rpmalloc_tls_create(tls_t *key, tls_dtor_t dtor);
 C_API void rpmalloc_tls_delete(tls_t key);
 C_API void *rpmalloc_tls_get(tls_t key);
 C_API int rpmalloc_tls_set(tls_t key, void *val);
-C_API void rpmalloc_shutdown(void);
 
 #ifndef thread_storage
+#define thread_storage_shutdown                 \
+        if (rpmalloc_is_thread_initialized())   \
+            rpmalloc_finalize();
 #define thread_storage_get(type, var)                   \
         type* var(void) {                               \
             if (rpmalloc_##var##_tls == 0) {            \
@@ -349,7 +347,7 @@ C_API void rpmalloc_shutdown(void);
                 rp_free(rpmalloc_tls_get(rpmalloc_##var##_tss));    \
                 rpmalloc_tls_delete(rpmalloc_##var##_tss);   \
                 rpmalloc_##var##_tss = 0;   \
-                rpmalloc_shutdown();        \
+                thread_storage_shutdown     \
             }                               \
         }
 
@@ -382,9 +380,9 @@ C_API void rpmalloc_shutdown(void);
     #define _Static_assert
   #elif defined(__GNUC__)
     #if defined(__STRICT_ANSI__)
-      #define FORCEINLINE __inline__
+      #define FORCEINLINE __inline__ __attribute__((always_inline))
     #else
-      #define FORCEINLINE inline
+      #define FORCEINLINE inline __attribute__((always_inline))
     #endif
   #elif defined(__BORLANDC__) || defined(__DMC__) || defined(__SC__) || defined(__WATCOMC__) || defined(__LCC__) ||  defined(__DECC)
     #define FORCEINLINE __inline

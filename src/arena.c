@@ -32,7 +32,12 @@ void arena_free(arena_t arena) {
         return;
 
     if (is_type(arena, RAII_ARENA + RAII_STRUCT)) {
-        arena_clear(arena);
+        num_free += (int)arena->threshold + 1;
+        if (arena->is_global)
+            RAII_FREE(arena->base);
+        else
+            arena_clear(arena);
+
         memset(arena, -1, sizeof(arena_t));
         RAII_FREE(arena);
         arena = NULL;
@@ -58,16 +63,25 @@ void *arena_alloc(arena_t arena, long nbytes) {
         } else {
             long m = align_up(sizeof(union header) + nbytes + arena->threshold * 1024, sizeof(u16));
             arena->total += m;
-            ptr = RAII_MALLOC(arena->total);
+            if (arena->is_global)
+                ptr = RAII_REALLOC(arena->base, arena->total);
+            else
+                ptr = RAII_MALLOC(arena->total);
+
             if (ptr == NULL) {
                 errno = ENOMEM;
                 return NULL;
             }
 
-            if (is_empty(arena->base))
+            if (arena->is_global) {
                 arena->base = ptr;
+                limit = (char *)arena->base + arena->total;
+            } else {
+                if (is_empty(arena->base))
+                    arena->base = ptr;
 
-            limit = (char *)ptr + arena->total;
+                limit = (char *)ptr + arena->total;
+            }
         }
 
         *ptr = *arena;
