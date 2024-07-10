@@ -1,5 +1,7 @@
 #include "raii.h"
 
+// make_atomic(unique_t *, atomic_arena_t)
+// static atomic_arena_t thrd_arena_tls = NULL;
 static unique_t *thrd_arena_tls = NULL;
 static mtx_t thrd_arena_mtx[1] = {0};
 tss_t thrd_arena_tss = 0;

@@ -22,7 +22,7 @@ int run(void *arg) {
     ASSERT_NOTNULL(foo);
 
     *foo = 10;
-    thrd_sleep(time_spec(*(int *)arg + 1, 0), NULL);
+    usleep(500);
     some_function();
 
     *foo++;

@@ -73,6 +73,7 @@ typedef enum {
     RAII_ARENA,
     RAII_THREAD,
     RAII_GUARDED_STATUS,
+    RAII_QUEUE,
     RAII_COUNT
 } raii_type;
 
