@@ -249,11 +249,10 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
 
 #ifdef emulate_tls
     if (ctx == ex_local())
-        ex_terminate();
 #else
     if (ctx == &thrd_except_buffer)
-        ex_terminate();
 #endif
+        ex_terminate();
 
 #ifdef _WIN32
     RaiseException(EXCEPTION_PANIC, 0, 0, NULL);

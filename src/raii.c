@@ -245,7 +245,12 @@ void raii_delete(memory_t *ptr) {
         return;
 
     raii_deferred_free(ptr);
-    if (ptr != raii()) {
+
+#ifdef emulate_tls
+    if (ptr != raii_local()) {
+#else
+    if (ptr != &thrd_raii_buffer) {
+#endif
         memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }
