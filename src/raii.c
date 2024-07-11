@@ -245,8 +245,7 @@ void raii_delete(memory_t *ptr) {
         return;
 
     raii_deferred_free(ptr);
-    bool self = ptr != (is_scope_emulated(ptr) ? thrd_scope() : &thrd_raii_buffer);
-    if (self) {
+    if (ptr != raii()) {
         memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }
@@ -675,16 +674,4 @@ RAII_INLINE bool is_str_eq(const char *str, const char *str2) {
 
 RAII_INLINE bool is_str_empty(const char *str) {
     return is_str_eq(str, "");
-}
-
-RAII_INLINE bool is_exception_emulated(ex_context_t *storage) {
-    return is_true(storage->is_emulated) && !is_zero(rpmalloc_local_except_tls);
-}
-
-RAII_INLINE bool is_protection_emulated(ex_ptr_t *storage) {
-    return is_true(storage->is_emulated) && !is_zero(rpmalloc_local_except_tls);
-}
-
-RAII_INLINE bool is_scope_emulated(memory_t *storage) {
-    return is_true(storage->is_emulated) && !is_zero(rpmalloc_local_except_tls);
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8...3.14)
 
-set(TARGET_LIST test-queue_fib test-defer test-exceptions test-cthread test-arena test-thrd_tls test-tls)
+set(TARGET_LIST test-queue_fib test-defer test-exceptions test-cthread test-arena test-tls)
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )
     target_link_libraries(${TARGET} raii)

@@ -317,9 +317,6 @@ C_API bool is_str_in(const char *text, char *pattern);
 C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void *self);
-C_API bool is_exception_emulated(ex_context_t *);
-C_API bool is_protection_emulated(ex_ptr_t *);
-C_API bool is_scope_emulated(memory_t *);
 
 C_API void *try_calloc(int, size_t);
 C_API void *try_malloc(size_t);
@@ -460,7 +457,6 @@ are only valid between these sections.
 
 thrd_local_create(memory_t, raii)
 thrd_local_create(ex_context_t, except)
-thread_storage_create(ex_context_t, local_except)
 
 typedef struct arena_s *arena_t;
 struct arena_s {
@@ -500,14 +496,6 @@ C_API size_t arena_capacity(const arena_t arena);
 C_API size_t arena_total(const arena_t arena);
 C_API void arena_print(const arena_t arena);
 
-C_API tss_t thrd_arena_tss;
-C_API void thrd_init(void);
-C_API void thrd_defer(func_t, void *);
-C_API void *thrd_unique(size_t);
-C_API void *thrd_get(void);
-C_API void *thrd_alloc(size_t);
-C_API void *thrd_malloc(size_t);
-C_API unique_t *thrd_scope(void);
 
 #ifdef __cplusplus
     }
