@@ -2636,12 +2636,13 @@ bit too pedantic with it's warnings. A few notes:
 /* fence between a thread and a signal handler executed in the same thread */
 #define atomic_signal_fence(order)	c89atomic_signal_fence(order)
 
+/* sets an atomic_flag to true and returns the old value */
+#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((c89atomic_uint8 *)obj)
+/* sets an atomic_flag to true and returns the old value */
+#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((c89atomic_uint8 *)obj, order)
+
 #if defined(__i386__) || defined(__ppc__) || defined(__arm__) || defined(_M_ARM) || defined(__i386) || defined(_M_IX86)
 /* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((c89atomic_uint32 *)obj)
-/* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((c89atomic_uint32 *)obj, order)
-/* indicates whether the atomic object is lock-free */
 #define atomic_is_lock_free(obj)  c89atomic_is_lock_free_32((c89atomic_uint32 *)obj)
 
 /* stores a value in an atomic object */
@@ -2690,19 +2691,15 @@ bit too pedantic with it's warnings. A few notes:
 #define atomic_exchange_explicit(obj, desired, order)	c89atomic_exchange_explicit_32((c89atomic_uint32 *)obj, (c89atomic_uint32)desired, order)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak(obj, expected, desired)	c89atomic_compare_exchange_32((c89atomic_uint32 *)obj, expected, desired)
+#define atomic_compare_exchange_weak(obj, expected, desired)	c89atomic_compare_exchange_weak_32((c89atomic_uint32 *)obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_explicit_32((c89atomic_uint32 *)obj, expected, desired, succ, fail)
+#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_weak_explicit_32((c89atomic_uint32 *)obj, expected, desired, succ, fail)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong(obj, expected, desired)	c89atomic_compare_exchange_strong_32((c89atomic_uint32 *)obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_strong_explicit_32((c89atomic_uint32 *)obj, expected, desired, succ, fail)
 #else
-/* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((c89atomic_uint64 *)obj)
-/* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((c89atomic_uint64 *)obj, order)
 /* indicates whether the atomic object is lock-free */
 #define atomic_is_lock_free(obj)  c89atomic_is_lock_free_64((c89atomic_uint64 *)obj)
 
@@ -2752,9 +2749,9 @@ bit too pedantic with it's warnings. A few notes:
 #define atomic_exchange_explicit(obj, desired, order)	c89atomic_exchange_explicit_64((c89atomic_uint64 *)obj, (c89atomic_uint64)desired, order)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak(obj, expected, desired)	c89atomic_compare_exchange_64((c89atomic_uint64 *)obj, expected, desired)
+#define atomic_compare_exchange_weak(obj, expected, desired)	c89atomic_compare_exchange_weak_64((c89atomic_uint64 *)obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_explicit_64((c89atomic_uint64 *)obj, expected, desired, succ, fail)
+#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_weak_explicit_64((c89atomic_uint64 *)obj, expected, desired, succ, fail)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong(obj, expected, desired)	c89atomic_compare_exchange_strong_64((c89atomic_uint64 *)obj, expected, desired)

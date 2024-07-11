@@ -135,7 +135,7 @@ int test_multi(ub_queue_t *q) {
 
     assert(resc == 0 && resp == 0);
     printf("Two-thread Test Complete\n");
-    printf("cycles/op for rdtsc %lu\n", (end_tsc_time - start_tsc_time) / N);
+    printf("cycles/op for rdtsc %li\n", (end_tsc_time - start_tsc_time) / N);
 
     assert(ub_is_empty(q));
     assert(ub_count(q) == 0);

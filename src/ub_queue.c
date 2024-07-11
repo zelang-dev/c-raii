@@ -28,9 +28,13 @@ static FORCEINLINE ub_node_t *ub_get(ub_queue_t *q) {
     return atomic_get(ub_node_t *, &(q->_tail));
 }
 
+static FORCEINLINE void *ub_value(atomic_queue_t *q) {
+    return (atomic_get(ub_node_t *, &q))->_value;
+}
+
 ub_queue_t *ub_raii(size_t size) {
     ub_queue_t *q = malloc_default(sizeof(ub_queue_t));
-    raii_defer(ub_destroy, q);
+    raii_defer((func_t)ub_destroy, q);
     atexit(raii_deferred_clean);
     ub_init(q, size);
     return q;
@@ -85,7 +89,7 @@ bool ub_enqueue(ub_queue_t *q, void *v) {
 bool ub_dequeue(ub_queue_t *q, void **v) {
     ub_node_t *tmp = ub_get(q);
     if (atomic_load_explicit(&(tmp->_next), memory_order_acquire)) {
-        *v = tmp->_next->_value;
+        *v = ub_value(tmp->_next);
         atomic_store_explicit(&q->_tail, tmp->_next, memory_order_release);
         atomic_fetch_sub(&q->count, 1);
 

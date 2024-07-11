@@ -49,9 +49,6 @@ void *arena_alloc(arena_t arena, long nbytes) {
         raii_panic("Bad block, `NULL` detected!");
 
     RAII_ASSERT(nbytes > 0);
-    if (arena_capacity(arena) == arena_total(arena))
-        num_free = 0;
-
     nbytes = align_up(nbytes, sizeof(u16));
     while (nbytes > arena->limit - arena->avail) {
         arena_t ptr;
