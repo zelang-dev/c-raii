@@ -175,7 +175,6 @@ else()
  include/raii.h
  include/rpmalloc.h
  include/rtypes.h
- include/ub_queue.h
     DESTINATION include)
 endif()
 

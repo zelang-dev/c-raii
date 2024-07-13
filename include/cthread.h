@@ -259,7 +259,6 @@ typedef int (*thrd_start_t)(void *arg);
 
 /** Create a new thread.
 * @param thr Identifier of the newly created thread.
-* @param stacksize The initial size of the stack, in bytes.
 * @param func A function pointer to the function that will be executed in
 *        the new thread.
 * @param arg An argument to the thread function.

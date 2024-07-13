@@ -2531,8 +2531,8 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     typedef volatile _Atomic(c89atomic_uint64)atomic_ullong;
     typedef volatile _Atomic(intptr_t)atomic_intptr_t;
     typedef volatile _Atomic(uintptr_t)atomic_uintptr_t;
-    typedef volatile _Atomic(size_t)atomic_size_t;
-    typedef volatile _Atomic(ptrdiff_t)atomic_ptrdiff_t;
+    typedef volatile _Atomic(__SIZE_TYPE__)atomic_size_t;
+    typedef volatile _Atomic(__PTRDIFF_TYPE__)atomic_ptrdiff_t;
     typedef volatile _Atomic(intmax_t)atomic_intmax_t;
     typedef volatile _Atomic(uintmax_t)atomic_uintmax_t;
     typedef volatile _Atomic(void *)atomic_ptr_t;
@@ -2607,7 +2607,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_weak(obj, expected, desired)	c89atomic_compare_exchange_weak_32((c89atomic_uint32 *)obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_weak_explicit_32((c89atomic_uint32 *)obj, expected, desired, succ, fail)
+#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_weak_explicit_32((c89atomic_uint32 *)obj, (c89atomic_uint32)expected, desired, succ, fail)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong(obj, expected, desired)	c89atomic_compare_exchange_strong_32((c89atomic_uint32 *)obj, expected, desired)
@@ -2665,7 +2665,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_weak(obj, expected, desired)	c89atomic_compare_exchange_weak_64((c89atomic_uint64 *)obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_weak_explicit_64((c89atomic_uint64 *)obj, expected, desired, succ, fail)
+#define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	c89atomic_compare_exchange_weak_explicit_64((c89atomic_uint64 *)obj, (c89atomic_uint64)expected, desired, succ, fail)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong(obj, expected, desired)	c89atomic_compare_exchange_strong_64((c89atomic_uint64 *)obj, expected, desired)

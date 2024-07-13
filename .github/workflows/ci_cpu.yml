@@ -48,7 +48,6 @@ jobs:
             ./test-exceptions
             ./test-cthread
             ./test-arena
-            ./test-queue_fib
             ./test-tls
       - name: Show the artifact
         run: |

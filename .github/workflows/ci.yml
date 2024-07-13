@@ -36,7 +36,6 @@ jobs:
             ./test-exceptions
             ./test-cthread
             ./test-arena
-            ./test-queue_fib
             ./test-tls
 
   build-windows:
@@ -65,7 +64,6 @@ jobs:
             .\test-exceptions.exe
             .\test-cthread.exe
             .\test-arena.exe
-            .\test-queue_fib.exe
             .\test-tls.exe
 
   build-macos:
@@ -86,5 +84,4 @@ jobs:
             ./test-exceptions
             ./test-cthread
             ./test-arena
-            ./test-queue_fib
             ./test-tls
