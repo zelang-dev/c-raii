@@ -22,6 +22,7 @@ static int thread_test_local_storage(void *aArg) {
     srand(thread);
     int data = thread + rand();
     *gLocalVar() = data;
+    usleep(500);
     printf("thread #%d, gLocalVar is: %d\n", thread, *gLocalVar());
     assert(*gLocalVar() == data);
     return 0;
