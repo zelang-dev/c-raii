@@ -260,7 +260,6 @@ C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
 C_API void *malloc_by(memory_t *scope, size_t size);
-C_API void *malloc_arena(memory_t *scope, size_t size);
 
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
@@ -269,11 +268,9 @@ C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed when scope smart pointer panics/returns/exits. */
 C_API void *calloc_by(memory_t *scope, int count, size_t size);
-C_API void *calloc_arena(memory_t *scope, int count, size_t size);
 
 /* Same as `raii_deferred_free`, but also destroy smart pointer. */
 C_API void raii_delete(memory_t *ptr);
-C_API void raii_delete_arena(memory_t *ptr);
 
 /* Same as `raii_deferred_clean`, but also
 reset/clear current `thread` smart pointer. */
@@ -288,7 +285,11 @@ C_API void raii_deferred_clean(void);
 /* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
 for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
+
 C_API unique_t *unique_init_arena(void);
+C_API void *calloc_arena(memory_t *scope, int count, size_t size);
+C_API void *malloc_arena(memory_t *scope, size_t size);
+C_API void free_arena(memory_t *ptr);
 
 /* Request/return raw memory of given `size`,
 uses current `thread` smart pointer,

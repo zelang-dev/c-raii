@@ -258,7 +258,7 @@ void raii_delete(memory_t *ptr) {
     ptr = NULL;
 }
 
-void raii_delete_arena(memory_t *ptr) {
+void free_arena(memory_t *ptr) {
     if (ptr == NULL)
         return;
 
