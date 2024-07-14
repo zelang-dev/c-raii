@@ -49,7 +49,7 @@ EX_EXCEPTION(stack_overflow);
 EX_EXCEPTION(invalid_handle);
 EX_EXCEPTION(bad_alloc);
 
-thrd_local(ex_context_t, except)
+thrd_local(ex_context_t, except, NULL)
 
 static volatile sig_atomic_t got_signal = false;
 static volatile sig_atomic_t got_uncaught_exception = false;
@@ -168,7 +168,7 @@ void ex_flags_reset(void) {
 }
 
 RAII_INLINE ex_context_t *ex_local(void) {
-    thrd_local_return(ex_context_t, except)
+    thrd_local_return(ex_context_t *, except)
 }
 
 void ex_update(ex_context_t *context) {

@@ -10,8 +10,7 @@
 #define CHK_EXPECTED(a, b) assert_expected(a, b, __FILE__, __LINE__, #a, #b)
 #define NUM_THREADS 8
 
-thrd_local_create(int, gLocalVar)
-thrd_local(int, gLocalVar)
+thrd_static(int, gLocalVar, 0)
 
 /* Thread function: Compile time thread-local storage */
 static int thread_test_local_storage(void *aArg) {
@@ -46,6 +45,8 @@ void run_tls(void) {
 
     /* Check if the TLS variable has changed */
     assert(*gLocalVar() == 1);
+    assert(++*gLocalVar() == 2);
+    assert(--*gLocalVar() == 1);
 }
 
 int main(void) {

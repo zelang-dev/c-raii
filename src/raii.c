@@ -1,6 +1,6 @@
 #include "raii.h"
 
-thrd_local(memory_t, raii)
+thrd_local(memory_t, raii, NULL)
 
 int raii_array_init(raii_array_t *a) {
     if (UNLIKELY(!a))
@@ -97,7 +97,7 @@ void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
 }
 
 RAII_INLINE memory_t *raii_local(void) {
-    thrd_local_return(memory_t, raii)
+    thrd_local_return(memory_t *, raii)
 }
 
 memory_t *raii_init(void) {

@@ -456,8 +456,8 @@ are only valid between these sections.
 
 #define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }
 
-thrd_local_create(memory_t, raii)
-thrd_local_create(ex_context_t, except)
+thrd_local_extern(memory_t, raii)
+thrd_local_extern(ex_context_t, except)
 
 typedef struct arena_s *arena_t;
 struct arena_s {
