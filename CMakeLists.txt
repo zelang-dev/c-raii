@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8...3.14)
 
 project(
     raii
-    VERSION 1.0.8
+    VERSION 1.0.9
     DESCRIPTION "An general RAII implementation for C, with Defer, C11 Threads with Thread Pool, and custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
@@ -57,8 +57,8 @@ else()
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.1.2.zip
- URL_MD5 c50d45ef98e296ac2d2730adcb53e8a3
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.1.3.zip
+ URL_MD5 48bc75222cfbc554fa1d132ab1ff3004
 )
 FetchContent_MakeAvailable(threads)
 
