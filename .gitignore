@@ -53,3 +53,4 @@ dkms.conf
 .vscode/settings.json
 build/
 built/
+/.vscode
