@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 2.8...3.14)
 
 project(
     raii
-    VERSION 1.0.9
-    DESCRIPTION "An general RAII implementation for C, with Defer, C11 Threads with Thread Pool, and custom malloc/heap allocation."
+    VERSION 1.0.10
+    DESCRIPTION "An general RAII implementation for C, with Defer, C11 Atomics/Threads with Thread Pool, and custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
 )
@@ -42,6 +42,9 @@ file(GLOB raii_files
 )
 
 if(BUILD_SHARED_LIBS)
+    if(WIN32)
+        add_definitions(-DMMAN_LIBRARY_DLL)
+    endif()
     add_library(raii SHARED ${raii_files})
 else()
     add_library(raii STATIC ${raii_files})
@@ -53,12 +56,12 @@ if(UNIX)
 else()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG ")
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
-    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
+    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.1.3.zip
- URL_MD5 48bc75222cfbc554fa1d132ab1ff3004
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.1.4.zip
+ URL_MD5 2a13bdf5c6b5082c48cfe51c74693e18
 )
 FetchContent_MakeAvailable(threads)
 

@@ -2487,13 +2487,6 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_flag_clear_explicit(pSpinlock, c89atomic_memory_order_release);
 }
 
-
-#if defined(__GNUC__)
-#   define atomic_typeof(T,V)   __typeof__(V)
-#else
-#   define atomic_typeof(T,V)   T
-#endif
-
 #ifdef _WIN32
     typedef volatile c89atomic_flag atomic_flag;
     typedef volatile c89atomic_bool atomic_bool;
@@ -2579,10 +2572,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #endif
 
 /* reads an atomic_flag, `relaxed` */
-#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit(ptr, memory_order_relaxed)
+#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_relaxed)
 
 /* sets an atomic_flag to false */
-#define atomic_flag_clear	c89atomic_flag_clear
+#define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)
 /* sets an atomic_flag to false */
 #define atomic_flag_clear_explicit	c89atomic_flag_clear_explicit
 
@@ -2593,9 +2586,9 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #define atomic_signal_fence(order)	c89atomic_signal_fence(order)
 
 /* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((c89atomic_uint8 *)obj)
+#define atomic_flag_test_and_set(obj)	c89atomic_flag_test_and_set((atomic_flag *)obj)
 /* sets an atomic_flag to true and returns the old value */
-#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((c89atomic_uint8 *)obj, order)
+#define atomic_flag_test_and_set_explicit(obj, order)	c89atomic_flag_test_and_set_explicit((atomic_flag *)obj, order)
 
 #if defined(__i386__) || defined(__ppc__) || defined(__arm__) || defined(_M_ARM) || defined(__i386) || defined(_M_IX86)
 /* sets an atomic_flag to true and returns the old value */
@@ -2731,7 +2724,56 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong_explicit(obj, expected, desired, succ, fail)	\
     c89atomic_compare_exchange_strong_explicit_64((c89atomic_uint64 *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired, succ, fail)
+
+#define __SIZEOF_POINTER__ 8
 #endif
+
+#define __c89atomic_copy(_d, _s, _sz, _type)            \
+    {                                                   \
+        _type val = atomic_load((const _type *) (_s));  \
+        _s += sizeof(_type);                            \
+        atomic_store((_type *) (_d), val);              \
+        _d += sizeof(_type);                            \
+        _sz -= sizeof(_type);                           \
+    }
+
+static C89ATOMIC_INLINE void atomic_memcpy(char *dst, const char *src, size_t sz) {
+#if __SIZEOF_POINTER__ == 8
+    while (sz >= sizeof(uint64_t))
+        __c89atomic_copy(dst, src, sz, uint64_t);
+    if (sz >= sizeof(uint32_t))
+        __c89atomic_copy(dst, src, sz, uint32_t);
+#else  //__SIZEOF_POINTER__ == 4
+    while (sz >= sizeof(uint32_t))
+        __c89atomic_copy(dst, src, sz, uint32_t);
+#endif
+    if (sz >= sizeof(uint16_t))
+        __c89atomic_copy(dst, src, sz, uint16_t);
+    if (sz >= sizeof(uint8_t))
+        __c89atomic_copy(dst, src, sz, uint8_t);
+}
+
+#if defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64) || defined(__mips) || defined(__mips__) || defined(__mips64) || defined(__mips32) || defined(__MIPSEL__) || defined(__MIPSEB__) || defined(__sparc__) || defined(__sparc64__) || defined(__sparc_v9__) || defined(__sparcv9) || defined(__riscv) || defined(__ARM64__)
+#   define __ATOMIC_PAD_LINE 32
+#elif defined(__m68k__)
+#   define __ATOMIC_PAD_LINE 16
+#elif defined(__x86_64) || defined(__x86_64__) || defined(__amd64) || defined(__ppc__) || defined(__ppc) || defined(__powerpc__) || defined(_M_MPPC) || defined(_M_PPC) ||  defined(__aarch64__)  || defined(__ppc64__) || defined(__powerpc64__) || defined(__arc__)
+#   define __ATOMIC_PAD_LINE 128
+#elif defined(__s390__) || defined(__s390x__)
+#   define __ATOMIC_PAD_LINE 256
+#else
+#   define __ATOMIC_PAD_LINE 64
+#endif
+
+/* The estimated size of the CPU's cache line when atomically updating memory.
+ Add this much padding or align to this boundary to avoid atomically-updated
+ memory from forcing cache invalidations on near, but non-atomic, memory.
+
+ https://en.wikipedia.org/wiki/False_sharing
+ https://github.com/golang/go/search?q=CacheLinePadSize
+ https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
+*/
+#define __ATOMIC_CACHE_LINE __ATOMIC_PAD_LINE
 
 #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)))
     #pragma GCC diagnostic pop  /* long long warnings with Clang. */
