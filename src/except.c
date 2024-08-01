@@ -189,6 +189,8 @@ ex_context_t *ex_init(void) {
         context->is_guarded = false;
         context->is_raii = false;
         context->is_emulated = false;
+        context->ex = NULL;
+        context->panic = NULL;
         context->caught = -1;
         context->type = ex_context_st;
         ex_signal_unblock(all);
@@ -264,10 +266,13 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
 int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep) {
     ex_context_t *ctx = ex_init();
     const char *ex = 0;
+    bool signaled = (int)code < 0;
     int i;
 
     if (!is_str_eq(ctx->ex, exception) && is_empty((void *)ctx->panic))
         return EXCEPTION_EXECUTE_HANDLER;
+    else if (is_empty((void *)ctx->ex) && signaled)
+        ctx->panic = NULL;
     else if (!is_str_eq(ctx->panic, exception) && !is_str_eq(ctx->ex, exception))
         return EXCEPTION_EXECUTE_HANDLER;
 
@@ -278,7 +283,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
             ) {
             ctx->state = ex_throw_st;
             ctx->is_rethrown = true;
-            if (got_signal) {
+            if (got_signal || signaled) {
                 ctx->ex = ex_sig[i].ex;
                 ctx->file = "unknown";
                 ctx->line = 0;

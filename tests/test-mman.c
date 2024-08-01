@@ -201,6 +201,36 @@ done_close:
     return result;
 }
 
+int test_file_map_mprotect() {
+    char *p;
+    int result = -1;
+    long pagesize = getpagesize();
+
+    if (pagesize == -1)
+        raii_panic("sysconf");
+
+    /* Allocate a buffer aligned on a page boundary;
+       initial protection is PROT_READ | PROT_WRITE. */
+    void *buffer = memalign(pagesize, 4 * pagesize);
+    if (buffer == NULL)
+        raii_panic("memalign");
+
+    if (mprotect(buffer, pagesize, PROT_READ) == -1)
+        raii_panic("mprotect");
+
+    try {
+        for (p = buffer; ; )
+            *(p++) = 'a';
+
+        printf("Loop completed\n");     /* Should never happen */
+    } catch (sig_segv) {
+        result = 0;
+    } end_trying;
+
+    free(buffer);
+    return result;
+}
+
 #define EXEC_TEST(name) \
     if (name() != 0) { result = -1; printf( #name ": fail\n"); } \
     else { printf(#name ": pass\n"); }
@@ -218,7 +248,7 @@ int main()
     EXEC_TEST(test_file_map_readwrite);
     EXEC_TEST(test_file_map_mlock_munlock);
     EXEC_TEST(test_file_map_msync);
-    // TODO: EXEC_TEST(test_file_map_mprotect);
+    EXEC_TEST(test_file_map_mprotect);
 
     return result;
 }

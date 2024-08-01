@@ -20,7 +20,7 @@ License: MIT License
 #include <errno.h>
 #include <io.h>
 
-#include "compat/mman.h"
+#include "compat/sys/mman.h"
 
 #ifndef FILE_MAP_EXECUTE
 #define FILE_MAP_EXECUTE 0x0020
@@ -136,7 +136,7 @@ int munmap(void *addr, size_t len) {
     return -1;
 }
 
-int _mprotect(void *addr, size_t len, int prot) {
+int mprotect(void *addr, size_t len, int prot) {
     DWORD newProtect = __map_mmap_prot_page(prot);
     DWORD oldProtect = 0;
 
