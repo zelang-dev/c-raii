@@ -24,6 +24,7 @@ int test_anon_map_readwrite()
 
 int test_anon_map_readonly()
 {
+    int result = 1;
     void *map = mmap(NULL, 1024, PROT_READ,
                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (map == MAP_FAILED)
@@ -32,12 +33,13 @@ int test_anon_map_readonly()
         return -1;
     }
 
-    *((unsigned char *)map) = 1;
-
-    int result = munmap(map, 1024);
-
-    if (result != 0)
-        printf("munmap (MAP_ANONYMOUS, PROT_READ) returned unexpected error: %d\n", errno);
+    try {
+        *((unsigned char *)map) = 1;
+    } catch_any {
+        result = munmap(map, 1024);
+        if (result != 0)
+            printf("munmap (MAP_ANONYMOUS, PROT_READ) returned unexpected error: %d\n", errno);
+    } end_trying;
 
     return result;
 }
@@ -241,7 +243,7 @@ int main()
 
     EXEC_TEST(test_anon_map_readwrite);
     // NOTE: this test must cause an access violation exception
-    // EXEC_TEST(test_anon_map_readonly);
+    EXEC_TEST(test_anon_map_readonly);
     EXEC_TEST(test_anon_map_readonly_nowrite);
     EXEC_TEST(test_anon_map_writeonly);
 
