@@ -45,6 +45,15 @@ jobs:
           overwrite: true
           file_glob: true
           body: "Various platform library/package installers, includes static libraries and needed header *.h files."
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
 
   build-linux:
     name: Linux ${{ matrix.config.target }}
@@ -85,6 +94,15 @@ jobs:
           overwrite: true
           file_glob: true
           body: "Various platform library/package installers, includes static libraries and needed header *.h files."
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
 
   build-centos:
     name: CentOS
@@ -121,6 +139,15 @@ jobs:
           overwrite: true
           file_glob: true
           body: "Various platform library/package installers, includes static libraries and needed header *.h files."
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
 
   build-macos:
     name: macOS
@@ -150,6 +177,15 @@ jobs:
           overwrite: true
           file_glob: true
           body: "Various platform library/package installers, includes static libraries and needed header *.h files."
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
 
   build-qemu:
     name: ${{ matrix.target }}
@@ -203,3 +239,12 @@ jobs:
           overwrite: true
           file_glob: true
           body: "Various platform library/package installers, includes `static` libraries and needed header `*.h` files."
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
