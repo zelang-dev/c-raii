@@ -19,6 +19,7 @@ cnd_t cnd2;
 tss_t tss;
 once_flag once = ONCE_FLAG_INIT;
 int flag;
+static int test_failed;
 
 thread_storage_create(int, gLocalVar)
 void run_thread_test(void);

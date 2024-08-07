@@ -162,6 +162,88 @@ done_close:
     return result;
 }
 
+#define BUFSIZE 8
+
+int test_mlock_valid_address()
+{
+    int result;
+    long page_size;
+    void *page_ptr;
+
+    page_size = getpagesize();
+    if (page_size == -1) {
+        perror("An error occurs when calling getpagesize()");
+        return -1;
+    }
+
+    page_ptr = (void *)(LONG_MAX - (LONG_MAX % page_size));
+    result = mlock(&page_ptr, BUFSIZE);
+
+    if (result == -1 && errno == ENOMEM) {
+        result = 0;
+    } else if (errno == EPERM) {
+        printf
+        ("You don't have permission to lock your address space.\nTry to rerun this test as root.\n");
+        result = -1;
+    }
+
+    if (munlock(&page_ptr, BUFSIZE) != 0) {
+        printf("munlock returned unexpected error: %d\n", errno);
+        result = -1;
+    }
+
+    return result;
+}
+
+int test_mlock_page()
+{
+    int result;
+    long page_size;
+    void *ptr;
+
+    page_size = getpagesize();
+    if (page_size == -1) {
+        perror("An error occurs when calling getpagesize()");
+        return -1;
+    }
+
+    ptr = malloc(page_size);
+    if (ptr == NULL) {
+        printf("Can not allocate memory.\n");
+        return -1;
+    }
+
+    result = mlock(ptr, page_size - 1);
+    if (result == 0) {
+        result = 0;
+    } else if (result == -1 && errno == EINVAL) {
+        printf
+        ("mlock() requires that addr be a multiple of {PAGESIZE}.\n");
+        result = 0;
+    } else if (errno == EPERM) {
+        printf
+        ("You don't have permission to lock your address space.\nTry to rerun this test as root.\n");
+        result = -1;
+    } else if (result != -1) {
+        printf("mlock() returns a value of %i instead of 0 or 1.\n",
+               result);
+        perror("mlock");
+        result = -1;
+    } else {
+        perror("Unexpected error");
+        result = -1;
+    }
+
+    if (munlock(ptr, page_size - 1) != 0) {
+        printf("munlock returned unexpected error: %d\n", errno);
+        result = -1;
+    }
+
+    free(ptr);
+
+    return result;
+}
+
 int test_file_map_msync()
 {
     const size_t map_size = 1024;
@@ -203,7 +285,7 @@ done_close:
     return result;
 }
 
-int test_file_map_mprotect() {
+int test_map_mprotect() {
     char *p;
     int result = -1;
     long pagesize = getpagesize();
@@ -247,10 +329,14 @@ int main()
     EXEC_TEST(test_anon_map_readonly_nowrite);
     EXEC_TEST(test_anon_map_writeonly);
 
+#ifdef _WIN32
     EXEC_TEST(test_file_map_readwrite);
     EXEC_TEST(test_file_map_mlock_munlock);
     EXEC_TEST(test_file_map_msync);
-    EXEC_TEST(test_file_map_mprotect);
+#endif
+    EXEC_TEST(test_mlock_valid_address);
+    EXEC_TEST(test_mlock_page);
+    EXEC_TEST(test_map_mprotect);
 
     return result;
 }
