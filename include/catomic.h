@@ -108,7 +108,8 @@ typedef unsigned char           c89atomic_bool;
 /* Inline */
 /* We want to encourage the compiler to inline. When adding support for a new compiler, make sure it's handled here. */
 #if defined(_MSC_VER)
-    #define C89ATOMIC_INLINE __forceinline
+#   define c89atomic_is_lock_free(obj) (sizeof((obj)) <= sizeof(void *))
+#   define C89ATOMIC_INLINE __forceinline
 #elif defined(__GNUC__)
     /*
     I've had a bug report where GCC is emitting warnings about functions possibly not being inlineable. This warning happens when
@@ -560,18 +561,7 @@ typedef unsigned char           c89atomic_bool;
             }
         }
     #else
-        /* Can't use MemoryBarrier() for this as it require Windows headers which we want to avoid in the header section of c89atomic. */
-        #if defined(C89ATOMIC_X64)
-            #define c89atomic_thread_fence(order)   __faststorefence(), (void)order
-        #elif defined(C89ATOMIC_ARM64)
-            #define c89atomic_thread_fence(order)   __dmb(_ARM64_BARRIER_ISH), (void)order
-        #else
-            static C89ATOMIC_INLINE void c89atomic_thread_fence(c89atomic_memory_order order)
-            {
-                volatile c89atomic_uint32 barrier = 0;
-                c89atomic_fetch_add_explicit_32(&barrier, 0, order);
-            }
-        #endif  /* C89ATOMIC_X64 */
+        #define c89atomic_thread_fence(order)   MemoryBarrier()
     #endif
 
 
@@ -580,9 +570,7 @@ typedef unsigned char           c89atomic_bool;
     any reshuffling. If anybody has a better idea on this please let me know! Cannot use _ReadWriteBarrier() as it has been marked as deprecated.
     */
     #define c89atomic_compiler_fence()      c89atomic_thread_fence(c89atomic_memory_order_seq_cst)
-
-    /* I'm not sure how to implement this for MSVC. For now just using thread_fence(). */
-    #define c89atomic_signal_fence(order)   c89atomic_thread_fence(order)
+    #define c89atomic_signal_fence(order)   _ReadWriteBarrier()
 
 
     /* Atomic loads can be implemented in terms of a compare-and-swap. Need to implement as functions to silence warnings about `order` being unused. */
@@ -1902,36 +1890,22 @@ typedef unsigned char           c89atomic_bool;
 #if !defined(C89ATOMIC_HAS_NATIVE_IS_LOCK_FREE)
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_8(volatile void* ptr)
     {
-        (void)ptr;
-        return 1;
+        return c89atomic_is_lock_free(ptr);
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_16(volatile void* ptr)
     {
-        (void)ptr;
-        return 1;
+        return c89atomic_is_lock_free(ptr);
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_32(volatile void* ptr)
     {
-        (void)ptr;
-        return 1;
+        return c89atomic_is_lock_free(ptr);
     }
 
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_64(volatile void* ptr)
     {
-        (void)ptr;
-
-        /* For 64-bit atomics, we can only safely say atomics are lock free on 64-bit architectures or x86. Otherwise we need to be conservative and assume not lock free. */
-    #if defined(C89ATOMIC_64BIT)
-        return 1;
-    #else
-        #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
-            return 1;
-        #else
-            return 0;
-        #endif
-    #endif
+        return c89atomic_is_lock_free(ptr);
     }
 #endif  /* C89ATOMIC_HAS_NATIVE_IS_LOCK_FREE */
 
@@ -1943,7 +1917,7 @@ functions are just implemented as inlined functions.
 #if defined(C89ATOMIC_64BIT)
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_is_lock_free_ptr(volatile void** ptr)
     {
-        return c89atomic_is_lock_free_64((volatile c89atomic_uint64*)ptr);
+        return c89atomic_is_lock_free_64(ptr);
     }
 
     static C89ATOMIC_INLINE void* c89atomic_load_explicit_ptr(volatile void** ptr, c89atomic_memory_order order)
@@ -2571,8 +2545,8 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #define atomic_swap(P, E, D)    __atomic_compare_exchange_n((P), (E), (D), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #endif
 
-/* reads an atomic_flag, `relaxed` */
-#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_relaxed)
+/* reads an atomic_flag */
+#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_seq_cst)
 
 /* sets an atomic_flag to false */
 #define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)
@@ -2644,15 +2618,13 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_exchange_explicit_32((c89atomic_uint32 *)obj, (c89atomic_uint32)desired, order)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak(obj, expected, desired)                        \
-    c89atomic_compare_exchange_weak_32((c89atomic_uint32 *)obj, (c89atomic_uint32)expected, (c89atomic_uint32)desired)
+#define atomic_compare_exchange_weak(obj, expected, desired)    atomic_cas_32(obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	\
     c89atomic_compare_exchange_weak_explicit_32((c89atomic_uint32 *)obj, (c89atomic_uint32)expected, (c89atomic_uint32)desired, succ, fail)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_strong(obj, expected, desired)	                    \
-    c89atomic_compare_exchange_strong_32((c89atomic_uint32 *)obj, (c89atomic_uint32)expected, (c89atomic_uint32)desired)
+#define atomic_compare_exchange_strong(obj, expected, desired)  atomic_cas_32(obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong_explicit(obj, expected, desired, succ, fail)	\
     c89atomic_compare_exchange_strong_explicit_32((c89atomic_uint32 *)obj, (c89atomic_uint32)expected, (c89atomic_uint32)desired, succ, fail)
@@ -2712,46 +2684,17 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_exchange_explicit_64((c89atomic_uint64 *)obj, (c89atomic_uint64)(c89atomic_uint64)desired, order)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_weak(obj, expected, desired)	\
-    c89atomic_compare_exchange_weak_64((c89atomic_uint64 *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired)
+#define atomic_compare_exchange_weak(obj, expected, desired)    atomic_cas(obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_weak_explicit(obj, expected, desired, succ, fail)	\
     c89atomic_compare_exchange_weak_explicit_64((c89atomic_uint64 *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired, succ, fail)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
-#define atomic_compare_exchange_strong(obj, expected, desired)	\
-    c89atomic_compare_exchange_strong_64((c89atomic_uint64 *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired)
+#define atomic_compare_exchange_strong(obj, expected, desired)	atomic_cas(obj, expected, desired)
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_strong_explicit(obj, expected, desired, succ, fail)	\
     c89atomic_compare_exchange_strong_explicit_64((c89atomic_uint64 *)obj, (c89atomic_uint64)expected, (c89atomic_uint64)desired, succ, fail)
-
-#define __SIZEOF_POINTER__ 8
 #endif
-
-#define __c89atomic_copy(_d, _s, _sz, _type)            \
-    {                                                   \
-        _type val = atomic_load((const _type *) (_s));  \
-        _s += sizeof(_type);                            \
-        atomic_store((_type *) (_d), val);              \
-        _d += sizeof(_type);                            \
-        _sz -= sizeof(_type);                           \
-    }
-
-static C89ATOMIC_INLINE void atomic_memcpy(char *dst, const char *src, size_t sz) {
-#if __SIZEOF_POINTER__ == 8
-    while (sz >= sizeof(uint64_t))
-        __c89atomic_copy(dst, src, sz, uint64_t);
-    if (sz >= sizeof(uint32_t))
-        __c89atomic_copy(dst, src, sz, uint32_t);
-#else  //__SIZEOF_POINTER__ == 4
-    while (sz >= sizeof(uint32_t))
-        __c89atomic_copy(dst, src, sz, uint32_t);
-#endif
-    if (sz >= sizeof(uint16_t))
-        __c89atomic_copy(dst, src, sz, uint16_t);
-    if (sz >= sizeof(uint8_t))
-        __c89atomic_copy(dst, src, sz, uint8_t);
-}
 
 #if defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64) || defined(__mips) || defined(__mips__) || defined(__mips64) || defined(__mips32) || defined(__MIPSEL__) || defined(__MIPSEB__) || defined(__sparc__) || defined(__sparc64__) || defined(__sparc_v9__) || defined(__sparcv9) || defined(__riscv) || defined(__ARM64__)
 #   define __ATOMIC_PAD_LINE 32
