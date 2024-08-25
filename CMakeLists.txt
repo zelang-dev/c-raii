@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8...3.14)
 
 project(
     raii
-    VERSION 1.0.15
+    VERSION 1.0.16
     DESCRIPTION "An general RAII implementation for C, with Defer, C11 Atomics/Threads with Thread Pool, and custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
@@ -12,9 +12,7 @@ set(CMAKE_C_STANDARD 90)
 
 include(CMakePackageConfigHelpers)
 include(CMakeDependentOption)
-include(CheckCCompilerFlag)
 include(GNUInstallDirs)
-include(GenerateExportHeader)
 include(FetchContent)
 include(CTest)
 
@@ -91,7 +89,6 @@ set(CPACK_NSIS_MODIFY_PATH ON)
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
 
-generate_export_header(${PROJECT_NAME})
 set(CPACK_SOURCE_IGNORE_FILES
 	"~$"
 	"\\\\.svn/"
