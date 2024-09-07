@@ -33,7 +33,7 @@ thread_storage(int, gLocalVar)
 /* Thread function: Compile time thread-local storage */
 static int thread_test_local_storage(void *aArg) {
     int thread = *(int *)aArg;
-    C11_FREE(aArg);
+    free(aArg);
 
     int data = thread + rand();
     *gLocalVar() = data;
@@ -55,7 +55,7 @@ void run_emulated_tls(void) {
     assert(rpmalloc_gLocalVar_tls == sizeof(int));
 
     for (i = 0; i < THREAD_COUNT; i++) {
-        int *n = C11_MALLOC(sizeof * n);  // Holds a thread serial number
+        int *n = malloc(sizeof * n);  // Holds a thread serial number
             *n = i;
         /* Start a child thread that modifies gLocalVar */
         thrd_create(t + i, thread_test_local_storage, n);
