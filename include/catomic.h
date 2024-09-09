@@ -2627,6 +2627,9 @@ typedef volatile _Atomic(uintmax_t)atomic_uintmax_t;
 #endif
 
 #if !defined(_STDATOMIC_H)
+/* reads an atomic_flag */
+#define atomic_flag_load(ptr)	c89atomic_flag_load_explicit((atomic_flag *)ptr, memory_order_seq_cst)
+
 /* sets an atomic_flag to false */
 #define atomic_flag_clear(ptr)	c89atomic_flag_clear((atomic_flag *)ptr)
 /* sets an atomic_flag to false */
