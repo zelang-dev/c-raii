@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 2.8...3.14)
 
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 project(
     raii
-    VERSION 1.1.0
+    VERSION 1.1.1
     DESCRIPTION "An general RAII implementation for C, with Defer, C11 Atomics/Threads with Thread Pool, and custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
