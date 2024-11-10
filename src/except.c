@@ -137,8 +137,119 @@ static void ex_print(ex_context_t *exception, const char *message) {
             fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
         }
     }
+
+    ex_backtrace(exception->backtrace);
 #endif
     fflush(stderr);
+}
+
+void ex_trace_set(ex_context_t *ex, void_t ctx) {
+#if defined(USE_DEBUG)
+#if defined(_WIN32)
+    // On x64, StackWalk64 modifies the context record, that could
+    // cause crashes, so we create a copy to prevent it
+    memcpy(&ex->backtrace->ctx, (CONTEXT *)ctx, sizeof(CONTEXT));
+    ex->backtrace->process = GetCurrentProcess();
+    ex->backtrace->thread = GetCurrentThread();
+#else
+    ex->backtrace->size = backtrace(ex->backtrace->ctx, EX_MAX_NAME_LEN);
+#endif
+#endif
+}
+
+void ex_backtrace(ex_backtrace_t *ex) { //Prints stack trace based on context record
+#if defined(USE_DEBUG)
+#if defined(_WIN32)
+    CONTEXT             *ctxCopy = ex->ctx;
+    HANDLE              process = ex->process;
+    HANDLE              thread = ex->thread;
+    DWORD64             TempAddress = (DWORD64)0;
+    BOOL                result;
+    HMODULE             hModule;
+
+    STACKFRAME64        stack;
+    ULONG               frame;
+    DWORD64             displacement;
+
+    DWORD disp;
+    IMAGEHLP_LINE64 *line;
+
+    char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+    char module[EX_MAX_NAME_LEN];
+    PSYMBOL_INFO pSymbol = (PSYMBOL_INFO)buffer;
+
+    memset(&stack, 0, sizeof(STACKFRAME64));
+    displacement = 0;
+#if !defined(_M_AMD64)
+    stack.AddrPC.Offset = (*ctx).Eip;
+    stack.AddrPC.Mode = AddrModeFlat;
+    stack.AddrStack.Offset = (*ctx).Esp;
+    stack.AddrStack.Mode = AddrModeFlat;
+    stack.AddrFrame.Offset = (*ctx).Ebp;
+    stack.AddrFrame.Mode = AddrModeFlat;
+#endif
+
+    SymInitialize(process, NULL, TRUE); //load symbols
+
+    for (frame = 0; ; frame++) {
+        //get next call from stack
+        result = StackWalk64
+        (
+#if defined(_M_AMD64)
+            IMAGE_FILE_MACHINE_AMD64
+#else
+            IMAGE_FILE_MACHINE_I386
+#endif
+            ,
+            process,
+            thread,
+            &stack,
+            ctxCopy,
+            NULL,
+            SymFunctionTableAccess64,
+            SymGetModuleBase64,
+            NULL
+        );
+
+        if (!result) break;
+
+        //get symbol name for address
+        pSymbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        pSymbol->MaxNameLen = MAX_SYM_NAME;
+        SymFromAddr(process, (ULONG64)stack.AddrPC.Offset, &displacement, pSymbol);
+
+        line = (IMAGEHLP_LINE64 *)malloc(sizeof(IMAGEHLP_LINE64));
+        line->SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+
+        //try to get line
+        if (SymGetLineFromAddr64(process, stack.AddrPC.Offset, &disp, line)) {
+            fprintf(stderr, "\tat %s in %s: line: %lu: address: 0x%0zx\n", pSymbol->Name, line->FileName, line->LineNumber, pSymbol->Address);
+        } else {
+            //failed to get line
+            if (pSymbol->Address != TempAddress)
+                fprintf(stderr, "\tat %s, address 0x%0zx.\n", pSymbol->Name, pSymbol->Address);
+
+            TempAddress = pSymbol->Address;
+            hModule = NULL;
+            lstrcpyA(module, "");
+            GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                              (LPCTSTR)(stack.AddrPC.Offset), &hModule);
+
+            //at least print module name
+            if (hModule != NULL)GetModuleFileNameA(hModule, module, EX_MAX_NAME_LEN);
+
+            if (!is_str_empty(module))
+                fprintf(stderr, "in %s\n", module);
+        }
+
+        free(line);
+        line = NULL;
+    }
+#else
+    fprintf(stderr, "backtrace() returned %d addresses:\n", (int)ex->size);
+    backtrace_symbols_fd(ex->ctx, ex->size, STDERR_FILENO);
+#endif
+#endif
 }
 
 RAII_INLINE void ex_unwind_set(ex_context_t *ctx, bool flag) {
@@ -191,6 +302,7 @@ ex_context_t *ex_init(void) {
         context->is_emulated = false;
         context->ex = NULL;
         context->panic = NULL;
+        memset(context->backtrace, 0, sizeof(context->backtrace));
         context->caught = -1;
         context->type = ex_context_st;
         ex_signal_unblock(all);
@@ -249,6 +361,10 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
 
+#ifndef _WIN32
+    ex_trace_set(ctx, NULL);
+#endif
+
 #ifdef emulate_tls
     if (ctx == ex_local())
 #else
@@ -269,6 +385,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     bool found = false, signaled = (int)code < 0;
     int i;
 
+    ex_trace_set(ctx, ep->ContextRecord);
     if (!is_str_eq(ctx->ex, exception) && is_empty((void *)ctx->panic))
         return EXCEPTION_EXECUTE_HANDLER;
     else if (is_empty((void *)ctx->ex) && signaled) {
@@ -318,6 +435,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     const char *ex = 0;
     int i;
 
+    ex_trace_set(ctx, ep->ContextRecord);
     if (code == EXCEPTION_PANIC) {
         ctx->state = ex_throw_st;
         return EXCEPTION_EXECUTE_HANDLER;
