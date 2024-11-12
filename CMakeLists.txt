@@ -6,7 +6,7 @@ endif()
 
 project(
     raii
-    VERSION 1.1.2
+    VERSION 1.1.3
     DESCRIPTION "An general RAII implementation for C, with Defer, C11 Atomics/Threads with Thread Pool, and custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C

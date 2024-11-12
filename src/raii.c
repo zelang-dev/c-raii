@@ -579,13 +579,18 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
     va_start(argp, desc);
     for (i = 0; i < count; i++) {
         switch (*desc++) {
-            case 'i':
-                // unsigned integer argument
-                args[i].value.max_size = va_arg(argp, size_t);
+            case 'l':
+                // signed `long` argument
+                args[i].value.s_long = (long)va_arg(argp, long);
                 break;
+            case 'z':
+                // unsigned `size_t` argument
+                args[i].value.max_size = *(size_t *)va_arg(argp, size_t);
+                break;
+            case 'i':
             case 'd':
-                // signed integer argument
-                args[i].value.long_long = va_arg(argp, int64_t);
+                // signed `int64_t` argument
+                args[i].value.long_long = *(int64_t *)va_arg(argp, int64_t);
                 break;
             case 'c':
                 // character argument
@@ -597,7 +602,7 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
                 break;
             case 'a':
                 // array argument
-                args[i].value.array = va_arg(argp, char **);
+                args[i].value.array = (char **)va_arg(argp, char **);
                 break;
             case 'x':
                 // executable argument
@@ -605,14 +610,12 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
                 break;
             case 'f':
                 // float argument
-                args[i].value.precision = va_arg(argp, double);
+                args[i].value.precision = (double)va_arg(argp, double);
                 break;
             case 'p':
                 // void pointer (any arbitrary pointer) argument
-                args[i].value.object = va_arg(argp, void *);
-                break;
             default:
-                args[i].value.object = NULL;
+                args[i].value.object = va_arg(argp, void *);
                 break;
         }
     }

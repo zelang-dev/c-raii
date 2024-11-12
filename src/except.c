@@ -148,7 +148,7 @@ void ex_trace_set(ex_context_t *ex, void_t ctx) {
 #if defined(_WIN32)
     // On x64, StackWalk64 modifies the context record, that could
     // cause crashes, so we create a copy to prevent it
-    memcpy(&ex->backtrace->ctx, (CONTEXT *)ctx, sizeof(CONTEXT));
+    memcpy(ex->backtrace->ctx, (CONTEXT *)ctx, sizeof(CONTEXT));
     ex->backtrace->process = GetCurrentProcess();
     ex->backtrace->thread = GetCurrentThread();
 #else
@@ -358,12 +358,11 @@ void ex_throw(const char *exception, const char *file, int line, const char *fun
     else if (ctx->is_raii)
         raii_unwind_set(ctx, ctx->ex, ctx->panic);
 
-    ex_unwind_stack(ctx);
-    ex_signal_unblock(all);
-
 #ifndef _WIN32
     ex_trace_set(ctx, NULL);
 #endif
+    ex_unwind_stack(ctx);
+    ex_signal_unblock(all);
 
 #ifdef emulate_tls
     if (ctx == ex_local())
@@ -385,7 +384,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     bool found = false, signaled = (int)code < 0;
     int i;
 
-    ex_trace_set(ctx, ep->ContextRecord);
+    ex_trace_set(ctx, (void_t)ep->ContextRecord);
     if (!is_str_eq(ctx->ex, exception) && is_empty((void *)ctx->panic))
         return EXCEPTION_EXECUTE_HANDLER;
     else if (is_empty((void *)ctx->ex) && signaled) {
@@ -435,7 +434,7 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
     const char *ex = 0;
     int i;
 
-    ex_trace_set(ctx, ep->ContextRecord);
+    ex_trace_set(ctx, (void_t)ep->ContextRecord);
     if (code == EXCEPTION_PANIC) {
         ctx->state = ex_throw_st;
         return EXCEPTION_EXECUTE_HANDLER;
