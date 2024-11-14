@@ -7,7 +7,7 @@
 An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety, _smarty!_
 
 * [Synopsis](#synopsis)
-    - [There is _1 ways_ to create an smart memory pointer.](#there-is-1-way-to-create-an-smart-memory-pointer)
+    - [There is _1 way_ to create an smart memory pointer.](#there-is-1-way-to-create-an-smart-memory-pointer)
     - [The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.](#the-following-malloccalloc-wrapper-functions-are-used-to-get-an-raw-memory-pointer)
     - [Thereafter, an smart pointer can be use with these _raii_* functions](#thereafter-an-smart-pointer-can-be-use-with-these-raii-functions)
     - [Using `thread local storage` for an default smart pointer, the following functions always available.](#using-thread-local-storage-for-an-default-smart-pointer-the-following-functions-always-available)
@@ -22,7 +22,9 @@ In the effort to find uniform naming of terms, various other packages was discov
 
 This library uses an custom version of [rpmalloc](https://github.com/mjansson/rpmalloc) for **malloc/heap** allocation, not **C11** compiler `thread local` dependant, nor **C++** focus, _removed_. The customization is merged with required [cthread](https://github.com/zelang-dev/cthread) for **C11** _thread like emulation_.
 
-- The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's C** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
+* The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's C** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
+
+As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
 
 The planned implementation from [defer reference implementation for C](https://gustedt.gitlabpages.inria.fr/defer/):
 
@@ -311,6 +313,25 @@ C_API void raii_deferred_clean(void);
 
 The full potently of **RAII** is encapsulated in the `guard` macro.
 Using `try/catch/catch_any/catch_if/finally/end_try` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
+
+```c++
+try {
+    throw(division_by_zero);
+    printf("never reached\n");
+} catch_if {
+    if (caught(bad_alloc))
+        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+    else if (caught(division_by_zero))
+        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+
+    ex_backtrace(err_backtrace);
+} finally {
+    if (err)
+        printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
+    else
+        printf("finally: try succeeded\n");
+} end_try;
+```
 
 The Planned C11 implementation details still holds here, but `defer` not confined to `guard` block, actual function call.
 

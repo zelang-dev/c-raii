@@ -588,6 +588,9 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
                 args[i].value.max_size = *(size_t *)va_arg(argp, size_t);
                 break;
             case 'i':
+                // unsigned `int` argument
+                args[i].value.u_int = (uint32_t)va_arg(argp, uint32_t);
+                break;
             case 'd':
                 // signed `int64_t` argument
                 args[i].value.long_long = *(int64_t *)va_arg(argp, int64_t);

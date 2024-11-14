@@ -314,6 +314,25 @@ C_API void raii_deferred_clean(void);
 The full potently of **RAII** is encapsulated in the `guard` macro.
 Using `try/catch/catch_any/catch_if/finally/end_try` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
 
+```c++
+try {
+    throw(division_by_zero);
+    printf("never reached\n");
+} catch_if {
+    if (caught(bad_alloc))
+        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+    else if (caught(division_by_zero))
+        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+
+    ex_backtrace(err_backtrace);
+} finally {
+    if (err)
+        printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
+    else
+        printf("finally: try succeeded\n");
+} end_try;
+```
+
 The Planned C11 implementation details still holds here, but `defer` not confined to `guard` block, actual function call.
 
 ```c
