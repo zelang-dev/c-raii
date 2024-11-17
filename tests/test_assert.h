@@ -5,6 +5,12 @@
 #include <stdio.h>
 #include <assert.h>
 
+#define EXEC_TEST(name) \
+    if (name() != 0) { result = -1; printf( #name ": fail\n"); } \
+    else { printf(#name ": pass\n"); }
+
+#define TEST(name)  int test_##name(void)
+
 #ifdef __linux__
 #  define PRINT_COLOR
 #endif
@@ -48,7 +54,8 @@
 #define ASSERT_PTR(expected, actual) ASSERT_EQ_(expected, actual, memcmp(expected, actual, sizeof(actual)) == 0, "%p")
 #define ASSERT_UEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%zu")
 #define ASSERT_EQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%d")
-#define ASSERT_XEQ(expected, actual) ASSERT_EQ_((int)(expected), (int)(actual), expected == actual, "%d")
+#define ASSERT_LEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%i")
+#define ASSERT_XEQ(expected, actual) ASSERT_EQ_((long)(expected), (long)(actual), expected == actual, "%ld")
 #define ASSERT_NULL(actual) ASSERT_EQ_(NULL, actual, NULL == actual, "%p")
 #define ASSERT_NOTNULL(actual) ASSERT_NEQ_(NULL, actual, NULL != actual, "%p")
 

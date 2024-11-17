@@ -1,8 +1,7 @@
 #ifndef RAII_H
 #define RAII_H
 
-#include "rtypes.h"
-#include "exception.h"
+#include "swar.h"
 #include "cthread.h"
 #include "catomic.h"
 #include <stdio.h>

@@ -1,4 +1,5 @@
 #include "raii.h"
+#include "test_assert.h"
 
 const char *map_file_name = "map_file.dat";
 
@@ -314,10 +315,6 @@ int test_map_mprotect() {
     free(buffer);
     return result;
 }
-
-#define EXEC_TEST(name) \
-    if (name() != 0) { result = -1; printf( #name ": fail\n"); } \
-    else { printf(#name ": pass\n"); }
 
 int main()
 {
