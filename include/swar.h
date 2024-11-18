@@ -63,13 +63,6 @@ C_API RAII_INLINE bool haszero(uint64_t x);
 // Check if word has some byte
 C_API RAII_INLINE bool hasbyte(uint64_t x, uint8_t c);
 
-// Find char in printable (chars < 128) string of 8 chars
-C_API RAII_INLINE uint32_t pmemchr8(const char* s, uint8_t c);
-
-// Find char in printable (chars < 128) string of 8 chars
-// * The string is known to contain the char
-C_API RAII_INLINE uint32_t pmemchr8k(const char* s, uint8_t c);
-
 // Find char in binary string of 8 chars
 C_API RAII_INLINE uint32_t memchr8(const char* s, uint8_t c);
 
@@ -77,18 +70,15 @@ C_API RAII_INLINE uint32_t memchr8(const char* s, uint8_t c);
 // * The string is known to contain the char
 C_API RAII_INLINE uint32_t memchr8k(const char* s, uint8_t c);
 
-// Find char in string and trim it
-C_API RAII_INLINE uint32_t _trim8(bool Printable, bool Exists , const char* s, uint8_t c);
-
 //
 // Strlen variants
 //
 
-/* Find zero byte in binary string */
-C_API RAII_INLINE uint32_t simd_strlen(const char* s);
+/* Return the length of the null-terminated string STR.  Scan for
+   the null terminator quickly by testing four bytes at a time. */
+C_API size_t simd_strlen(const char *s);
 
-/* Find zero byte in printable string */
-C_API RAII_INLINE uint32_t simd_strlen_p(const char *s);
+C_API int simd_strcmp(const char *s, const char *c);
 
 //
 // Find byte in const string. Like memchr

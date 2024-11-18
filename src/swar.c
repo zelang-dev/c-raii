@@ -16,7 +16,7 @@ static RAII_INLINE int64_t _copySign(int64_t src, uint64_t dst) {
 
 RAII_INLINE uintptr_t cast(const char *src) {
     uintptr_t ret;
-    memcpy(&ret, src, sizeof(ret));
+    memcpy(&ret, src, sizeof(uintptr_t));
     return ret;
 }
 
@@ -35,7 +35,7 @@ RAII_INLINE uintptr_t cast8(const char *s, uint32_t len) {
 
 RAII_INLINE uintptr_t extend(char c) {
     uintptr_t ret;
-    memset(&ret, c, sizeof(ret));
+    memset(&ret, c, sizeof(uintptr_t));
     return ret;
 }
 
@@ -78,7 +78,7 @@ RAII_INLINE bool haszero(uint64_t x) {
 
 /* Check if word has some byte */
 RAII_INLINE bool hasbyte(uint64_t x, uint8_t c) {
-    return haszero(x ^ (uint64_t)extend(c));
+    return haszero(x ^ extend(c));
 }
 
 // Find char in string. Support all options.
@@ -388,79 +388,108 @@ RAII_INLINE uint64_t simd_htou(const char *s, uint32_t len) {
     return x + htou8(s, len);
 }
 
-// Find char in printable (chars < 128) string of 8 chars
-RAII_INLINE uint32_t pmemchr8(const char *s, uint8_t c) {
-    return _memchr8(true, false, false, s, c);
-}
+RAII_INLINE int simd_strcmp(const char *str0, const char *str1) {
+    int len = simd_strlen(str0);
+    int fast = len / sizeof(size_t) + 1;
+    int offset = (fast - 1) * sizeof(size_t);
+    int current_block = 0;
 
-// Find char in printable (chars < 128) string of 8 chars
-// * The string is known to contain the char
-RAII_INLINE uint32_t pmemchr8k(const char *s, uint8_t c) {
-    return _memchr8(true, true, false, s, c);
-}
+    if (len <= sizeof(size_t)) { fast = 0; }
 
-// Find zero byte in binary string
-RAII_INLINE uint32_t simd_strlen(const char *s) {
-    // check words for zero
-    const char *p = s;
-    while (!haszero(cast(p))) {
-        p += 8;
+    size_t *lstr0 = (size_t *)str0;
+    size_t *lstr1 = (size_t *)str1;
+
+    while (current_block < fast) {
+        if ((lstr0[current_block] ^ lstr1[current_block])) {
+            int pos;
+            for (pos = current_block * sizeof(size_t); pos < len; ++pos) {
+                if ((str0[pos] ^ str1[pos]) || (str0[pos] == 0) || (str1[pos] == 0)) {
+                    return  (int)((unsigned char)str0[pos] - (unsigned char)str1[pos]);
+                }
+            }
+        }
+
+        ++current_block;
     }
 
-    return p - s + memchr8k(p, 8);
+    while (len > offset) {
+        if ((str0[offset] ^ str1[offset])) {
+            return (int)((unsigned char)str0[offset] - (unsigned char)str1[offset]);
+        }
+        ++offset;
+    }
+
+    return 0;
 }
 
-// Find zero byte in printable string
-RAII_INLINE uint32_t simd_strlen_p(const char *s) {
-    // check words for zero
-    const char *p = s;
-    while (!haszero(cast(p))) {
-        p += 8;
+RAII_INLINE size_t simd_strlen(const char *str) {
+    const char *char_ptr;
+    const uintptr_t *longword_ptr;
+    uintptr_t longword, himagic, lomagic;
+
+    /* Handle the first few characters by reading one character at a time.
+       Do this until CHAR_PTR is aligned on a longword boundary.  */
+    for (char_ptr = str; ((uintptr_t)char_ptr
+                          & (sizeof(longword) - 1)) != 0;
+         ++char_ptr)
+        if (*char_ptr == '\0')
+            return char_ptr - str;
+
+    /* All these elucidatory comments refer to 4-byte longwords,
+       but the theory applies equally well to 8-byte longwords.  */
+
+    longword_ptr = (uintptr_t *)char_ptr;
+
+    /* Bits 31, 24, 16, and 8 of this number are zero.  Call these bits
+       the "holes."  Note that there is a hole just to the left of
+       each byte, with an extra at the end:
+       bits:  01111110 11111110 11111110 11111111
+       bytes: AAAAAAAA BBBBBBBB CCCCCCCC DDDDDDDD
+       The 1-bits make sure that carries propagate to the next 0-bit.
+       The 0-bits provide holes for carries to fall into.  */
+    himagic = 0x80808080L;
+    lomagic = 0x01010101L;
+    if (sizeof(longword) > 4) {
+        /* 64-bit version of the magic.  */
+        /* Do the shift in two steps to avoid a warning if long has 32 bits.  */
+        himagic = ((himagic << 16) << 16) | himagic;
+        lomagic = ((lomagic << 16) << 16) | lomagic;
     }
 
-    return p - s + pmemchr8k(p, 8);
-}
+    RAII_ASSERT(!(sizeof(longword) > 8));
 
-// Find char in string and trim it
-RAII_INLINE uint32_t _trim8(bool Printable, bool Exists, const char *s, uint8_t c) {
-    // int 64 of all c's
-    uint64_t m = extend(c);
+    /* Instead of the traditional loop which tests each character,
+       we will test a longword at a time.  The tricky part is testing
+       if *any of the four* bytes in the longword in question are zero.  */
+    for (;;) {
+        longword = *longword_ptr++;
 
-    // int 64 of s
-    uint64_t x = cast(s);
-    uint64_t xo = x;
+        if (((longword - lomagic) & ~longword & himagic) != 0) {
+            /* Which of the bytes was the zero?  If none of them were, it was
+               a misfire; continue the search.  */
 
-    // remove c's from string
-    // so now we have to find first zero byte
-    x ^= m;
+            const char *cp = (const char *)(longword_ptr - 1);
 
-    uint64_t a = 0x7f7f7f7f7f7f7f7full;
-
-    // set the high bit in non-zero bytes
-    if (Printable) {
-        x += a;
-    } else {
-        x = ((x & a) + a) | x;
+            if (cp[0] == 0)
+                return cp - str;
+            if (cp[1] == 0)
+                return cp - str + 1;
+            if (cp[2] == 0)
+                return cp - str + 2;
+            if (cp[3] == 0)
+                return cp - str + 3;
+            if (sizeof(longword) > 4) {
+                if (cp[4] == 0)
+                    return cp - str + 4;
+                if (cp[5] == 0)
+                    return cp - str + 5;
+                if (cp[6] == 0)
+                    return cp - str + 6;
+                if (cp[7] == 0)
+                    return cp - str + 7;
+            }
+        }
     }
-
-    // flip to set the high bit in zero bytes, and clear other high bits
-    x = ~x;
-
-    // clear all bits except the high bit of the zero byte
-    x &= ~a;
-
-    // set all bits under the lowest high bit
-    x &= x - 1u;
-
-    if (!Exists) {
-        x >>= 7;
-    } else if (Printable) {
-        // complete the killed high bit
-        x <<= 1u;
-        x |= 1u;
-    }
-
-    return xo & x;
 }
 
 // Find char in binary string

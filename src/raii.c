@@ -525,8 +525,8 @@ values_type raii_value(void *data) {
 int strpos(const char *text, char *pattern) {
     size_t c, d, e, text_length, pattern_length, position = -1;
 
-    text_length = strlen(text);
-    pattern_length = strlen(pattern);
+    text_length = simd_strlen(text);
+    pattern_length = simd_strlen(pattern);
 
     if (pattern_length > text_length)
         return -1;
@@ -681,7 +681,7 @@ RAII_INLINE bool is_str_in(const char *text, char *pattern) {
 }
 
 RAII_INLINE bool is_str_eq(const char *str, const char *str2) {
-    return (str != NULL && str2 != NULL) && (strcmp(str, str2) == 0);
+    return (str != NULL && str2 != NULL) && (simd_strcmp(str, str2) == 0);
 }
 
 RAII_INLINE bool is_str_empty(const char *str) {

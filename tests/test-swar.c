@@ -267,6 +267,13 @@ TEST(itoa) {
     itoa8(12345678, itoa_ret); ASSERT_STR(itoa_ret, "12345678");
 }
 
+TEST(strlen) {
+    const char *any = "Hello World!";
+
+    size_t result = simd_strlen(any);
+    ASSERT_UEQ((size_t)12, result);
+}
+
 int test_list() {
     int result = 0;
 
@@ -275,6 +282,7 @@ int test_list() {
     EXEC_TEST(test_atoi);
     EXEC_TEST(test_htou);
     EXEC_TEST(test_itoa);
+    EXEC_TEST(test_strlen);
 
     return result;
 }
