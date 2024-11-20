@@ -171,7 +171,7 @@ static RAII_INLINE uint32_t _memrchr(bool Printable, bool Known, const char *s, 
 }
 
 // Find char in const binary string
-RAII_INLINE uint32_t _memchr(bool Printable, bool Known, const char *s, uint32_t len, uint8_t c) {
+static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, const char *s, uint32_t len, uint8_t c) {
     const char *p = s;
     const char *end = s + len;
 
@@ -267,7 +267,7 @@ RAII_INLINE uint32_t simd_itoa(int64_t x, char *buf) {
     bool neg = x < 0;
     *buf = '-'; // Always write
     buf += neg; // But advance only if negative
-    x = _abs64(x);
+    x = abs(x);
 
     char tmp[20];
     char *p = tmp + 20;
@@ -492,9 +492,12 @@ RAII_INLINE size_t simd_strlen(const char *str) {
     }
 }
 
-// Find char in binary string
-RAII_INLINE uint32_t simd_memchr(const char *s, uint32_t len, uint8_t c) {
-    return _memchr(false, false, s, len, c);
+RAII_INLINE string simd_memchr(const char *s, uint8_t c, uint32_t len) {
+    return (char *)s + _memchr(false, false, s, len, c);
+}
+
+RAII_INLINE string simd_memrchr(const char *s, uint8_t c, uint32_t len) {
+    return (char *)s + _memrchr(false, false, s, len, c) - 3;
 }
 
 // Find char in binary string. Char c is known to be in s + len
@@ -512,10 +515,6 @@ RAII_INLINE uint32_t pmemchrk(const char *s, uint32_t len, uint8_t c) {
     return _memchr(true, true, s, len, c);
 }
 
-// Find char in binary string
-RAII_INLINE uint32_t simd_memrchr(const char *s, uint32_t len, uint8_t c) {
-    return _memrchr(false, false, s, len, c);
-}
 
 // Find char in binary string. Char c is known to be in s + len
 RAII_INLINE uint32_t memrchrk(const char *s, uint32_t len, uint8_t c) {
@@ -598,4 +597,278 @@ RAII_INLINE char *utoap(int N, uint64_t x, char *s) {
 
     s[N] = '\0';
     return s;
+}
+
+int strpos(const char *text, char *pattern) {
+    size_t c, d, e, text_length, pattern_length, position = -1;
+
+    text_length = simd_strlen(text);
+    pattern_length = simd_strlen(pattern);
+
+    if (pattern_length > text_length)
+        return -1;
+
+    for (c = 0; c <= text_length - pattern_length; c++) {
+        position = e = c;
+        for (d = 0; d < pattern_length; d++)
+            if (pattern[d] == text[e])
+                e++;
+            else
+                break;
+
+        if (d == pattern_length)
+            return (int)position;
+    }
+
+    return -1;
+}
+
+string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count) {
+    if (is_str_eq(s, ""))
+        return NULL;
+
+    if (is_empty((void_t)delim))
+        delim = " ";
+
+    void *data;
+    string _s = (string)s;
+    string_t *ptrs;
+    size_t ptrsSize, nbWords = 1, sLen = simd_strlen(s), delimLen = simd_strlen(delim);
+
+    while ((_s = strstr(_s, delim))) {
+        _s += delimLen;
+        ++nbWords;
+    }
+
+    ptrsSize = (nbWords + 1) * sizeof(string);
+    if (defer)
+        ptrs = data = calloc_full(defer, 1, ptrsSize + sLen + 1, RAII_FREE);
+    else
+        ptrs = data = try_calloc(1, ptrsSize + sLen + 1);
+
+    if (data) {
+        *ptrs = _s = str_copy((string)data + ptrsSize, s, sLen);
+        if (nbWords > 1) {
+            while ((_s = strstr(_s, delim))) {
+                *_s = '\0';
+                _s += delimLen;
+                *++ptrs = _s;
+            }
+        }
+
+        *++ptrs = NULL;
+        if (count)
+            *count = (int)nbWords;
+    }
+
+    return data;
+}
+
+string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy) {
+    size_t strsize = 0;
+    int i;
+    va_list ap;
+
+    va_copy(ap, ap_copy);
+    for (i = 0; i < num_args; i++)
+        strsize += simd_strlen(va_arg(ap, string));
+
+    string res = try_calloc(1, strsize + 1);
+    strsize = 0;
+
+    va_copy(ap, ap_copy);
+    for (i = 0; i < num_args; i++) {
+        string s = va_arg(ap, string);
+        str_copy(res + strsize, s, 0);
+        strsize += simd_strlen(s);
+    }
+    va_end(ap);
+
+    if (defer)
+        raii_deferred(defer, RAII_FREE, res);
+
+    return res;
+}
+
+string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, string_t replace) {
+    if (!haystack || !needle || !replace)
+        return NULL;
+
+    string result;
+    size_t i, cnt = 0;
+    size_t newWlen = simd_strlen(replace);
+    size_t oldWlen = simd_strlen(needle);
+
+    for (i = 0; haystack[i] != '\0'; i++) {
+        if (strstr(&haystack[i], needle) == &haystack[i]) {
+            cnt++;
+
+            i += oldWlen - 1;
+        }
+    }
+
+    if (cnt == 0)
+        return NULL;
+
+    if (defer)
+        result = (string)calloc_full(defer, 1, i + cnt * (newWlen - oldWlen) + 1, RAII_FREE);
+    else
+        result = (string)try_calloc(1, i + cnt * (newWlen - oldWlen) + 1);
+
+    i = 0;
+    while (*haystack) {
+        if (strstr(haystack, needle) == haystack) {
+            str_copy(&result[i], replace, newWlen);
+            i += newWlen;
+            haystack += oldWlen;
+        } else {
+            result[i++] = *haystack++;
+        }
+    }
+
+    result[i] = '\0';
+    return result;
+}
+
+RAII_INLINE string str_copy(string dest, string_t src, size_t len) {
+    return memcpy(dest, src, (len ? len : simd_strlen(src)));
+}
+
+RAII_INLINE string str_memdup_ex(memory_t *defer, const_t src, size_t len) {
+    string ptr = (string)calloc_full(defer, 1, len + 1, RAII_FREE);
+
+    return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;
+}
+
+static u_char_t base64_table[65] =
+"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static u_char_t base64_decode_table[256] = {
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x3e, 0x80, 0x80, 0x80, 0x3f,
+    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x80, 0x80,
+    0x80, 0x00, 0x80, 0x80, 0x80, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+    0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12,
+    0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24,
+    0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30,
+    0x31, 0x32, 0x33, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80};
+
+static inline size_t str_base64_len(size_t decoded_len) {
+    /* This counts the padding bytes (by rounding to the next multiple of 4). */
+    return ((4u * decoded_len / 3u) + 3u) & ~3u;
+}
+
+bool is_base64(u_string_t src) {
+    size_t i, len = simd_strlen(src);
+    for (i = 0; i < len; i++) {
+        if (base64_decode_table[src[i]] == 0x80)
+            return false;
+    }
+
+    return true;
+}
+
+u_string str_encode64_ex(memory_t *defer, u_string_t src) {
+    u_string out, pos;
+    u_string_t end, begin;
+    size_t olen;
+    size_t len = simd_strlen(src);
+
+    olen = str_base64_len(len) + 1 /* for NUL termination */;
+    if (olen < len)
+        return NULL; /* integer overflow */
+
+    out = calloc_full(defer, 1, olen, RAII_FREE);
+    end = src + len;
+    begin = src;
+    pos = out;
+    while (end - begin >= 3) {
+        *pos++ = base64_table[begin[0] >> 2];
+        *pos++ = base64_table[((begin[0] & 0x03) << 4) | (begin[1] >> 4)];
+        *pos++ = base64_table[((begin[1] & 0x0f) << 2) | (begin[2] >> 6)];
+        *pos++ = base64_table[begin[2] & 0x3f];
+        begin += 3;
+    }
+
+    if (end - begin) {
+        *pos++ = base64_table[begin[0] >> 2];
+        if (end - begin == 1) {
+            *pos++ = base64_table[(begin[0] & 0x03) << 4];
+            *pos++ = '=';
+        } else {
+            *pos++ = base64_table[((begin[0] & 0x03) << 4) | (begin[1] >> 4)];
+            *pos++ = base64_table[(begin[1] & 0x0f) << 2];
+        }
+        *pos++ = '=';
+    }
+
+    *pos = '\0';
+
+    return out;
+}
+
+u_string str_decode64_ex(memory_t *defer, u_string_t src) {
+    u_string out, pos;
+    u_char block[4];
+    size_t i, count, olen;
+    int pad = 0;
+    size_t len = simd_strlen(src);
+
+    count = 0;
+    for (i = 0; i < len; i++) {
+        if (base64_decode_table[src[i]] != 0x80)
+            count++;
+    }
+
+    if (count == 0 || count % 4)
+        return NULL;
+
+    olen = (count / 4 * 3) + 1;
+    pos = out = calloc_full(defer, 1, olen, RAII_FREE);
+
+    count = 0;
+    for (i = 0; i < len; i++) {
+        u_char tmp = base64_decode_table[src[i]];
+        if (tmp == 0x80)
+            continue;
+
+        if (src[i] == '=')
+            pad++;
+        block[count] = tmp;
+        count++;
+        if (count == 4) {
+            *pos++ = (u_char)((block[0] << 2) | (block[1] >> 4));
+            *pos++ = (u_char)((block[1] << 4) | (block[2] >> 2));
+            *pos++ = (u_char)((block[2] << 6) | block[3]);
+            count = 0;
+            if (pad) {
+                if (pad == 1)
+                    pos--;
+                else if (pad == 2)
+                    pos -= 2;
+                else {
+                    /* Invalid padding */
+                    return NULL;
+                }
+                break;
+            }
+        }
+    }
+    *pos = '\0';
+
+    return out;
 }

@@ -165,6 +165,37 @@ void *try_realloc(void *old_ptr, size_t size) {
     return ptr;
 }
 
+RAII_INLINE void_t raii_memdup(const_t src, size_t len) {
+    return (void_t)str_memdup_ex(raii_init(), src, len);
+}
+
+RAII_INLINE string *raii_split(string_t s, string_t delim, int *count) {
+    return str_split_ex(raii_init(), s, delim, count);
+}
+
+RAII_INLINE string raii_concat(int num_args, ...) {
+    va_list ap;
+    string data;
+
+    va_start(ap, num_args);
+    data = str_concat_ex(raii_init(), num_args, ap);
+    va_end(ap);
+
+    return data;
+}
+
+RAII_INLINE string raii_replace(string_t haystack, string_t needle, string_t replace) {
+    return str_replace_ex(raii_init(), haystack, needle, replace);
+}
+
+RAII_INLINE u_string raii_encode64(u_string_t src) {
+    return str_encode64_ex(raii_init(), src);
+}
+
+RAII_INLINE u_string raii_decode64(u_string_t src) {
+    return str_decode64_ex(raii_local(), src);
+}
+
 unique_t *unique_init(void) {
     unique_t *raii = try_calloc(1, sizeof(unique_t));
     if (UNLIKELY(raii_deferred_init(&raii->defer) < 0))
@@ -520,30 +551,6 @@ values_type raii_value(void *data) {
 
     RAII_LOG("attempt to get value on null");
     return;
-}
-
-int strpos(const char *text, char *pattern) {
-    size_t c, d, e, text_length, pattern_length, position = -1;
-
-    text_length = simd_strlen(text);
-    pattern_length = simd_strlen(pattern);
-
-    if (pattern_length > text_length)
-        return -1;
-
-    for (c = 0; c <= text_length - pattern_length; c++) {
-        position = e = c;
-        for (d = 0; d < pattern_length; d++)
-            if (pattern[d] == text[e])
-                e++;
-            else
-                break;
-
-        if (d == pattern_length)
-            return (int)position;
-    }
-
-    return -1;
 }
 
 void args_free(args_t *params) {

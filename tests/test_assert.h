@@ -5,9 +5,19 @@
 #include <stdio.h>
 #include <assert.h>
 
+inline void assert_expected(long res, long expected, const char *file, unsigned int line, const char *expr, const char *expected_str) {
+    if (res != expected) {
+        fflush(stdout);
+        fprintf(stderr, "%s:%u: %s: error %li, expected %s\n", file, line, expr, res, expected_str);
+        abort();
+    }
+}
+
+#define CHK_EXPECTED(a, b) assert_expected(a, b, __FILE__, __LINE__, #a, #b)
+
 #define EXEC_TEST(name) \
-    if (name() != 0) { result = -1; printf( #name ": fail\n"); } \
-    else { printf(#name ": pass\n"); }
+    if (test_##name() != 0) { result = -1; printf( #name ": fail\n\n"); } \
+    else { printf(#name ": pass\n\n"); }
 
 #define TEST(name)  int test_##name(void)
 
@@ -65,4 +75,7 @@
     } \
   } while (0)
 
+#define TEST_FUNC(name) ASSERT_FUNC(test_##name);  \
+    printf("\nAll tests successful!\n"); \
+    return 0
 #endif

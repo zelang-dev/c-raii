@@ -288,6 +288,13 @@ C_API void raii_deferred_free(memory_t *);
 /* Begin `unwinding`, executing current `thread` scope `raii_defer` statements. */
 C_API void raii_deferred_clean(void);
 
+C_API void *raii_memdup(const_t src, size_t len);
+C_API string *raii_split(string_t s, string_t delim, int *count);
+C_API string raii_concat(int num_args, ...);
+C_API string raii_replace(string_t haystack, string_t needle, string_t replace);
+C_API u_string raii_encode64(u_string_t src);
+C_API u_string raii_decode64(u_string_t src);
+
 /* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
 for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
@@ -508,6 +515,15 @@ C_API size_t arena_capacity(const arena_t arena);
 C_API size_t arena_total(const arena_t arena);
 C_API void arena_print(const arena_t arena);
 
+C_API string str_memdup_ex(memory_t *defer, const_t src, size_t len);
+C_API string str_copy(string dest, string_t src, size_t len);
+C_API string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count);
+C_API string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy);
+C_API string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, string_t replace);
+C_API u_string str_encode64_ex(memory_t *defer, u_string_t src);
+C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
+C_API bool is_base64(u_string_t src);
+C_API int strpos(const char *text, char *pattern);
 
 #ifdef __cplusplus
     }

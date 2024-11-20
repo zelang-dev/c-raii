@@ -85,7 +85,7 @@ C_API int simd_strcmp(const char *s, const char *c);
 //
 
 // Find char in binary string
-C_API RAII_INLINE uint32_t simd_memchr(const char* s, uint32_t len, uint8_t c);
+C_API RAII_INLINE string simd_memchr(const char *s, uint8_t c, uint32_t len);
 
 // Find char in binary string. Char c is known to be in s + len
 C_API RAII_INLINE uint32_t memchrk(const char* s, uint32_t len, uint8_t c);
@@ -101,7 +101,7 @@ C_API RAII_INLINE uint32_t pmemchrk(const char* s, uint32_t len, uint8_t c);
 //
 
 // Find char, in reverse, in binary string
-C_API RAII_INLINE uint32_t simd_memrchr(const char* s, uint32_t len, uint8_t c);
+C_API RAII_INLINE string simd_memrchr(const char* s, uint8_t c, uint32_t len);
 
 // Find char in binary string. Char c is known to be in s + len
 C_API RAII_INLINE uint32_t memrchrk(const char* s, uint32_t len, uint8_t c);

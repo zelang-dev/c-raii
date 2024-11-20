@@ -6,8 +6,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
-
-#define CHK_EXPECTED(a, b) assert_expected(a, b, __FILE__, __LINE__, #a, #b)
 #define NUM_THREADS 8
 
 int flag;
@@ -94,12 +92,4 @@ int main(void) {
     puts("end memory test\n");
 
     return 0;
-}
-
-void assert_expected(int res, int expected, const char *file, unsigned int line, const char *expr, const char *expected_str) {
-    if (res != expected) {
-        fflush(stdout);
-        fprintf(stderr, "%s:%u: %s: error %d, expected %s\n", file, line, expr, res, expected_str);
-        abort();
-    }
 }

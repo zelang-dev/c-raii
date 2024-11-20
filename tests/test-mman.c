@@ -320,20 +320,20 @@ int main()
 {
     int result = 0;
 
-    EXEC_TEST(test_anon_map_readwrite);
+    EXEC_TEST(anon_map_readwrite);
     // NOTE: this test must cause an access violation exception
-    EXEC_TEST(test_anon_map_readonly);
-    EXEC_TEST(test_anon_map_readonly_nowrite);
-    EXEC_TEST(test_anon_map_writeonly);
+    EXEC_TEST(anon_map_readonly);
+    EXEC_TEST(anon_map_readonly_nowrite);
+    EXEC_TEST(anon_map_writeonly);
 
 #ifdef _WIN32
-    EXEC_TEST(test_file_map_readwrite);
-    EXEC_TEST(test_file_map_mlock_munlock);
-    EXEC_TEST(test_file_map_msync);
+    EXEC_TEST(file_map_readwrite);
+    EXEC_TEST(file_map_mlock_munlock);
+    EXEC_TEST(file_map_msync);
 #endif
-    EXEC_TEST(test_mlock_valid_address);
-    EXEC_TEST(test_mlock_page);
-    EXEC_TEST(test_map_mprotect);
+    EXEC_TEST(mlock_valid_address);
+    EXEC_TEST(mlock_page);
+    EXEC_TEST(map_mprotect);
 
     return result;
 }

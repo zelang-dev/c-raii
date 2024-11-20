@@ -22,10 +22,9 @@ TEST(memchr) {
     ASSERT_LEQ(memchr8("==", '='), 0);
     ASSERT_LEQ(memchr8("=", '='), 0);
 
-    //                    123456789 123456789 123456789
-    ASSERT_LEQ(simd_memchr("1234567890abcdefghij=", 20, '='), -1);
-    ASSERT_LEQ(simd_memchr("12345678=90abcdefghi", 20, '='), 8);
-    ASSERT_LEQ(simd_memchr("1234=567890abcdefghi", 20, '='), 4);
+    const char str[] = "tutor.ials.point";
+    ASSERT_STR(simd_memchr(str, '.', simd_strlen(str)), ".ials.point");
+    ASSERT_STR(simd_memrchr(str, '.', simd_strlen(str)), ".point");
 }
 
 TEST(cast8) {
@@ -196,75 +195,75 @@ TEST(htou) {
 TEST(itoa) {
     int i;
     long long x;
-    char itoa_ret[100];
+    char itoa_returned[100];
     char test_buf[100];
 
     for (i = -100000; i < 100000; i++) {
         sprintf(test_buf, "%d", i);
-        simd_itoa(i, itoa_ret);
-        if (strcmp(itoa_ret, test_buf) != 0)
-            ASSERT_STR(itoa_ret, test_buf);
+        simd_itoa(i, itoa_returned);
+        if (strcmp(itoa_returned, test_buf) != 0)
+            ASSERT_STR(itoa_returned, test_buf);
     }
 
     for (x = LLONG_MIN;
          x < LLONG_MIN; x += 13371) {
         sprintf(test_buf, "%zi", x);
-        simd_itoa(x, itoa_ret);
-        if (strcmp(itoa_ret, test_buf) != 0)
-            ASSERT_STR(itoa_ret, test_buf);
+        simd_itoa(x, itoa_returned);
+        if (strcmp(itoa_returned, test_buf) != 0)
+            ASSERT_STR(itoa_returned, test_buf);
     }
 
-    ASSERT_STR(utoap(1, 0, itoa_ret), "0");
-    ASSERT_STR(utoap(2, 0, itoa_ret), "00");
-    ASSERT_STR(utoap(3, 0, itoa_ret), "000");
-    ASSERT_STR(utoap(4, 0, itoa_ret), "0000");
-    ASSERT_STR(utoap(5, 0, itoa_ret), "00000");
-    ASSERT_STR(utoap(6, 0, itoa_ret), "000000");
-    ASSERT_STR(utoap(7, 0, itoa_ret), "0000000");
-    ASSERT_STR(utoap(8, 0, itoa_ret), "00000000");
-    ASSERT_STR(utoap(9, 0, itoa_ret), "000000000");
-    ASSERT_STR(utoap(10, 0, itoa_ret), "0000000000");
-    ASSERT_STR(utoap(11, 0, itoa_ret), "00000000000");
-    ASSERT_STR(utoap(12, 0, itoa_ret), "000000000000");
-    ASSERT_STR(utoap(13, 0, itoa_ret), "0000000000000");
-    ASSERT_STR(utoap(14, 0, itoa_ret), "00000000000000");
-    ASSERT_STR(utoap(15, 0, itoa_ret), "000000000000000");
-    ASSERT_STR(utoap(16, 0, itoa_ret), "0000000000000000");
-    ASSERT_STR(utoap(17, 0, itoa_ret), "00000000000000000");
-    ASSERT_STR(utoap(18, 0, itoa_ret), "000000000000000000");
-    ASSERT_STR(utoap(19, 0, itoa_ret), "0000000000000000000");
+    ASSERT_STR(utoap(1, 0, itoa_returned), "0");
+    ASSERT_STR(utoap(2, 0, itoa_returned), "00");
+    ASSERT_STR(utoap(3, 0, itoa_returned), "000");
+    ASSERT_STR(utoap(4, 0, itoa_returned), "0000");
+    ASSERT_STR(utoap(5, 0, itoa_returned), "00000");
+    ASSERT_STR(utoap(6, 0, itoa_returned), "000000");
+    ASSERT_STR(utoap(7, 0, itoa_returned), "0000000");
+    ASSERT_STR(utoap(8, 0, itoa_returned), "00000000");
+    ASSERT_STR(utoap(9, 0, itoa_returned), "000000000");
+    ASSERT_STR(utoap(10, 0, itoa_returned), "0000000000");
+    ASSERT_STR(utoap(11, 0, itoa_returned), "00000000000");
+    ASSERT_STR(utoap(12, 0, itoa_returned), "000000000000");
+    ASSERT_STR(utoap(13, 0, itoa_returned), "0000000000000");
+    ASSERT_STR(utoap(14, 0, itoa_returned), "00000000000000");
+    ASSERT_STR(utoap(15, 0, itoa_returned), "000000000000000");
+    ASSERT_STR(utoap(16, 0, itoa_returned), "0000000000000000");
+    ASSERT_STR(utoap(17, 0, itoa_returned), "00000000000000000");
+    ASSERT_STR(utoap(18, 0, itoa_returned), "000000000000000000");
+    ASSERT_STR(utoap(19, 0, itoa_returned), "0000000000000000000");
 
-    ASSERT_STR(utoap(0, 7, itoa_ret), "");
-    ASSERT_STR(utoap(1, 7, itoa_ret), "7");
-    ASSERT_STR(utoap(2, 7, itoa_ret), "07");
-    ASSERT_STR(utoap(3, 7, itoa_ret), "007");
-    ASSERT_STR(utoap(4, 7, itoa_ret), "0007");
-    ASSERT_STR(utoap(5, 7, itoa_ret), "00007");
-    ASSERT_STR(utoap(6, 12345, itoa_ret), "012345");
-    ASSERT_STR(utoap(7, 12345, itoa_ret), "0012345");
-    ASSERT_STR(utoap(8, 12345, itoa_ret), "00012345");
-    ASSERT_STR(utoap(9, 12345, itoa_ret), "000012345");
-    ASSERT_STR(utoap(10, 12345, itoa_ret), "0000012345");
-    ASSERT_STR(utoap(11, 12345, itoa_ret), "00000012345");
-    ASSERT_STR(utoap(12, 12345678901, itoa_ret), "012345678901");
-    ASSERT_STR(utoap(13, 12345678901, itoa_ret), "0012345678901");
-    ASSERT_STR(utoap(14, 12345678901, itoa_ret), "00012345678901");
-    ASSERT_STR(utoap(15, 12345678901, itoa_ret), "000012345678901");
-    ASSERT_STR(utoap(16, 12345678901, itoa_ret), "0000012345678901");
-    ASSERT_STR(utoap(17, 123456789012345, itoa_ret), "00123456789012345");
-    ASSERT_STR(utoap(18, 123456789012345, itoa_ret), "000123456789012345");
-    ASSERT_STR(utoap(19, 123456789012345, itoa_ret), "0000123456789012345");
-    ASSERT_STR(utoap(20, 123456789012345, itoa_ret), "00000123456789012345");
+    ASSERT_STR(utoap(0, 7, itoa_returned), "");
+    ASSERT_STR(utoap(1, 7, itoa_returned), "7");
+    ASSERT_STR(utoap(2, 7, itoa_returned), "07");
+    ASSERT_STR(utoap(3, 7, itoa_returned), "007");
+    ASSERT_STR(utoap(4, 7, itoa_returned), "0007");
+    ASSERT_STR(utoap(5, 7, itoa_returned), "00007");
+    ASSERT_STR(utoap(6, 12345, itoa_returned), "012345");
+    ASSERT_STR(utoap(7, 12345, itoa_returned), "0012345");
+    ASSERT_STR(utoap(8, 12345, itoa_returned), "00012345");
+    ASSERT_STR(utoap(9, 12345, itoa_returned), "000012345");
+    ASSERT_STR(utoap(10, 12345, itoa_returned), "0000012345");
+    ASSERT_STR(utoap(11, 12345, itoa_returned), "00000012345");
+    ASSERT_STR(utoap(12, 12345678901, itoa_returned), "012345678901");
+    ASSERT_STR(utoap(13, 12345678901, itoa_returned), "0012345678901");
+    ASSERT_STR(utoap(14, 12345678901, itoa_returned), "00012345678901");
+    ASSERT_STR(utoap(15, 12345678901, itoa_returned), "000012345678901");
+    ASSERT_STR(utoap(16, 12345678901, itoa_returned), "0000012345678901");
+    ASSERT_STR(utoap(17, 123456789012345, itoa_returned), "00123456789012345");
+    ASSERT_STR(utoap(18, 123456789012345, itoa_returned), "000123456789012345");
+    ASSERT_STR(utoap(19, 123456789012345, itoa_returned), "0000123456789012345");
+    ASSERT_STR(utoap(20, 123456789012345, itoa_returned), "00000123456789012345");
 
-    itoa8(0, itoa_ret); ASSERT_STR(itoa_ret, "0");
-    itoa8(1, itoa_ret); ASSERT_STR(itoa_ret, "1");
-    itoa8(12, itoa_ret); ASSERT_STR(itoa_ret, "12");
-    itoa8(123, itoa_ret); ASSERT_STR(itoa_ret, "123");
-    itoa8(1234, itoa_ret); ASSERT_STR(itoa_ret, "1234");
-    itoa8(12345, itoa_ret); ASSERT_STR(itoa_ret, "12345");
-    itoa8(123456, itoa_ret); ASSERT_STR(itoa_ret, "123456");
-    itoa8(1234567, itoa_ret); ASSERT_STR(itoa_ret, "1234567");
-    itoa8(12345678, itoa_ret); ASSERT_STR(itoa_ret, "12345678");
+    itoa8(0, itoa_returned); ASSERT_STR(itoa_returned, "0");
+    itoa8(1, itoa_returned); ASSERT_STR(itoa_returned, "1");
+    itoa8(12, itoa_returned); ASSERT_STR(itoa_returned, "12");
+    itoa8(123, itoa_returned); ASSERT_STR(itoa_returned, "123");
+    itoa8(1234, itoa_returned); ASSERT_STR(itoa_returned, "1234");
+    itoa8(12345, itoa_returned); ASSERT_STR(itoa_returned, "12345");
+    itoa8(123456, itoa_returned); ASSERT_STR(itoa_returned, "123456");
+    itoa8(1234567, itoa_returned); ASSERT_STR(itoa_returned, "1234567");
+    itoa8(12345678, itoa_returned); ASSERT_STR(itoa_returned, "12345678");
 }
 
 TEST(strlen) {
@@ -274,21 +273,67 @@ TEST(strlen) {
     ASSERT_UEQ((size_t)12, result);
 }
 
-int test_list() {
+TEST(raii_replace) {
+    string_t text = "hello world";
+    ASSERT_STR(raii_replace(text, "world", "hello"), "hello hello");
+}
+
+TEST(raii_concat) {
+    ASSERT_STR(raii_concat(3, "testing ", "this ", "thing"), "testing this thing");
+}
+
+TEST(raii_split) {
+    char **token, **parts;
+    const char *any = "lots=1&of=2&parameters=3&too=4&here=5";
+    int x, i = 0;
+    token = raii_split(any, "&", &i);
+    for (x = 0; x < i; x++) {
+        parts = raii_split(token[x], "=", NULL);
+        switch (x) {
+            case 0:
+                ASSERT_STR(parts[0], "lots");
+                ASSERT_STR(parts[1], "1");
+                break;
+            case 1:
+                ASSERT_STR(parts[0], "of");
+                ASSERT_STR(parts[1], "2");
+                break;
+            case 2:
+                ASSERT_STR(parts[0], "parameters");
+                ASSERT_STR(parts[1], "3");
+                break;
+            case 3:
+                ASSERT_STR(parts[0], "too");
+                ASSERT_STR(parts[1], "4");
+                break;
+            case 4:
+                ASSERT_STR(parts[0], "here");
+                ASSERT_STR(parts[1], "5");
+                break;
+        }
+    }
+
+    raii_destroy();
+
+    return 0;
+}
+
+TEST(list) {
     int result = 0;
 
-    EXEC_TEST(test_memchr);
-    EXEC_TEST(test_cast8);
-    EXEC_TEST(test_atoi);
-    EXEC_TEST(test_htou);
-    EXEC_TEST(test_itoa);
-    EXEC_TEST(test_strlen);
+    EXEC_TEST(memchr);
+    EXEC_TEST(cast8);
+    EXEC_TEST(atoi);
+    EXEC_TEST(htou);
+    EXEC_TEST(itoa);
+    EXEC_TEST(strlen);
+    EXEC_TEST(raii_replace);
+    EXEC_TEST(raii_concat);
+    EXEC_TEST(raii_split);
 
     return result;
 }
 
 int main(int argc, char **argv) {
-    ASSERT_FUNC(test_list());
-
-    return 0;
+    TEST_FUNC(list());
 }
