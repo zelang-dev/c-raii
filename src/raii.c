@@ -122,6 +122,8 @@ memory_t *raii_init(void) {
         ctx->is_raii = true;
         if (!exception_signal_set)
             ex_signal_setup();
+
+        atexit(raii_destroy);
     }
 
     return scope;
