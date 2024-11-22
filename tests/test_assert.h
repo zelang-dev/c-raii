@@ -49,6 +49,17 @@ inline void assert_expected(long res, long expected, const char *file, unsigned 
     PRINT_OK(" %s == %s\n", #expected, #actual); \
   } while (0)
 
+#define ASSERT_THREAD_EQ(expected, actual, cmp, print_op) do { \
+    if (!(cmp)) \
+      { \
+	PRINT_ERR(" %s %d:\n   * %s != %s\n   * Expected: " print_op	\
+          "\n   * Actual: " print_op "\n", __FILE__, __LINE__, \
+          #expected, #actual, expected, actual); \
+    return 0; \
+      } \
+    PRINT_OK(" %s == %s\n", #expected, #actual); \
+  } while (0)
+
 #define ASSERT_NEQ_(expected, actual, cmp, print_op) do { \
     if (!(cmp)) \
       { \
@@ -68,6 +79,9 @@ inline void assert_expected(long res, long expected, const char *file, unsigned 
 #define ASSERT_XEQ(expected, actual) ASSERT_EQ_((long)(expected), (long)(actual), expected == actual, "%ld")
 #define ASSERT_NULL(actual) ASSERT_EQ_(NULL, actual, NULL == actual, "%p")
 #define ASSERT_NOTNULL(actual) ASSERT_NEQ_(NULL, actual, NULL != actual, "%p")
+#define ASSERT_TRUE(actual) ASSERT_EQ_(true, actual, true == actual, "%c")
+#define ASSERT_FALSE(actual) ASSERT_EQ_(false, actual, false == actual, "%d")
+#define ASSERT_THREAD(actual) ASSERT_THREAD_EQ(true, actual, true == actual, "%c")
 
 #define ASSERT_FUNC(FNC_CALL) do { \
     if (FNC_CALL) { \

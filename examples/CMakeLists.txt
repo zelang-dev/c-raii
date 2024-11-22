@@ -15,7 +15,8 @@ set(TARGET_LIST defer_thread
  try_signal_sigfpe
  try_signal_sigsegv
  try_unprotected
- work-steal )
+ work-steal
+ thrd_for )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )
     target_link_libraries(${TARGET} raii)

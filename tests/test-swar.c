@@ -268,9 +268,7 @@ TEST(itoa) {
 
 TEST(strlen) {
     const char *any = "Hello World!";
-
-    size_t result = simd_strlen(any);
-    ASSERT_UEQ((size_t)12, result);
+    ASSERT_TRUE((12 == simd_strlen(any)));
 }
 
 TEST(raii_replace) {
@@ -313,8 +311,6 @@ TEST(raii_split) {
         }
     }
 
-    raii_destroy();
-
     return 0;
 }
 
@@ -336,4 +332,5 @@ TEST(list) {
 
 int main(int argc, char **argv) {
     TEST_FUNC(list());
+    raii_destroy();
 }

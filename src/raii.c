@@ -444,7 +444,7 @@ void raii_deferred_free(memory_t *scope) {
 }
 
 RAII_INLINE void raii_deferred_clean(void) {
-    raii_deferred_free(raii_init());
+    raii_deferred_free(raii_local());
 }
 
 static size_t raii_deferred_any(memory_t *scope, func_t func, void *data, void *check) {
@@ -470,11 +470,11 @@ RAII_INLINE size_t raii_deferred(memory_t *scope, func_t func, void *data) {
 }
 
 RAII_INLINE size_t raii_defer(func_t func, void *data) {
-    return raii_deferred(raii_init(), func, data);
+    return raii_deferred(raii_local(), func, data);
 }
 
 RAII_INLINE void raii_recover(func_t func, void *data) {
-    raii_deferred_any(raii_init(), func, data, (void *)"err");
+    raii_deferred_any(raii_local(), func, data, (void *)"err");
 }
 
 RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void *data) {
@@ -482,7 +482,7 @@ RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void *data) {
 }
 
 bool raii_caught(const char *err) {
-    memory_t *scope = raii_init();
+    memory_t *scope = raii_local();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
 
     if (exception == NULL && is_str_eq(err, ex_local()->ex)) {
@@ -499,13 +499,13 @@ bool raii_caught(const char *err) {
 bool raii_is_caught(memory_t *scope, const char *err) {
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
     if ((scope->is_recovered = is_str_eq(err, exception)))
-        ex_init()->state = ex_catch_st;
+        ex_local()->state = ex_catch_st;
 
     return scope->is_recovered;
 }
 
 const char *raii_message(void) {
-    memory_t *scope = raii_init();
+    memory_t *scope = raii_local();
     const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
     return exception == NULL ? ex_local()->ex : exception;
 }
@@ -515,15 +515,15 @@ RAII_INLINE const char *raii_message_by(memory_t *scope) {
 }
 
 RAII_INLINE void raii_defer_cancel(size_t index) {
-    raii_deferred_cancel(raii_init(), index);
+    raii_deferred_cancel(raii_local(), index);
 }
 
 RAII_INLINE void raii_defer_fire(size_t index) {
-    raii_deferred_fire(raii_init(), index);
+    raii_deferred_fire(raii_local(), index);
 }
 
 void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
-    memory_t *scope = raii_init()->arena;
+    memory_t *scope = raii_local()->arena;
     scope->err = (void *)ex;
     scope->panic = message;
     ctx->is_guarded = true;
@@ -532,7 +532,7 @@ void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
 }
 
 void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind) {
-    raii_init()->arena = scope;
+    raii_local()->arena = scope;
     ex_swap_reset(ex_local());
     ex_local()->is_guarded = false;
     exception_setup_func = set;
@@ -547,7 +547,7 @@ void guard_delete(memory_t *ptr) {
     }
 }
 
-values_type raii_value(void *data) {
+RAII_INLINE values_type raii_value(void *data) {
     if (data)
         return ((raii_values_t *)data)->value;
 
@@ -555,7 +555,7 @@ values_type raii_value(void *data) {
     return;
 }
 
-void args_free(args_t *params) {
+void args_free(args_t params) {
     if (is_type(params, RAII_ARGS)) {
         RAII_FREE(params->args);
         memset(params, -1, sizeof(args_t));
@@ -563,29 +563,41 @@ void args_free(args_t *params) {
     }
 }
 
-values_type get_args(void *params, int item) {
-    args_t *args = (args_t *)params;
+values_type raii_get_args(memory_t *scope, void_t params, int item) {
+    args_t args = (args_t)params;
+    memory_t *scoped = scope;
     if (!args->defer_set) {
         args->defer_set = true;
-        raii_deferred(args->context, (func_t)args_free, args);
+        if (is_empty(scope))
+            scoped = is_empty(args->context) ? raii_local() : args->context;
+
+        raii_deferred(scoped, (func_t)args_free, params);
     }
 
     return args_in(args, item);
 }
 
-RAII_INLINE values_type args_in(args_t *params, int index) {
-    return (index > -1 && index < (int)params->n_args)
+RAII_INLINE values_type get_arg(void_t params) {
+    return raii_value(params);
+}
+
+RAII_INLINE values_type get_args(args_t params, int item) {
+    return raii_get_args(nullptr, params, item);
+}
+
+RAII_INLINE values_type args_in(args_t params, size_t index) {
+    return (index >= 0 && index < params->n_args)
         ? params->args[index].value
         : ((raii_values_t *)0)->value;
 }
 
-args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
-    int i, count = (int)strlen(desc);
-    args_t *params = try_calloc(1, sizeof(args_t));
+static args_t raii_args_ex(memory_t *scope, const char *desc, va_list ap) {
+    size_t i, count = simd_strlen(desc);
+    args_t params = try_calloc(1, sizeof(args_t));
     raii_values_t *args = try_calloc(count, sizeof(raii_values_t));
     va_list argp;
 
-    va_start(argp, desc);
+    va_copy(argp, ap);
     for (i = 0; i < count; i++) {
         switch (*desc++) {
             case 'l':
@@ -594,15 +606,19 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
                 break;
             case 'z':
                 // unsigned `size_t` argument
-                args[i].value.max_size = *(size_t *)va_arg(argp, size_t);
+                args[i].value.max_size = (size_t)va_arg(argp, size_t);
+                break;
+            case 'u':
+                // unsigned `u` argument
+                args[i].value.u_int = (uint32_t)va_arg(argp, uint32_t);
                 break;
             case 'i':
-                // unsigned `int` argument
-                args[i].value.u_int = (uint32_t)va_arg(argp, uint32_t);
+                // signed `i` argument
+                args[i].value.integer = (int32_t)va_arg(argp, int32_t);
                 break;
             case 'd':
                 // signed `int64_t` argument
-                args[i].value.long_long = *(int64_t *)va_arg(argp, int64_t);
+                args[i].value.long_long = (int64_t)va_arg(argp, int64_t);
                 break;
             case 'c':
                 // character argument
@@ -610,11 +626,11 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
                 break;
             case 's':
                 // string argument
-                args[i].value.char_ptr = va_arg(argp, char *);
+                args[i].value.char_ptr = (char *)va_arg(argp, char *);
                 break;
             case 'a':
                 // array argument
-                args[i].value.array = (char **)va_arg(argp, char **);
+                args[i].value.array = (uintptr_t **)va_arg(argp, uintptr_t **);
                 break;
             case 'x':
                 // executable argument
@@ -635,9 +651,31 @@ args_t *raii_args_for(memory_t *scope, const char *desc, ...) {
 
     params->args = args;
     params->defer_set = false;
-    params->n_args = (int)count;
+    params->n_args = count;
     params->context = scope;
     params->type = RAII_ARGS;
+    return params;
+}
+
+args_t raii_args_for(memory_t *scope, const char *desc, ...) {
+    args_t params;
+    va_list args;
+
+    va_start(args, desc);
+    params = raii_args_ex(scope, desc, args);
+    va_end(args);
+
+    return params;
+}
+
+args_t args_for(const char *desc, ...) {
+    args_t params;
+    va_list args;
+
+    va_start(args, desc);
+    params = raii_args_ex(nullptr, desc, args);
+    va_end(args);
+
     return params;
 }
 

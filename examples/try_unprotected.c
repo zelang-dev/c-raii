@@ -1,7 +1,7 @@
 #include "raii.h"
 
-static int div_err(int a, int b) {
-    *(int *)0 = b;
+static int segfault(int a, int b) {
+    return *(int *)0 = b;
 }
 
 static void pfree(void *p) {
@@ -28,8 +28,9 @@ int main(int argc, char **argv) {
         free(p2);
         unprotected(p1); /* unprotected p2 too */
 
-        div_err(1, 0);
+        segfault(1, 0);
         printf("never reached\n");
+        (void)ex_protected_p2;
     } catch_any {
         printf("catch_any: exception %s (%s:%d) caught\n", err, err_file, err_line);
     } end_trying;

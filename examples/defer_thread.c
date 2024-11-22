@@ -24,9 +24,9 @@ void defer_capture(void *arg) {
         thrd_exit(EXIT_FAILURE);
     }
 #ifdef _WIN32
-    printf("main: thread %lu joined.\n", (unsigned long)thrd.p);
+    printf("main: thread %zu joined.\n", (uintptr_t)thrd.p);
 #else
-    printf("main: thread %lu joined.\n", thrd);
+    printf("main: thread %zu joined.\n", thrd);
 #endif
 }
 
@@ -41,7 +41,7 @@ void do_print(void *name) {
 int do_work(void *namep) {
     guard{
     unsigned int *name = namep;
-      printf("thread #%lu . %u: starting do_work guarded block\n", thrd_current(), *name);
+      printf("thread #%zu . %u: starting do_work guarded block\n", thrd_self(), *name);
       if (thrd_success != mtx_lock(&lock)) {
           thrd_exit(thrd_error);
       }
