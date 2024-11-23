@@ -7,11 +7,11 @@
 An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety, _smarty!_
 
 * [Synopsis](#synopsis)
-    - [There is _1 way_ to create an smart memory pointer.](#there-is-1-way-to-create-an-smart-memory-pointer)
-    - [The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.](#the-following-malloccalloc-wrapper-functions-are-used-to-get-an-raw-memory-pointer)
-    - [Thereafter, an smart pointer can be use with these _raii__* functions.](#thereafter-an-smart-pointer-can-be-use-with-these-raii_-functions)
-    - [Using `thread local storage` for an default smart pointer, the following functions always available.](#using-thread-local-storage-for-an-default-smart-pointer-the-following-functions-always-available)
-    - [Fully automatic memory safety, using `guard/unguarded/guarded` macro.](#fully-automatic-memory-safety-using-guardunguardedguarded-macro)
+  * [There is _1 way_ to create an smart memory pointer.](#there-is-1-way-to-create-an-smart-memory-pointer)
+  * [The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.](#the-following-malloccalloc-wrapper-functions-are-used-to-get-an-raw-memory-pointer)
+  * [Thereafter, an smart pointer can be use with these _raii__* functions.](#thereafter-an-smart-pointer-can-be-use-with-these-raii_-functions)
+  * [Using `thread local storage` for an default smart pointer, the following functions always available.](#using-thread-local-storage-for-an-default-smart-pointer-the-following-functions-always-available)
+  * [Fully automatic memory safety, using `guard/unguarded/guarded` macro.](#fully-automatic-memory-safety-using-guardunguardedguarded-macro)
 * [Installation](#installation)
 * [Contributing](#contributing)
 * [License](#license)
@@ -24,7 +24,86 @@ This library uses an custom version of [rpmalloc](https://github.com/mjansson/rp
 
 * The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's C** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
 
-As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
+> As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
+
+> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_for(thread_func, args_for("six", "text & num & another func", 3, worker_func))` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
+
+The C++ version from <https://cplusplus.com/reference/future/future/wait/>
+
+<table>
+<tr>
+<th>RAII C89</th>
+<th>C++11</th>
+</tr>
+<tr>
+<td>
+
+```c
+#include "raii.h"
+
+// a non-optimized way of checking for prime numbers:
+void *is_prime(args_t arg) {
+    int i, x = get_arg(arg).integer;
+    for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
+    return thrd_value(true);
+}
+
+int main(int argc, char **argv) {
+    int prime = 194232491;
+    // call function asynchronously:
+    future *fut = thrd_for(is_prime, &prime);
+
+    // a status check, use to guarantee any `thrd_get` call will be ready (and not block)
+    // must be part of some external event loop handling routine
+    if (!thrd_is_done(fut))
+        printf("checking...\n");
+
+    printf("\n194232491 ");
+    if (thrd_get(fut).boolean) // blocks and wait for is_prime to return
+        printf("is prime.\n");
+    else
+        printf("is not prime.\n");
+
+    return 0;
+}
+```
+
+</td>
+<td>
+
+```c++
+// future::wait
+#include <iostream>       // std::cout
+#include <future>         // std::async, std::future
+#include <chrono>         // std::chrono::milliseconds
+
+// a non-optimized way of checking for prime numbers:
+bool is_prime (int x) {
+  for (int i=2; i<x; ++i) if (x%i==0) return false;
+  return true;
+}
+
+int main ()
+{
+  // call function asynchronously:
+  std::future<bool> fut = std::async (is_prime,194232491);
+
+  std::cout << "checking...\n";
+  fut.wait();
+
+  std::cout << "\n194232491 ";
+  if (fut.get())      // guaranteed to be ready (and not block) after wait returns
+    std::cout << "is prime.\n";
+  else
+    std::cout << "is not prime.\n";
+
+  return 0;
+}
+```
+
+</td>
+</tr>
+</table>
 
 The planned implementation from [defer reference implementation for C](https://gustedt.gitlabpages.inria.fr/defer/):
 
@@ -53,6 +132,7 @@ guard {
     // all resources acquired
 } unguarded(0);
 ```
+
 </td>
 <td>
 
@@ -72,19 +152,20 @@ guard {
   // all resources acquired
 }
 ```
+
 </td>
 </tr>
 </table>
 
 There C Standard implementation states: **The important interfaces of this tool are:**
 
-- `guard` prefixes a guarded block
-- `defer` prefixes a defer clause
-- `break` ends a guarded block and executes all its defer clauses
-- `return` unwinds all guarded blocks of the current function and returns to the caller
-- `exit` unwinds all defer clauses of all active function calls of the thread and exits normally
-- `panic` starts global unwinding of all guarded blocks
-- `recover` inside a defer clause stops a panic and provides an error code
+* `guard` prefixes a guarded block
+* `defer` prefixes a defer clause
+* `break` ends a guarded block and executes all its defer clauses
+* `return` unwinds all guarded blocks of the current function and returns to the caller
+* `exit` unwinds all defer clauses of all active function calls of the thread and exits normally
+* `panic` starts global unwinding of all guarded blocks
+* `recover` inside a defer clause stops a panic and provides an error code
 
 There example from [source](https://gitlab.inria.fr/gustedt/defer/-/blob/master/defer4.c?ref_type=heads) - **gitlab**, outlined in [C Standard WG14 meeting](http://www.open-std.org/jtc1/sc22/wg14/www/docs/n2542.pdf) - **pdf**
 
@@ -188,6 +269,7 @@ int main(int argc, char* argv[static argc+1]) {
   return EXIT_SUCCESS;
 }
 ```
+
 </td>
 </tr>
 </table>
@@ -217,7 +299,58 @@ Returned normally from f.
 
 Here too the same process is in effect through an **new** _typedef_ `unique_t` aka `memory_t` _structure_.
 
-### There is _1 way_ to create an smart memory pointer.
+```c
+/* Calls fn (with args as arguments) in separate thread, returning without waiting
+for the execution of fn to complete. The value returned by fn can be accessed
+by calling `thrd_get()`. */
+C_API future *thrd_for(thrd_func_t fn, void_t args);
+
+/* Returns the value of a `future` ~promise~ thread's shared object, If not ready, this
+function blocks the calling thread and waits until it is ready. */
+C_API values_type thrd_get(future *);
+
+/* Check status of `future` object state, if `true` indicates thread execution has ended,
+any call thereafter to `thrd_get` is guaranteed non-blocking. */
+C_API bool thrd_is_done(future *);
+C_API uintptr_t thrd_self(void);
+C_API raii_values_t *thrd_value(uintptr_t value);
+
+/**
+* Creates an scoped container for arbitrary arguments passing to an single `args` function.
+* Use `get_args()` or `args_in()` for retrieval.
+*
+* @param scope callers context to bind `allocated` arguments to
+* @param desc format, similar to `printf()`:
+* * `i` unsigned integer,
+* * `d` signed integer,
+* * `l` signed long,
+* * `z` size_t - max size,
+* * `c` character,
+* * `s` string,
+* * `a` array,
+* * `x` function,
+* * `f` double/float,
+* * `p` void pointer for any arbitrary object
+* @param arguments indexed by `desc` format order
+*/
+C_API args_t raii_args_for(memory_t *scope, const char *desc, ...);
+C_API args_t args_for(const char *desc, ...);
+
+/**
+* Returns generic union `values_type` of argument, will auto `release/free`
+* allocated memory when scoped return/exit.
+*
+* Must be called at least once to release `allocated` memory.
+*
+* @param params arbitrary arguments
+* @param item index number
+*/
+C_API values_type raii_get_args(memory_t *scope, void_t params, int item);
+C_API values_type get_args(void *params, int item);
+C_API values_type get_arg(void_t params);
+```
+
+### There is _1 way_ to create an smart memory pointer
 
 ```c
 /* Creates smart memory pointer, this object binds any additional requests to it's lifetime.
@@ -226,10 +359,10 @@ C_API unique_t *unique_init(void);
 ```
 
 > This system use macros `RAII_MALLOC`, `RAII_FREE`, `RAII_REALLOC`, and `RAII_CALLOC`.
-> If not **defined**, the default __malloc/calloc/realloc/free__ are used when expanded.
+> If not **defined**, the default **malloc/calloc/realloc/free** are used when expanded.
 > The expansion thereto points to custom replacement allocation routines **rpmalloc**.
 
-### The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer.
+### The following _malloc/calloc_ wrapper functions are used to get an raw memory pointer
 
 ```c
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
@@ -252,7 +385,7 @@ C_API void *calloc_full(memory_t *scope, int count, size_t size, func_t func);
 Note the above functions will **panic/throw** if request fails, is `NULL`,
 and begin **unwinding**, executing _deferred_ statements.
 
-### Thereafter, an smart pointer can be use with these _raii__* functions.
+### Thereafter, an smart pointer can be use with these _raii__* functions
 
 ```c
 /* Defer execution `LIFO` of given function with argument,
@@ -276,7 +409,7 @@ C_API void raii_deferred_free(memory_t *);
 C_API void raii_delete(memory_t *ptr);
 ```
 
-### Using `thread local storage` for an default smart pointer, the following functions always available.
+### Using `thread local storage` for an default smart pointer, the following functions always available
 
 ```c
 /* Request/return raw memory of given `size`,
@@ -309,7 +442,7 @@ C_API const char *raii_message(void);
 C_API void raii_deferred_clean(void);
 ```
 
-### Fully automatic memory safety, using `guard/unguarded/guarded` macro.
+### Fully automatic memory safety, using `guard/unguarded/guarded` macro
 
 The full potently of **RAII** is encapsulated in the `guard` macro.
 Using `try/catch/catch_any/catch_if/finally/end_try` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
