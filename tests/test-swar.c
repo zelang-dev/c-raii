@@ -311,6 +311,7 @@ TEST(raii_split) {
         }
     }
 
+    raii_deferred_clean();
     return 0;
 }
 

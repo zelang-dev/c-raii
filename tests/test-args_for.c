@@ -38,10 +38,10 @@ TEST(list) {
 
     EXEC_TEST(args_for);
 
+    raii_deferred_clean();
     return result;
 }
 
 int main(int argc, char **argv) {
     TEST_FUNC(list());
-    raii_destroy();
 }

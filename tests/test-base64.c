@@ -60,6 +60,7 @@ TEST(list) {
     EXEC_TEST(raii_encode64);
     EXEC_TEST(raii_decode64);
 
+    raii_deferred_clean();
     return result;
 }
 

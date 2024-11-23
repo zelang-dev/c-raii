@@ -569,7 +569,7 @@ values_type raii_get_args(memory_t *scope, void_t params, int item) {
     if (!args->defer_set) {
         args->defer_set = true;
         if (is_empty(scope))
-            scoped = is_empty(args->context) ? raii_local() : args->context;
+            scoped = is_empty(args->context) ? raii_init() : args->context;
 
         raii_deferred(scoped, (func_t)args_free, params);
     }
@@ -582,7 +582,7 @@ RAII_INLINE values_type get_arg(void_t params) {
 }
 
 RAII_INLINE values_type get_args(args_t params, int item) {
-    return raii_get_args(nullptr, params, item);
+    return raii_get_args(nullptr, (void_t)params, item);
 }
 
 RAII_INLINE values_type args_in(args_t params, size_t index) {
