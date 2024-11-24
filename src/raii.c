@@ -591,65 +591,61 @@ RAII_INLINE values_type args_in(args_t params, size_t index) {
         : ((raii_values_t *)0)->value;
 }
 
-static args_t raii_args_ex(memory_t *scope, const char *desc, va_list ap) {
+static args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
     size_t i, count = simd_strlen(desc);
     args_t params = try_calloc(1, sizeof(args_t));
-    raii_values_t *args = try_calloc(count, sizeof(raii_values_t));
-    va_list argp;
+    params->args = try_calloc(count, sizeof(raii_values_t));
 
-    va_copy(argp, ap);
     for (i = 0; i < count; i++) {
         switch (*desc++) {
             case 'l':
                 // signed `long` argument
-                args[i].value.s_long = (long)va_arg(argp, long);
+                params->args[i].value.s_long = (long)va_arg(argp, long);
                 break;
             case 'z':
                 // unsigned `size_t` argument
-                args[i].value.max_size = (size_t)va_arg(argp, size_t);
+                params->args[i].value.max_size = (size_t)va_arg(argp, size_t);
                 break;
             case 'u':
                 // unsigned `u` argument
-                args[i].value.u_int = (uint32_t)va_arg(argp, uint32_t);
+                params->args[i].value.u_int = (uint32_t)va_arg(argp, uint32_t);
                 break;
             case 'i':
                 // signed `i` argument
-                args[i].value.integer = (int32_t)va_arg(argp, int32_t);
+                params->args[i].value.integer = (int32_t)va_arg(argp, int32_t);
                 break;
             case 'd':
                 // signed `int64_t` argument
-                args[i].value.long_long = (int64_t)va_arg(argp, int64_t);
+                params->args[i].value.long_long = (int64_t)va_arg(argp, int64_t);
                 break;
             case 'c':
                 // character argument
-                args[i].value.schar = (char)va_arg(argp, int);
+                params->args[i].value.schar = (char)va_arg(argp, int);
                 break;
             case 's':
                 // string argument
-                args[i].value.char_ptr = (char *)va_arg(argp, char *);
+                params->args[i].value.char_ptr = (char *)va_arg(argp, char *);
                 break;
             case 'a':
                 // array argument
-                args[i].value.array = (uintptr_t **)va_arg(argp, uintptr_t **);
+                params->args[i].value.array = (uintptr_t **)va_arg(argp, uintptr_t **);
                 break;
             case 'x':
                 // executable argument
-                args[i].value.func = (raii_func_t)va_arg(argp, func_args_t);
+                params->args[i].value.func = (raii_func_t)va_arg(argp, func_args_t);
                 break;
             case 'f':
                 // float argument
-                args[i].value.precision = (double)va_arg(argp, double);
+                params->args[i].value.precision = (double)va_arg(argp, double);
                 break;
             case 'p':
                 // void pointer (any arbitrary pointer) argument
             default:
-                args[i].value.object = va_arg(argp, void *);
+                params->args[i].value.object = va_arg(argp, void *);
                 break;
         }
     }
-    va_end(argp);
 
-    params->args = args;
     params->defer_set = false;
     params->n_args = count;
     params->context = scope;
