@@ -164,13 +164,14 @@ struct memory_s {
 
 typedef struct args_s {
     raii_type type;
-    /* allocated array of arguments */
-    raii_values_t *args;
-    unique_t *context;
+    bool defer_set;
 
     /* total number of args in set */
     size_t n_args;
-    bool defer_set;
+
+    unique_t *context;
+    /* allocated array of arguments */
+    raii_values_t *args;
 } *args_t;
 
 typedef void_t (*thrd_func_t)(args_t);
