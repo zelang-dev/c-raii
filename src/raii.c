@@ -130,7 +130,7 @@ memory_t *raii_init(void) {
 }
 
 RAII_INLINE size_t raii_mid(void) {
-    return raii_init()->mid;
+    return raii_local()->mid;
 }
 
 RAII_INLINE size_t raii_last_mid(memory_t *scope) {
@@ -570,8 +570,17 @@ values_type raii_get_args(memory_t *scope, void_t params, int item) {
         args->defer_set = true;
         if (is_empty(scope))
             scoped = is_empty(args->context) ? raii_init() : args->context;
+/*
+        if (is_empty(scope) && is_empty(args->context)) {
+            if (is_empty(scoped->protector))
+                scoped->protector = try_calloc(1, sizeof(ex_ptr_t));
 
-        raii_deferred(scoped, (func_t)args_free, params);
+            scoped->protector->is_emulated = scoped->is_emulated;
+            ex_protect_ptr(scoped->protector, params, (func_t)args_free);
+            scoped->is_protected = true;
+        }
+*/
+        scoped->mid = raii_deferred(scoped, (func_t)args_free, params);
     }
 
     return args_in(args, item);
@@ -632,7 +641,7 @@ static args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
                 break;
             case 'x':
                 // executable argument
-                params->args[i].value.func = (raii_func_t)va_arg(argp, func_args_t);
+                params->args[i].value.func = (raii_func_t)va_arg(argp, raii_func_args_t);
                 break;
             case 'f':
                 // float argument
