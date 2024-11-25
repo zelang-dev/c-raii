@@ -18,8 +18,8 @@ void *is_future(args_t args) {
     return thrd_value(true);
 }
 
-TEST(thrd_for) {
-    future *fut = thrd_for(is_future, args_for("six", "hello world", 128, some_worker));
+TEST(thrd_async) {
+    future *fut = thrd_async(is_future, args_for("six", "hello world", 128, some_worker));
 
     ASSERT_TRUE(is_type(fut, RAII_FUTURE));
     ASSERT_FALSE(thrd_is_done(fut));
@@ -31,7 +31,7 @@ TEST(thrd_for) {
 TEST(list) {
     int result = 0;
 
-    EXEC_TEST(thrd_for);
+    EXEC_TEST(thrd_async);
 
     return result;
 }

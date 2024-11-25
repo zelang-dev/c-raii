@@ -26,7 +26,7 @@ This library uses an custom version of [rpmalloc](https://github.com/mjansson/rp
 
 > As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
 
-> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_for(thread_func, args_for("six", "text & num & another func", 3, worker_func))` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
+> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_async(thread_func, args_for("six", "text & num & another func", 3, worker_func))` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
 
 The C++ version from <https://cplusplus.com/reference/future/future/wait/>
 
@@ -51,7 +51,7 @@ void *is_prime(args_t arg) {
 int main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future *fut = thrd_for(is_prime, &prime);
+    future *fut = thrd_async(is_prime, &prime);
 
     // a status check, use to guarantee any `thrd_get` call will be ready (and not block)
     // must be part of some external event loop handling routine
@@ -300,7 +300,7 @@ Here too the same process is in effect through an **new** _typedef_ `unique_t` a
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
-C_API future *thrd_for(thrd_func_t fn, void_t args);
+C_API future *thrd_async(thrd_func_t fn, void_t args);
 
 /* Returns the value of a `future` ~promise~ thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */

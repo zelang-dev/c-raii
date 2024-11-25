@@ -40,7 +40,7 @@ void *is_prime(args_t arg) {
 int main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future *fut = thrd_for(is_prime, &prime);
+    future *fut = thrd_async(is_prime, &prime);
 
     // a status check, use to guarantee any `thrd_get` call will be ready (and not block)
     // must be part of some external event loop handling routine

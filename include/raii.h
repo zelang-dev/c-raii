@@ -153,16 +153,16 @@ typedef struct {
 
 struct memory_s {
     void *arena;
-    int status;
     bool is_recovered;
-    void *volatile err;
-    const char *volatile panic;
     bool is_protected;
     bool is_arena;
     bool is_emulated;
-    ex_ptr_t *protector;
-    defer_t defer;
+    int status;
     size_t mid;
+    defer_t defer;
+    ex_ptr_t *protector;
+    void *volatile err;
+    const char *volatile panic;
 };
 
 typedef struct args_s {
@@ -178,10 +178,13 @@ typedef struct args_s {
 
 typedef void_t (*thrd_func_t)(args_t);
 typedef void_t (*result_func_t)(void_t result, size_t id, values_type value);
+make_atomic(c89atomic_spinlock, atomic_spinlock)
 typedef struct _promise {
     raii_type type;
     bool done;
+ //   atomic_flag done;
     int id;
+ //   atomic_spinlock mutex;
     mtx_t mutex;
     cnd_t cond;
     memory_t *scope;
@@ -222,7 +225,7 @@ typedef struct _future_arg {
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
-C_API future *thrd_for(thrd_func_t fn, void_t args);
+C_API future *thrd_async(thrd_func_t fn, void_t args);
 
 /* Returns the value of a `future` ~promise~ thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
@@ -234,10 +237,13 @@ C_API bool thrd_is_done(future *);
 C_API uintptr_t thrd_self(void);
 C_API raii_values_t *thrd_value(uintptr_t value);
 
-C_API future *thrd_for_ex(thrd_func_t fn, size_t times, const char *desc, ...);
+C_API future *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
 C_API thrd_values *thrd_sync(future *f);
 C_API values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result);
 C_API bool thrd_is_finish(future_t *f);
+
+#define atomic_lock(mutex)   c89atomic_spinlock_lock((atomic_spinlock *)mutex)
+#define atomic_unlock(mutex) c89atomic_spinlock_unlock((atomic_spinlock *)mutex)
 
 /**
 * `Release/free` allocated memory, must be called if not using `get_args()` function.
