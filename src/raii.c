@@ -570,17 +570,8 @@ values_type raii_get_args(memory_t *scope, void_t params, int item) {
         args->defer_set = true;
         if (is_empty(scope))
             scoped = is_empty(args->context) ? raii_init() : args->context;
-/*
-        if (is_empty(scope) && is_empty(args->context)) {
-            if (is_empty(scoped->protector))
-                scoped->protector = try_calloc(1, sizeof(ex_ptr_t));
 
-            scoped->protector->is_emulated = scoped->is_emulated;
-            ex_protect_ptr(scoped->protector, params, (func_t)args_free);
-            scoped->is_protected = true;
-        }
-*/
-        scoped->mid = raii_deferred(scoped, (func_t)args_free, params);
+        raii_deferred(scoped, (func_t)args_free, params);
     }
 
     return args_in(args, item);
@@ -600,7 +591,7 @@ RAII_INLINE values_type args_in(args_t params, size_t index) {
         : ((raii_values_t *)0)->value;
 }
 
-static args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
+args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
     size_t i, count = simd_strlen(desc);
     args_t params = try_calloc(1, sizeof(args_t));
     params->args = try_calloc(count, sizeof(raii_values_t));

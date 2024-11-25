@@ -18,6 +18,7 @@
 /* Smart memory pointer, the allocated memory requested in `arena` field,
 all other fields private, this object binds any additional requests to it's lifetime. */
 typedef struct memory_s memory_t;
+typedef struct _future future;
 typedef memory_t unique_t;
 typedef void (*func_t)(void *);
 typedef void (*func_args_t)(void *, ...);
@@ -82,6 +83,8 @@ typedef enum {
     RAII_THREAD,
     RAII_GUARDED_STATUS,
     RAII_QUEUE,
+    RAII_POOL,
+    RAII_SYNC,
     RAII_COUNT
 } raii_type;
 
@@ -165,16 +168,16 @@ struct memory_s {
 typedef struct args_s {
     raii_type type;
     bool defer_set;
+    /* allocated array of arguments */
+    raii_values_t *args;
+    unique_t *context;
 
     /* total number of args in set */
     size_t n_args;
-
-    unique_t *context;
-    /* allocated array of arguments */
-    raii_values_t *args;
 } *args_t;
 
 typedef void_t (*thrd_func_t)(args_t);
+typedef void_t (*result_func_t)(void_t result, size_t id, values_type value);
 typedef struct _promise {
     raii_type type;
     bool done;
@@ -185,13 +188,29 @@ typedef struct _promise {
     raii_values_t *result;
 } promise;
 
-typedef struct _future {
+typedef struct {
+    raii_type type;
+    size_t value_count;
+    values_type total[1];
+    values_type *value;
+} thrd_values;
+
+typedef struct future_pool {
+    raii_type type;
+    size_t thread_count;
+    future **futures;
+    promise **promises;
+} future_t;
+
+struct _future {
     raii_type type;
     int id;
+    bool parallelized;
     thrd_t thread;
     thrd_func_t func;
     promise *value;
-} future;
+    future_t *pool;
+};
 
 typedef struct _future_arg {
     raii_type type;
@@ -214,6 +233,11 @@ any call thereafter to `thrd_get` is guaranteed non-blocking. */
 C_API bool thrd_is_done(future *);
 C_API uintptr_t thrd_self(void);
 C_API raii_values_t *thrd_value(uintptr_t value);
+
+C_API future *thrd_for_ex(thrd_func_t fn, size_t times, const char *desc, ...);
+C_API thrd_values *thrd_sync(future *f);
+C_API values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result);
+C_API bool thrd_is_finish(future_t *f);
 
 /**
 * `Release/free` allocated memory, must be called if not using `get_args()` function.
@@ -242,6 +266,7 @@ C_API void args_free(args_t params);
 */
 C_API args_t raii_args_for(memory_t *scope, const char *desc, ...);
 C_API args_t args_for(const char *desc, ...);
+C_API args_t raii_args_ex(memory_t *scope, const char *desc, va_list);
 
 /**
 * Returns generic union `values_type` of argument, will auto `release/free`

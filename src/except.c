@@ -7,6 +7,7 @@
 EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(divide_by_zero);
+EX_EXCEPTION(logic_error);
 EX_EXCEPTION(division_by_zero);
 EX_EXCEPTION(out_of_memory);
 EX_EXCEPTION(panic);
