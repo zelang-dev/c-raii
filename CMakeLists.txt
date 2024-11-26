@@ -7,7 +7,7 @@ endif()
 project(
     raii
     VERSION 1.2.0
-    DESCRIPTION "An general RAII implementation for C, with Defer, C11 Atomics/Threads with Thread Pool, and custom malloc/heap allocation."
+    DESCRIPTION "An general RAII implementation for C, with Defer, simple high-level C11/C++11 like Threading/Futures, custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
 )
@@ -65,8 +65,8 @@ else()
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.0.2.1.zip
- URL_MD5 15b390eaf827faecc77f3ede1790d853
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.1.0.0.zip
+ URL_MD5 b94418e2efd06782e7ddf81a7c1a7e40
 )
 FetchContent_MakeAvailable(threads)
 
@@ -143,7 +143,7 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Lawrence Stubbs <${CPACK_PACKAGE_CONTACT}>"
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
 SET(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "Raii C library")
-SET(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "An general RAII implementation and memory/heap allocation for C.")
+SET(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "An general RAII implementation, c11/c++11 like threads, and memory/heap allocation for C.")
 
 set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
 set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)

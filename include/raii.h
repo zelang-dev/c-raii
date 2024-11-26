@@ -246,6 +246,9 @@ C_API future *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
 C_API thrd_values *thrd_sync(future *f);
 C_API values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result);
 C_API bool thrd_is_finish(future_t *f);
+C_API future_t thrd_add(future *f, thrd_func_t routine, const char *desc, ...);
+C_API void thrd_wait(future *f, void (*until_ready)(void));
+C_API void thrd_destr0y(future *f);
 
 #define atomic_lock(mutex)   c89atomic_spinlock_lock((atomic_spinlock *)mutex)
 #define atomic_unlock(mutex) c89atomic_spinlock_unlock((atomic_spinlock *)mutex)
