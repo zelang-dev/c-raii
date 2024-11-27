@@ -35,8 +35,8 @@
 #include "exception.h"
 
 // Cast char* to T using memcpy. memcpy is optimized away on x86
-C_API RAII_INLINE uintptr_t cast(const char *src);
-C_API RAII_INLINE uintptr_t cast8(const char *s, uint32_t len);
+C_API uintptr_t cast(const char *src);
+C_API uintptr_t cast8(const char *s, uint32_t len);
 
 // Fill T with c's
 C_API RAII_INLINE uintptr_t extend(char c);
@@ -64,7 +64,7 @@ C_API RAII_INLINE bool haszero(uint64_t x);
 C_API RAII_INLINE bool hasbyte(uint64_t x, uint8_t c);
 
 // Find char in binary string of 8 chars
-C_API RAII_INLINE uint32_t memchr8(const char* s, uint8_t c);
+C_API uint32_t memchr8(const char* s, uint8_t c);
 
 // Find char in binary string of 8 chars
 // * The string is known to contain the char
@@ -85,7 +85,7 @@ C_API int simd_strcmp(const char *s, const char *c);
 //
 
 // Find char in binary string
-C_API RAII_INLINE string simd_memchr(const char *s, uint8_t c, uint32_t len);
+C_API string simd_memchr(const char *s, uint8_t c, uint32_t len);
 
 // Find char in binary string. Char c is known to be in s + len
 C_API RAII_INLINE uint32_t memchrk(const char* s, uint32_t len, uint8_t c);
@@ -101,7 +101,7 @@ C_API RAII_INLINE uint32_t pmemchrk(const char* s, uint32_t len, uint8_t c);
 //
 
 // Find char, in reverse, in binary string
-C_API RAII_INLINE string simd_memrchr(const char* s, uint8_t c, uint32_t len);
+C_API string simd_memrchr(const char* s, uint8_t c, uint32_t len);
 
 // Find char in binary string. Char c is known to be in s + len
 C_API RAII_INLINE uint32_t memrchrk(const char* s, uint32_t len, uint8_t c);
@@ -116,39 +116,39 @@ C_API RAII_INLINE uint32_t pmemrchrk(const char* s, uint32_t len, uint8_t c);
 
 // Parse uint64_t from string of up to 20 chars
 // *** More than 20 char returns junk.
-C_API RAII_INLINE uint64_t simd_atou(const char* s, uint32_t len);
-C_API RAII_INLINE uint32_t atou8(const char *s, uint32_t len);
+C_API uint64_t simd_atou(const char* s, uint32_t len);
+C_API uint32_t atou8(const char *s, uint32_t len);
 
 // Parse _signed_ int from string of up to 20 chars. No spaces
-C_API RAII_INLINE int64_t simd_atoi(const char *s, uint32_t len);
+C_API int64_t simd_atoi(const char *s, uint32_t len);
 
 // Parse hex int from string of up to 16 chars
-C_API RAII_INLINE uint64_t simd_htou(const char* s, uint32_t len);
+C_API uint64_t simd_htou(const char* s, uint32_t len);
 
-C_API RAII_INLINE uint32_t htou8(const char *s, uint32_t len);
+C_API uint32_t htou8(const char *s, uint32_t len);
 
 //// int to string
 
 // *** p suffix means zero-padded
 
 // Convert uint, of less than 100, to %02u, as int 16
-C_API RAII_INLINE uint16_t utoa2p(uint64_t x);
+C_API uint16_t utoa2p(uint64_t x);
 
 // Convert uint, of less than 100, to %02u
-C_API RAII_INLINE void utoa2p_ex(uint64_t x, char* s);
+C_API void utoa2p_ex(uint64_t x, char* s);
 
 // Convert uint to %0<N>u, N <= 20
-C_API RAII_INLINE char* utoap(int N, uint64_t x, char* s);
+C_API char* utoap(int N, uint64_t x, char* s);
 
 // Convert signed int 64 to string. String buffer is at least 22 bytes.
 // Returns length
 // *** this feels inefficient :( ***
-C_API RAII_INLINE uint32_t simd_itoa(int64_t x, char *buf);
-C_API RAII_INLINE uint32_t itoa8(int32_t x, char *buf);
+C_API uint32_t simd_itoa(int64_t x, char *buf);
+C_API uint32_t itoa8(int32_t x, char *buf);
 
 //// Double to string
 
 // Parse double from string
 // *** More than 20 char integer part returns junk.
 // *** Too much decimal char will get lost to precision
-C_API RAII_INLINE double simd_atod(const char *s, uint32_t len);
+C_API double simd_atod(const char *s, uint32_t len);

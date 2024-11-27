@@ -175,7 +175,7 @@ RAII_INLINE string *raii_split(string_t s, string_t delim, int *count) {
     return str_split_ex(raii_init(), s, delim, count);
 }
 
-RAII_INLINE string raii_concat(int num_args, ...) {
+string raii_concat(int num_args, ...) {
     va_list ap;
     string data;
 

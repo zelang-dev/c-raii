@@ -2552,7 +2552,13 @@ static C89ATOMIC_INLINE double c89atomic_compare_and_swap_f64(volatile double* d
 /* Spinlock */
 typedef c89atomic_flag c89atomic_spinlock;
 
-static C89ATOMIC_INLINE void c89atomic_spinlock_lock(volatile c89atomic_spinlock* pSpinlock)
+#ifndef _STDATOMIC_H
+    make_atomic(c89atomic_flag, atomic_flag)
+#endif
+
+make_atomic(c89atomic_spinlock, atomic_spinlock)
+
+static C89ATOMIC_INLINE void c89atomic_spinlock_lock(atomic_spinlock *pSpinlock)
 {
     for (;;) {
         if (c89atomic_flag_test_and_set_explicit(pSpinlock, c89atomic_memory_order_acquire) == 0) {
@@ -2565,14 +2571,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_lock(volatile c89atomic_spinlock
     }
 }
 
-static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlock* pSpinlock)
+static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(atomic_spinlock *pSpinlock)
 {
     c89atomic_flag_clear_explicit(pSpinlock, c89atomic_memory_order_release);
 }
-
-#ifndef _STDATOMIC_H
-    make_atomic(c89atomic_flag, atomic_flag)
-#endif
 
 #ifdef _WIN32
     typedef volatile void *atomic_ptr_t;
@@ -2640,6 +2642,9 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 /* reads a value from an atomic object then cast to type */
 #   define atomic_get(type, obj)  (type)c89atomic_load_64((atomic_ullong *)obj)
 #endif
+
+#define atomic_lock(mutex)   c89atomic_spinlock_lock((atomic_spinlock *)mutex)
+#define atomic_unlock(mutex) c89atomic_spinlock_unlock((atomic_spinlock *)mutex)
 
 #if !defined(_STDATOMIC_H)
 /* reads an atomic_flag */

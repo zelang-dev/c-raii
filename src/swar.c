@@ -564,11 +564,12 @@ RAII_INLINE double simd_atod(const char *s, uint32_t len) {
 
 // Convert uint to %0<N>u, N <= 8
 RAII_INLINE uint64_t _utoap(int N, uint64_t x, char *s) {
+    int i;
     RAII_ASSERT(N <= 8);
 
     uint64_t tmp = utoa2p(x % 100);
 
-    for (int i = 0; i < N - 2; i += 2) {
+    for (i = 0; i < N - 2; i += 2) {
         x /= 100;
         tmp <<= 16;
         tmp |= utoa2p(x % 100);

@@ -308,7 +308,7 @@ C_API args_t raii_args_ex(memory_t *scope, const char *desc, va_list);
 * @param item index number
 */
 C_API values_type raii_get_args(memory_t *scope, void_t params, int item);
-C_API values_type get_args(void *params, int item);
+C_API values_type get_args(args_t params, int item);
 C_API values_type get_arg(void_t params);
 
 /**
