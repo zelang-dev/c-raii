@@ -182,59 +182,75 @@ typedef struct args_s {
 } *args_t;
 
 typedef void_t (*thrd_func_t)(args_t);
-typedef void_t (*result_func_t)(void_t result, size_t id, values_type value);
+typedef void_t (*result_func_t)(void_t result, size_t id, values_type iter);
+typedef void (*wait_func)(void);
 make_atomic(c89atomic_spinlock, atomic_spinlock)
 typedef struct _promise {
     raii_type type;
-    bool done;
- //   atomic_flag done;
     int id;
- //   atomic_spinlock mutex;
-    mtx_t mutex;
-    cnd_t cond;
-    memory_t *scope;
-    raii_values_t *result;
+    atomic_flag done;
+    atomic_spinlock mutex;
+    raii_values_t result[1];
 } promise;
 
 typedef struct {
     raii_type type;
+    int id;
     size_t value_count;
-    values_type total[1];
-    values_type *value;
+    raii_values_t **values;
 } thrd_values;
+
+typedef struct _future_arg future_arg;
+typedef struct future_deque future_deque_t;
+struct _future_arg {
+    raii_type type;
+    int id;
+    void_t arg;
+    thrd_func_t func;
+    promise *value;
+    future_deque_t *queue;
+};
+
+make_atomic(future_arg, atomic_future_arg)
+typedef struct {
+    atomic_size_t size;
+    atomic_future_arg buffer[];
+} future_array_t;
+
+make_atomic(future_array_t *, atomic_future_t)
+struct future_deque {
+    /* Assume that they never overflow */
+    atomic_size_t top, bottom;
+    atomic_future_t array;
+};
 
 typedef struct future_pool {
     raii_type type;
-    size_t thread_count;
+    int thread_count;
     future **futures;
-    promise **promises;
+    future_deque_t queue[1];
 } future_t;
 
 struct _future {
     raii_type type;
     int id;
-    bool parallelized;
     thrd_t thread;
     thrd_func_t func;
     promise *value;
     future_t *pool;
 };
 
-typedef struct _future_arg {
-    raii_type type;
-    thrd_func_t func;
-    void_t arg;
-    promise *value;
-} future_arg;
-
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
 C_API future *thrd_async(thrd_func_t fn, void_t args);
 
-/* Returns the value of a `future` ~promise~ thread's shared object, If not ready, this
+/* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
 C_API values_type thrd_get(future *);
+
+/* This function blocks the calling thread and waits until `future` is ready, will execute provided `yield` callback function continuously.  */
+C_API void thrd_wait(future *, wait_func yield);
 
 /* Check status of `future` object state, if `true` indicates thread execution has ended,
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
@@ -242,13 +258,12 @@ C_API bool thrd_is_done(future *);
 C_API uintptr_t thrd_self(void);
 C_API raii_values_t *thrd_value(uintptr_t value);
 
-C_API future *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
-C_API thrd_values *thrd_sync(future *f);
+C_API future_t *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
+C_API thrd_values *thrd_sync(future_t *);
 C_API values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result);
-C_API bool thrd_is_finish(future_t *f);
-C_API future_t thrd_add(future *f, thrd_func_t routine, const char *desc, ...);
-C_API void thrd_wait(future *f, void (*until_ready)(void));
-C_API void thrd_destr0y(future *f);
+C_API bool thrd_is_finish(future_t *);
+C_API future_t thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+C_API void thrd_destroy(future_t *);
 
 #define atomic_lock(mutex)   c89atomic_spinlock_lock((atomic_spinlock *)mutex)
 #define atomic_unlock(mutex) c89atomic_spinlock_unlock((atomic_spinlock *)mutex)

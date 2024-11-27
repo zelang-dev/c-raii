@@ -42,13 +42,11 @@ int main(int argc, char **argv) {
     // call function asynchronously:
     future *fut = thrd_async(is_prime, &prime);
 
-    // a status check, use to guarantee any `thrd_get` call will be ready (and not block)
-    // must be part of some external event loop handling routine
-    if (!thrd_is_done(fut))
-        printf("checking...\n");
+    printf("checking...\n");
+    thrd_wait(fut, thrd_yield);
 
     printf("\n194232491 ");
-    if (thrd_get(fut).boolean) // blocks and wait for is_prime to return
+    if (thrd_get(fut).boolean)  // guaranteed to be ready (and not block) after wait returns
         printf("is prime.\n");
     else
         printf("is not prime.\n");

@@ -2,58 +2,40 @@
 
 static promise *promise_create(void) {
     promise *p = calloc_default(1, sizeof(promise));
-    p->scope = raii_local();
-    mtx_init(&p->mutex, mtx_plain);
-    cnd_init(&p->cond);
-    srand((unsigned int)time(NULL));
-    p->id = rand();
-    p->done = false;
+    atomic_flag_clear(&p->mutex);
+    atomic_flag_clear(&p->done);
     p->type = RAII_PROMISE;
 
     return p;
 }
 
 static void promise_set(promise *p, void_t res) {
-    mtx_lock(&p->mutex);
-    p->result = (raii_values_t*)calloc_full(p->scope, 1, sizeof(raii_values_t) + sizeof(res), RAII_FREE);
+    atomic_lock(&p->mutex);
     if (!is_empty(res))
         p->result->value.object = res;
 
-    p->done = true;
-    cnd_signal(&p->cond);
-    mtx_unlock(&p->mutex);
+    atomic_unlock(&p->mutex);
+    atomic_flag_test_and_set(&p->done);
 }
 
-static raii_values_t *promise_get(promise *p) {
-    mtx_lock(&p->mutex);
-    while (!p->done) {
-        cnd_wait(&p->cond, &p->mutex);
-    }
+static RAII_INLINE raii_values_t *promise_get(promise *p) {
+    while (!atomic_flag_load(&p->done))
+        thrd_yield();
 
-    mtx_unlock(&p->mutex);
     return p->result;
-}
-
-static bool promise_done(promise *p) {
-    mtx_lock(&p->mutex);
-    bool done = p->done;
-    mtx_unlock(&p->mutex);
-    return done;
 }
 
 static void promise_close(promise *p) {
     if (is_type(p, RAII_PROMISE)) {
         p->type = -1;
-        mtx_destroy(&p->mutex);
-        cnd_destroy(&p->cond);
+        atomic_flag_clear(&p->mutex);
+        atomic_flag_clear(&p->done);
     }
 }
 
 static future *future_create(thrd_func_t start_routine) {
-    future *f = try_calloc(1, sizeof(future));
+    future *f = try_malloc(sizeof(future));
     f->func = (thrd_func_t)start_routine;
-    srand((unsigned int)time(NULL));
-    f->id = rand();
     f->type = RAII_FUTURE;
 
     return f;
@@ -89,7 +71,7 @@ static int raii_wrapper(void_t arg) {
 }
 
 static void thrd_start(future *f, promise *value, void_t arg) {
-    future_arg *f_arg = try_calloc(1, sizeof(future_arg));
+    future_arg *f_arg = try_malloc(sizeof(future_arg));
     f_arg->func = f->func;
     f_arg->arg = arg;
     f_arg->value = value;
@@ -97,7 +79,7 @@ static void thrd_start(future *f, promise *value, void_t arg) {
     int r = thrd_create(&f->thread, raii_wrapper, f_arg);
 }
 
-future *thrd_for(thrd_func_t fn, void_t args) {
+future *thrd_async(thrd_func_t fn, void_t args) {
     promise *p = promise_create();
     future *f = future_create(fn);
     f->value = p;
@@ -106,15 +88,23 @@ future *thrd_for(thrd_func_t fn, void_t args) {
 }
 
 values_type thrd_get(future *f) {
-    promise *p = f->value;
-    raii_values_t *r = promise_get(p);
-    future_close(f);
-    promise_close(p);
-    return r->value;
+    if (is_type(f, RAII_FUTURE) && !is_empty(f->value) && is_type(f->value, RAII_PROMISE)) {
+        raii_values_t *r = promise_get(f->value);
+        future_close(f);
+        promise_close(f->value);
+        return r->value;
+    }
+
+    throw(logic_error);
 }
 
 RAII_INLINE bool thrd_is_done(future *f) {
-    return promise_done(f->value);
+    return atomic_flag_load_explicit(&f->value->done, memory_order_relaxed);
+}
+
+RAII_INLINE void thrd_wait(future *f, wait_func yield) {
+    while (!thrd_is_done(f))
+        yield();
 }
 
 RAII_INLINE raii_values_t *thrd_value(uintptr_t value) {
@@ -127,4 +117,63 @@ RAII_INLINE uintptr_t thrd_self(void) {
 #else
     return (uintptr_t)thrd_current();
 #endif
+}
+
+future_t *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...) {
+    future_t *pool = (future_t *)calloc_default(1, sizeof(future_t));
+    pool->futures = (future **)calloc_default(times, sizeof(pool->futures[0]) * 2);
+    args_t params;
+    va_list args;
+    size_t i;
+
+    for (i = 0; i < times; i++) {
+        va_start(args, desc);
+        params = raii_args_ex(nullptr, desc, args);
+        pool->futures[i] = thrd_async(fn, (void_t)params);
+    }
+    va_end(args);
+
+    pool->thread_count = times;
+    pool->type = RAII_POOL;
+    return pool;
+}
+
+thrd_values *thrd_sync(future_t *v) {
+    if (is_type(v, RAII_POOL)) {
+        thrd_values *summary = (thrd_values *)calloc_default(v->thread_count, sizeof(thrd_values));
+        summary->values = (raii_values_t **)calloc_default(v->thread_count, sizeof(summary->values[0]) * 2);
+        size_t i;
+
+        for (i = 0; i < v->thread_count; i++) {
+            summary->values[i] = promise_get(v->futures[i]->value);
+            future_close(v->futures[i]);
+            promise_close(v->futures[i]->value);
+        }
+
+        summary->value_count = v->thread_count;
+        summary->type = RAII_SYNC;
+        return summary;
+    }
+
+    throw(logic_error);
+}
+
+values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result) {
+    size_t i, max = iter->value_count;
+
+    for (i = 0; i < max; i++)
+        result = callback(result, i, iter->values[i]->value);
+
+    iter->values[max]->value.object = result;
+    return iter->values[max]->value;
+}
+
+RAII_INLINE bool thrd_is_finish(future_t *f) {
+    size_t i;
+    for (i = 0; i < f->thread_count; i++) {
+        if (!thrd_is_done(f->futures[i]))
+            return false;
+    }
+
+    return true;
 }

@@ -7,7 +7,7 @@
  * runtime system. In Proceedings of the Fifth ACM SIGPLAN Symposium on
  * Principles and Practice of Parallel Programming (PPoPP), pages 207-216,
  * Santa Barbara, California, July 1995.
- * http://supertech.csail.mit.edu/papers/PPoPP95.pdf
+ * https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F21/handouts/papers/Cilk-PPoPP95.pdf
  *
  * However, that refers to an outdated model of Cilk; an update appears in
  * the essential idea of work stealing mentioned in Leiserson and Platt,
@@ -35,7 +35,6 @@ struct work_internal;
  */
 typedef struct work_internal *(*task_t)(struct work_internal *);
 
-/* the coroutine aka routine_t */
 typedef struct work_internal {
     task_t code;
     atomic_size_t join_count;
@@ -48,14 +47,12 @@ typedef struct work_internal {
 static work_t *EMPTY = (work_t *)0x100, *ABORT = (work_t *)0x200;
 
 make_atomic(work_t *, atomic_work_t)
-/* queue/list `all_coroutine`'s of work_t */
 typedef struct {
     atomic_size_t size;
     atomic_work_t buffer[];
 } array_t;
 
 make_atomic(array_t *, atomic_array_t)
-/* `all_coroutine` stealing deque, `run_queue` aka `co_scheduler_t` */
 typedef struct {
     /* Assume that they never overflow */
     atomic_size_t top, bottom;
