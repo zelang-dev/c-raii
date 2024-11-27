@@ -53,18 +53,14 @@ int main(int argc, char **argv) {
     // call function asynchronously:
     future *fut = thrd_async(is_prime, &prime);
 
-    // a status check, use to guarantee any `thrd_get` call will be ready (and not block)
-    // must be part of some external event loop handling routine
-    if (!thrd_is_done(fut))
-        printf("checking...\n");
+    printf("checking...\n");
+    thrd_wait(fut, thrd_yield);
 
     printf("\n194232491 ");
-    if (thrd_get(fut).boolean) // blocks and wait for is_prime to return
+    if (thrd_get(fut).boolean) // guaranteed to be ready (and not block) after wait returns
         printf("is prime.\n");
     else
         printf("is not prime.\n");
-
-    return 0;
 }
 ```
 
@@ -302,15 +298,26 @@ for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
 C_API future *thrd_async(thrd_func_t fn, void_t args);
 
-/* Returns the value of a `future` ~promise~ thread's shared object, If not ready, this
+/* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
 C_API values_type thrd_get(future *);
+
+/* This function blocks the calling thread and waits until `future` is ready,
+will execute provided `yield` callback function continuously. */
+C_API void thrd_wait(future *, wait_func yield);
 
 /* Check status of `future` object state, if `true` indicates thread execution has ended,
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
 C_API bool thrd_is_done(future *);
 C_API uintptr_t thrd_self(void);
 C_API raii_values_t *thrd_value(uintptr_t value);
+
+C_API future_t *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
+C_API thrd_values *thrd_sync(future_t *);
+C_API values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result);
+C_API bool thrd_is_finish(future_t *);
+C_API future_t thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+C_API void thrd_destroy(future_t *);
 
 /**
 * Creates an scoped container for arbitrary arguments passing to an single `args` function.

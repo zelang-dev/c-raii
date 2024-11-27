@@ -249,7 +249,8 @@ C_API future *thrd_async(thrd_func_t fn, void_t args);
 function blocks the calling thread and waits until it is ready. */
 C_API values_type thrd_get(future *);
 
-/* This function blocks the calling thread and waits until `future` is ready, will execute provided `yield` callback function continuously.  */
+/* This function blocks the calling thread and waits until `future` is ready,
+will execute provided `yield` callback function continuously.  */
 C_API void thrd_wait(future *, wait_func yield);
 
 /* Check status of `future` object state, if `true` indicates thread execution has ended,
