@@ -318,8 +318,8 @@ C_API uintptr_t thrd_self(void);
 C_API raii_values_t *thrd_value(uintptr_t value);
 
 C_API future_t *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
-C_API thrd_values *thrd_sync(future_t *);
-C_API values_type thrd_then(result_func_t callback, thrd_values *iter, void_t result);
+C_API thrd_values_t *thrd_sync(future_t *);
+C_API values_type thrd_then(result_func_t callback, thrd_values_t *iter, void_t result);
 C_API bool thrd_is_finish(future_t *);
 C_API future_t thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
 C_API void thrd_destroy(future_t *);

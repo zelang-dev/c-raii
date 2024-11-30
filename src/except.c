@@ -8,6 +8,7 @@ EX_EXCEPTION(invalid_type);
 EX_EXCEPTION(range_error);
 EX_EXCEPTION(divide_by_zero);
 EX_EXCEPTION(logic_error);
+EX_EXCEPTION(future_error);
 EX_EXCEPTION(system_error);
 EX_EXCEPTION(domain_error);
 EX_EXCEPTION(length_error);

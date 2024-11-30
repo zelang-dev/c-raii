@@ -592,9 +592,14 @@ RAII_INLINE values_type args_in(args_t params, size_t index) {
 }
 
 args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
-    size_t i, count = simd_strlen(desc);
-    args_t params = try_calloc(1, sizeof(args_t));
-    params->args = try_calloc(count, sizeof(raii_values_t));
+    size_t i, len, count = simd_strlen(desc);
+    args_t params = try_calloc(1, sizeof(struct args_s));
+    uintptr_t **a;
+    void_t p;
+    string s;
+    params->args_size = sizeof(raii_values_t);
+    params->args = try_calloc(count, params->args_size);
+    params->args_size = params->args_size * count;
 
     for (i = 0; i < count; i++) {
         switch (*desc++) {
@@ -624,7 +629,15 @@ args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
                 break;
             case 's':
                 // string argument
-                params->args[i].value.char_ptr = (char *)va_arg(argp, char *);
+                s = (char *)va_arg(argp, char *);
+                len = simd_strlen(s);
+                if (len > sizeof(raii_values_t)) {
+                    params->args_size += len + 1;
+                    params->args = try_realloc(params->args, params->args_size);
+                    strncpy(params->args[i].value.char_ptr, s, len);
+                } else {
+                    params->args[i].value.char_ptr = s;
+                }
                 break;
             case 'a':
                 // array argument
@@ -640,8 +653,13 @@ args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
                 break;
             case 'p':
                 // void pointer (any arbitrary pointer) argument
-            default:
                 params->args[i].value.object = va_arg(argp, void *);
+            default:
+                p = va_arg(argp, void *);
+                len = sizeof(p);
+                params->args_size += len;
+                params->args = try_realloc(params->args, params->args_size);
+                memcpy(params->args[i].value.object, p, sizeof(p));
                 break;
         }
     }
