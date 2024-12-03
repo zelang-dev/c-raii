@@ -11,6 +11,7 @@ set(TARGET_LIST
  test-mman
  test-swar
  test-thrd_local
+ test-thrd_spawn
 )
 
 foreach (TARGET ${TARGET_LIST})

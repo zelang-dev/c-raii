@@ -83,6 +83,7 @@ typedef enum {
     RAII_THREAD,
     RAII_GUARDED_STATUS,
     RAII_QUEUE,
+    RAII_SPAWN,
     RAII_POOL,
     RAII_SYNC,
     RAII_COUNT
@@ -111,8 +112,10 @@ typedef union {
     unsigned char uchar;
     unsigned char *uchar_ptr;
     char *char_ptr;
-    uintptr_t **array;
     void *object;
+    ptrdiff_t **array;
+    intptr_t **array_int;
+    uintptr_t **array_uint;
     raii_func_t func;
     const char const_char[256];
 } values_type;
@@ -177,6 +180,7 @@ typedef struct args_s {
     raii_values_t *args;
 } *args_t;
 
+typedef void (*for_func_t)(i64, i64);
 typedef void_t (*thrd_func_t)(args_t);
 typedef void_t (*result_func_t)(void_t result, size_t id, values_type iter);
 typedef void (*wait_func)(void);
@@ -219,11 +223,19 @@ struct future_deque {
     atomic_future_t array;
 };
 
+typedef struct result_data {
+    raii_type type;
+    bool is_ready;
+    raii_values_t *result;
+} *result_t;
+
 typedef struct future_pool {
     raii_type type;
     int thread_count;
+    size_t cpu_present;
     memory_t *scope;
     future **futures;
+    result_t *results;
     future_deque_t queue[1];
 } future_t;
 
@@ -252,14 +264,25 @@ C_API void thrd_wait(future *, wait_func yield);
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
 C_API bool thrd_is_done(future *);
 C_API uintptr_t thrd_self(void);
-C_API raii_values_t *thrd_value(uintptr_t value);
+C_API size_t thrd_cpu_count(void);
+C_API raii_values_t *thrd_returning(args_t, void_t value);
 
-C_API future_t *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
-C_API thrd_values_t *thrd_sync(future_t *);
+C_API future_t *thrd_scope(void);
+C_API future_t *thrd_sync(future_t *);
+C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
+C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
+C_API values_type thrd_result(result_t value);
+
+C_API future_t *thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
+C_API future_t *thrd_pool(size_t count, size_t queue_count);
 C_API int thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
-C_API void thrd_then(result_func_t callback, thrd_values_t *iter, void_t result);
+
+C_API void thrd_then(result_func_t callback, future_t *iter, void_t result);
 C_API void thrd_destroy(future_t *);
 C_API bool thrd_is_finish(future_t *);
+
+#define thrd_data(value) ((raii_values_t *)&value)
+#define thrd_value(value) ((raii_values_t *)value)
 
 /**
 * `Release/free` allocated memory, must be called if not using `get_args()` function.

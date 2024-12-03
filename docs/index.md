@@ -310,14 +310,25 @@ C_API void thrd_wait(future *, wait_func yield);
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
 C_API bool thrd_is_done(future *);
 C_API uintptr_t thrd_self(void);
-C_API raii_values_t *thrd_value(uintptr_t value);
+C_API size_t thrd_cpu_count(void);
+C_API raii_values_t *thrd_returning(args_t, void_t value);
 
-C_API future_t *thrd_for(thrd_func_t fn, size_t times, const char *desc, ...);
-C_API thrd_values_t *thrd_sync(future_t *);
-C_API void thrd_then(result_func_t callback, thrd_values_t *iter, void_t result);
-C_API bool thrd_is_finish(future_t *);
-C_API int thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+C_API future_t *thrd_scope(void);
+C_API future_t *thrd_sync(future_t *);
+C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
+C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
+C_API values_type thrd_result(result_t value);
+
+// C_API future_t *thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
+// C_API future_t *thrd_pool(size_t count, size_t queue_count);
+// C_API int thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+
+C_API void thrd_then(result_func_t callback, future_t *iter, void_t result);
 C_API void thrd_destroy(future_t *);
+C_API bool thrd_is_finish(future_t *);
+
+#define thrd_data(value) ((raii_values_t *)&value)
+#define thrd_value(value) ((raii_values_t *)value)
 
 /**
 * Creates an scoped container for arbitrary arguments passing to an single `args` function.

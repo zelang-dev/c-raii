@@ -17,7 +17,8 @@ set(TARGET_LIST defer_thread
  try_unprotected
  work-steal
  thrd_async
- thrd_for )
+ thrd_spawn_fib
+ fib )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )
     target_link_libraries(${TARGET} raii)

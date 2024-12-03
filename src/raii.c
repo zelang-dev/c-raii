@@ -641,7 +641,7 @@ args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
                 break;
             case 'a':
                 // array argument
-                params->args[i].value.array = (uintptr_t **)va_arg(argp, uintptr_t **);
+                params->args[i].value.array = (ptrdiff_t **)va_arg(argp, ptrdiff_t **);
                 break;
             case 'x':
                 // executable argument
