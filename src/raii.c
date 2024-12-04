@@ -594,7 +594,6 @@ RAII_INLINE values_type args_in(args_t params, size_t index) {
 args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
     size_t i, len, count = simd_strlen(desc);
     args_t params = try_calloc(1, sizeof(struct args_s));
-    uintptr_t **a;
     void_t p;
     string s;
     params->args_size = sizeof(raii_values_t);

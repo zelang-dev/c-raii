@@ -189,6 +189,7 @@ typedef struct _promise {
     int id;
     atomic_flag done;
     atomic_spinlock mutex;
+    memory_t *scope;
     raii_values_t result[1];
 } promise;
 
@@ -243,6 +244,7 @@ struct _future {
     raii_type type;
     int id;
     thrd_t thread;
+    memory_t *scope;
     thrd_func_t func;
     promise *value;
 };

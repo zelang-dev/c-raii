@@ -24,6 +24,6 @@ int main(int argc, char *argv[])
      n = atoi(argv[1]);
      result = fib(n);
 
-     printf("Result: %zud\n", (unsigned long long)result);
+     printf("Result: %zu\n", (unsigned long long)result);
      return 0;
 }

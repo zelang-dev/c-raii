@@ -6,7 +6,7 @@ endif()
 
 project(
     raii
-    VERSION 1.2.0
+    VERSION 1.2.1
     DESCRIPTION "An general RAII implementation for C, with Defer, simple high-level C11/C++11 like Threading/Futures, custom malloc/heap allocation."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
@@ -65,8 +65,8 @@ else()
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.1.0.2.zip
- URL_MD5 c2a1173a7797bc7d4c2d52cd93ba8ac1
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.1.0.3.zip
+ URL_MD5 995443e3541e91cf7423eae64c7a480b
 )
 FetchContent_MakeAvailable(threads)
 

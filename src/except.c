@@ -97,8 +97,10 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 }
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
-    const_ptr->type = -1;
-    ex_local()->stack = const_ptr->next;
+    if (is_type(const_ptr, ex_protected_st) && !is_except_empty()) {
+        const_ptr->type = -1;
+        ex_local()->stack = const_ptr->next;
+    }
 }
 
 static void ex_unwind_stack(ex_context_t *ctx) {
