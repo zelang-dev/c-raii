@@ -1,6 +1,5 @@
 #include "raii.h"
 
-bool raii_rpmalloc_set = false;
 thrd_local(memory_t, raii, NULL)
 
 int raii_array_init(raii_array_t *a) {
@@ -746,14 +745,4 @@ RAII_INLINE bool is_str_eq(const char *str, const char *str2) {
 
 RAII_INLINE bool is_str_empty(const char *str) {
     return is_str_eq(str, "");
-}
-
-void raii_rpmalloc_init(void) {
-    if (!raii_rpmalloc_set && !rpmalloc_is_thread_initialized()) {
-        raii_rpmalloc_set = true;
-        rpmalloc_initialize();
-        atexit(rpmalloc_shutdown);
-    } else if (!rpmalloc_is_thread_initialized()) {
-        rpmalloc_thread_initialize();
-    }
 }

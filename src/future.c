@@ -56,7 +56,7 @@ static int raii_wrapper(void_t arg) {
     future_arg *f = (future_arg *)arg;
     int err = 0;
     void_t res = nullptr;
-    rpmalloc_thread_initialize();
+    rpmalloc_init();
 
     guard {
         res = f->func((args_t)f->arg);

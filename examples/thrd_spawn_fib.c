@@ -8,12 +8,12 @@ void_t fib(args_t args) {
         result_t x, y;
         future_t *f = thrd_scope();
 
-        x = thrd_spawn(fib, thrd_data(n - 1));
-        y = thrd_spawn(fib, thrd_data(n - 2));
+        x = thrd_spawn(fib, thrd_value(n - 1));
+        y = thrd_spawn(fib, thrd_value(n - 2));
 
         thrd_sync(f);
 
-        return thrd_result(x).integer + thrd_result(y).integer;
+        return thrd_value(thrd_result(x).integer + thrd_result(y).integer);
     }
 }
 
