@@ -2,7 +2,8 @@
 #include "test_assert.h"
 
 int some_worker(int args) {
-    return args * 2;
+    throw(division_by_zero);
+    return args / 0;
 }
 
 void *is_future(args_t args) {
@@ -23,7 +24,12 @@ TEST(thrd_async) {
 
     ASSERT_TRUE(is_type(fut, RAII_FUTURE));
     ASSERT_FALSE(thrd_is_done(fut));
-    ASSERT_TRUE(thrd_get(fut).boolean);
+
+    try {
+        ASSERT_TRUE(thrd_get(fut).boolean);
+    } catch (division_by_zero) {
+        ASSERT_STR(err, "division_by_zero");
+    } end_trying;
 
     return 0;
 }

@@ -18,7 +18,7 @@
 /* Smart memory pointer, the allocated memory requested in `arena` field,
 all other fields private, this object binds any additional requests to it's lifetime. */
 typedef struct memory_s memory_t;
-typedef struct _future future;
+typedef struct _future *future;
 typedef memory_t unique_t;
 typedef void (*func_t)(void *);
 typedef void (*func_args_t)(void *, ...);
@@ -98,6 +98,7 @@ enum {
 typedef union {
     int integer;
     unsigned int u_int;
+    int *int_ptr;
     signed long s_long;
     unsigned long u_long;
     long long long_long;
@@ -108,20 +109,25 @@ typedef union {
     bool boolean;
     signed short s_short;
     unsigned short u_short;
+    unsigned short *u_short_ptr;
+    unsigned char *uchar_ptr;
     signed char schar;
     unsigned char uchar;
-    unsigned char *uchar_ptr;
     char *char_ptr;
     void *object;
     ptrdiff_t **array;
+    char **array_char;
     intptr_t **array_int;
     uintptr_t **array_uint;
     raii_func_t func;
     const char const_char[256];
+    char buffer[256];
 } values_type;
 
 typedef struct {
     values_type value;
+    size_t size;
+    void_t extended;
 } raii_values_t;
 
 typedef struct {
@@ -163,6 +169,7 @@ struct memory_s {
     size_t mid;
     defer_t defer;
     ex_ptr_t *protector;
+    ex_backtrace_t *backtrace;
     void *volatile err;
     const char *volatile panic;
 };
@@ -170,6 +177,7 @@ struct memory_s {
 typedef struct args_s {
     raii_type type;
     int defer_set;
+    int is_returning;
 
     unique_t *context;
     size_t args_size;
@@ -190,7 +198,7 @@ typedef struct _promise {
     atomic_flag done;
     atomic_spinlock mutex;
     memory_t *scope;
-    raii_values_t result[1];
+    raii_values_t *result;
 } promise;
 
 typedef struct {
@@ -235,10 +243,10 @@ typedef struct future_pool {
     int thread_count;
     size_t cpu_present;
     memory_t *scope;
-    future **futures;
+    future *futures;
     result_t *results;
     future_deque_t queue[1];
-} future_t;
+} *future_t;
 
 struct _future {
     raii_type type;
@@ -252,36 +260,40 @@ struct _future {
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
-C_API future *thrd_async(thrd_func_t fn, void_t args);
+C_API future thrd_async(thrd_func_t fn, void_t args);
 
 /* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
-C_API values_type thrd_get(future *);
+C_API values_type thrd_get(future);
 
 /* This function blocks the calling thread and waits until `future` is ready,
-will execute provided `yield` callback function continuously.  */
-C_API void thrd_wait(future *, wait_func yield);
+will execute provided `yield` callback function continuously. */
+C_API void thrd_wait(future, wait_func yield);
 
 /* Check status of `future` object state, if `true` indicates thread execution has ended,
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
-C_API bool thrd_is_done(future *);
+C_API bool thrd_is_done(future);
 C_API uintptr_t thrd_self(void);
 C_API size_t thrd_cpu_count(void);
-C_API raii_values_t *thrd_returning(args_t, void_t value);
 
-C_API future_t *thrd_scope(void);
-C_API future_t *thrd_sync(future_t *);
+
+/* Return `value` any heap allocated instance/struct,
+only available in `thread` using `args_for`, DO NOT FREE! */
+C_API raii_values_t *thrd_returning(args_t, void_t value, size_t size);
+
+C_API future_t thrd_scope(void);
+C_API future_t thrd_sync(future_t);
 C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
 C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
 C_API values_type thrd_result(result_t value);
 
-C_API future_t *thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
-C_API future_t *thrd_pool(size_t count, size_t queue_count);
-C_API int thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
+C_API future_t thrd_pool(size_t count, size_t queue_count);
+C_API int thrd_add(future_t, thrd_func_t routine, const char *desc, ...);
 
-C_API void thrd_then(result_func_t callback, future_t *iter, void_t result);
-C_API void thrd_destroy(future_t *);
-C_API bool thrd_is_finish(future_t *);
+C_API void thrd_then(result_func_t callback, future_t iter, void_t result);
+C_API void thrd_destroy(future_t);
+C_API bool thrd_is_finish(future_t);
 
 #define thrd_data(value) ((raii_values_t *)(&value))
 #define thrd_value(value) ((raii_values_t *)(value))
@@ -555,6 +567,26 @@ are only valid between these sections.
     } ex_catch_if {                                                 \
         raii_deferred_free(_$##__FUNCTION__);                       \
     } ex_finally {                                                  \
+        guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
+        guard_delete(_$##__FUNCTION__);                             \
+    } ex_end_try;                                                   \
+}
+
+
+    /* This ends an scoped guard section, it replaces `}`.
+    On exit will begin executing deferred functions. Will catch and set `error`
+    this is an internal macro for `thrd_spawn` and `thrd_async` usage. */
+#define guarded_exception(error)                                    \
+        } while (false);                                            \
+        raii_deferred_free(_$##__FUNCTION__);                       \
+    } ex_catch_if {                                                 \
+        raii_deferred_free(_$##__FUNCTION__);                       \
+        if (!_$##__FUNCTION__->is_recovered && raii_is_caught(_$##__FUNCTION__, raii_message_by(_$##__FUNCTION__))) { \
+            ((memory_t *)error)->err = (void_t)ex_err.ex;                   \
+            ((memory_t *)error)->panic = ex_err.panic;              \
+            ((memory_t *)error)->backtrace = ex_err.backtrace;      \
+        }                                                           \
+    } ex_finally{\
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
     } ex_end_try;                                                   \

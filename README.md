@@ -51,7 +51,7 @@ void *is_prime(args_t arg) {
 int main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future *fut = thrd_async(is_prime, &prime);
+    future fut = thrd_async(is_prime, &prime);
 
     printf("checking...\n");
     thrd_wait(fut, thrd_yield);
@@ -301,36 +301,39 @@ Here too the same process is in effect through an **new** _typedef_ `unique_t` a
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
-C_API future *thrd_async(thrd_func_t fn, void_t args);
+C_API future thrd_async(thrd_func_t fn, void_t args);
 
 /* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
-C_API values_type thrd_get(future *);
+C_API values_type thrd_get(future);
 
 /* This function blocks the calling thread and waits until `future` is ready,
 will execute provided `yield` callback function continuously. */
-C_API void thrd_wait(future *, wait_func yield);
+C_API void thrd_wait(future, wait_func yield);
 
 /* Check status of `future` object state, if `true` indicates thread execution has ended,
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
-C_API bool thrd_is_done(future *);
+C_API bool thrd_is_done(future);
 C_API uintptr_t thrd_self(void);
 C_API size_t thrd_cpu_count(void);
-C_API raii_values_t *thrd_returning(args_t, void_t value);
 
-C_API future_t *thrd_scope(void);
-C_API future_t *thrd_sync(future_t *);
+/* Return `value` any heap allocated instance/struct,
+only available in `thread` using `args_for`, DO NOT FREE! */
+C_API raii_values_t *thrd_returning(args_t, void_t value, size_t size);
+
+C_API future_t thrd_scope(void);
+C_API future_t thrd_sync(future_t);
 C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
 C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
 C_API values_type thrd_result(result_t value);
 
-// C_API future_t *thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
-// C_API future_t *thrd_pool(size_t count, size_t queue_count);
-// C_API int thrd_add(future_t *, thrd_func_t routine, const char *desc, ...);
+// C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
+// C_API future_t thrd_pool(size_t count, size_t queue_count);
+// C_API int thrd_add(future_t, thrd_func_t routine, const char *desc, ...);
 
-C_API void thrd_then(result_func_t callback, future_t *iter, void_t result);
-C_API void thrd_destroy(future_t *);
-C_API bool thrd_is_finish(future_t *);
+C_API void thrd_then(result_func_t callback, future_t iter, void_t result);
+C_API void thrd_destroy(future_t);
+C_API bool thrd_is_finish(future_t);
 
 #define thrd_data(value) ((raii_values_t *)&value)
 #define thrd_value(value) ((raii_values_t *)value)

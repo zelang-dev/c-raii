@@ -376,14 +376,16 @@ void ex_terminate(void) {
         exit(EXIT_FAILURE);
 }
 
-void ex_throw(const char *exception, const char *file, int line, const char *function, const char *message) {
+void ex_throw(string_t exception, string_t file, int line, string_t function, string_t message, ex_backtrace_t *dump) {
     ex_context_t *ctx = ex_init();
 
     if (ctx->unstack)
         ex_terminate();
 
     ex_signal_block(all);
-    ex_trace_set(ctx, NULL);
+    if (is_empty(dump))
+        ex_trace_set(ctx, NULL);
+
     ctx->ex = exception;
     ctx->file = file;
     ctx->line = line;
@@ -541,7 +543,7 @@ void ex_handler(int sig) {
         }
     }
 
-    ex_throw(ex, "unknown", 0, NULL, NULL);
+    ex_throw(ex, "unknown", 0, NULL, NULL, NULL);
 }
 
 void ex_signal_reset(int sig) {

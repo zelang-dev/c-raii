@@ -8,6 +8,7 @@ set(TARGET_LIST
  test-defer
  test-exceptions
  test-future
+ test-future-exception
  test-mman
  test-swar
  test-thrd_local
