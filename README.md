@@ -314,6 +314,7 @@ C_API void thrd_wait(future, wait_func yield);
 /* Check status of `future` object state, if `true` indicates thread execution has ended,
 any call thereafter to `thrd_get` is guaranteed non-blocking. */
 C_API bool thrd_is_done(future);
+C_API void thrd_delete(future);
 C_API uintptr_t thrd_self(void);
 C_API size_t thrd_cpu_count(void);
 

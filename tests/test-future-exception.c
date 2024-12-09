@@ -31,6 +31,7 @@ TEST(thrd_async) {
         ASSERT_STR(err, "division_by_zero");
     } end_trying;
 
+    thrd_delete(fut);
     return 0;
 }
 
@@ -44,5 +45,4 @@ TEST(list) {
 
 int main(int argc, char **argv) {
     TEST_FUNC(list());
-    raii_destroy();
 }

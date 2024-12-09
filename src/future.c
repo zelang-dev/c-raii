@@ -54,6 +54,7 @@ static void promise_close(promise *p) {
 
 static future future_create(thrd_func_t start_routine) {
     future f = try_malloc(sizeof(struct _future));
+    f->scope = unique_init();
     f->func = (thrd_func_t)start_routine;
     f->type = RAII_FUTURE;
 
@@ -111,8 +112,25 @@ future thrd_async(thrd_func_t fn, void_t args) {
 values_type thrd_get(future f) {
     if (is_type(f, RAII_FUTURE) && !is_empty(f->value) && is_type(f->value, RAII_PROMISE)) {
         raii_values_t *r = promise_get(f->value);
-        future_close(f);
-        promise_close(f->value);
+        if (!is_empty(r)) {
+            size_t size = r->size;
+            raii_values_t *result = (raii_values_t *)calloc_full(f->scope, 1, sizeof(raii_values_t), RAII_FREE);
+            if (size > 0) {
+                result->extended = calloc_full(f->scope, 1, size, RAII_FREE);
+                memcpy(result->extended, r->extended, size);
+                result->value.object = result->extended;
+            } else {
+                result->value.array = r->value.array;
+            }
+        }
+
+        if (thrd_join(f->thread, NULL) == thrd_success) {
+            atomic_flag_clear(&f->value->mutex);
+            atomic_flag_clear(&f->value->done);
+            if (!is_empty(f->value->scope->err))
+                ex_throw(f->value->scope->err, "unknown", 0, "thrd_raii_wrapper", f->value->scope->panic, f->value->scope->backtrace);
+        }
+
         if (is_empty(r))
             return thrd_value(0)->value;
 
@@ -301,6 +319,15 @@ void thrd_destroy(future_t f) {
         RAII_FREE(f->results);
         ex_unprotected_ptr(err);
         raii_delete(scope);
+    }
+}
+
+void thrd_delete(future f) {
+    if (is_type(f, RAII_FUTURE)) {
+        memory_t *scope = f->scope;
+        f->type = -1;
+        raii_delete(scope);
+        RAII_FREE(f);
     }
 }
 

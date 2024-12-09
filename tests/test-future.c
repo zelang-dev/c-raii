@@ -25,6 +25,7 @@ TEST(thrd_async) {
     ASSERT_FALSE(thrd_is_done(fut));
     ASSERT_TRUE(thrd_get(fut).boolean);
 
+    thrd_delete(fut);
     return 0;
 }
 
@@ -38,5 +39,4 @@ TEST(list) {
 
 int main(int argc, char **argv) {
     TEST_FUNC(list());
-    raii_destroy();
 }
