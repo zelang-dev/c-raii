@@ -36,12 +36,8 @@ TEST(thrd_spawn) {
     ASSERT_FALSE(thrd_is_finish(fut));
 
     thrd_then(check_primes, thrd_sync(fut), &data);
-
-    if (!data) {
-        thrd_destroy(fut);
-
+    if (!data)
         return 0;
-    }
 }
 
 TEST(list) {

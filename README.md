@@ -321,7 +321,10 @@ C_API size_t thrd_cpu_count(void);
 /* Return `value` any heap allocated instance/struct,
 only available in `thread` using `args_for`, DO NOT FREE! */
 C_API raii_values_t *thrd_returning(args_t, void_t value, size_t size);
+C_API raii_values_t *thrd_data(void_t value);
+C_API raii_values_t *thrd_value(uintptr_t value);
 
+C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
 C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
@@ -329,15 +332,10 @@ C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
 C_API values_type thrd_result(result_t value);
 
 // C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
-// C_API future_t thrd_pool(size_t count, size_t queue_count);
-// C_API int thrd_add(future_t, thrd_func_t routine, const char *desc, ...);
 
 C_API void thrd_then(result_func_t callback, future_t iter, void_t result);
 C_API void thrd_destroy(future_t);
 C_API bool thrd_is_finish(future_t);
-
-#define thrd_data(value) ((raii_values_t *)&value)
-#define thrd_value(value) ((raii_values_t *)value)
 
 /**
 * Creates an scoped container for arbitrary arguments passing to an single `args` function.
@@ -390,14 +388,6 @@ C_API unique_t *unique_init(void);
 
 ```c
 /* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
-DO NOT `free`, will be `RAII_FREE` when scope smart pointer panics/returns/exits. */
-C_API void *malloc_by(memory_t *scope, size_t size);
-
-/* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
-DO NOT `free`, will be `RAII_FREE` when scope smart pointer panics/returns/exits. */
-C_API void *calloc_by(memory_t *scope, int count, size_t size);
-
-/* Request/return raw memory of given `size`, using smart memory pointer's lifetime scope handle.
 DO NOT `free`, will be freed with given `func`, when scope smart pointer panics/returns/exits. */
 C_API void *malloc_full(memory_t *scope, size_t size, func_t func);
 
@@ -440,13 +430,13 @@ C_API void raii_delete(memory_t *ptr);
 uses current `thread` smart pointer,
 DO NOT `free`, will be `RAII_FREE`
 when `raii_deferred_clean` is called. */
-C_API void *malloc_default(size_t size);
+C_API void *malloc_this(size_t size);
 
 /* Request/return raw memory of given `size`,
 uses current `thread` smart pointer,
 DO NOT `free`, will be `RAII_FREE`
 when `raii_deferred_clean` is called. */
-C_API void *calloc_default(int count, size_t size);
+C_API void *calloc_this(int count, size_t size);
 
 /* Defer execution `LIFO` of given function with argument,
 to current `thread` scope lifetime/destruction. */
@@ -510,27 +500,33 @@ On exit will begin executing deferred functions. */
 #define guarded
 
 /* Returns protected raw memory pointer,
-DO NOT FREE, will `throw/panic` if memory request fails. */
-#define _malloc(size)
+DO NOT FREE, will `throw/panic` if memory request fails.
+Only valid between `guard` blocks or inside `thread/future` call. */
+C_API void_t malloc_local(size_t size);
+#define _malloc(size) malloc_local(size)
 
 /* Returns protected raw memory pointer,
-DO NOT FREE, will `throw/panic` if memory request fails. */
-#define _calloc(count, size)
+DO NOT FREE, will `throw/panic` if memory request fails.
+Only valid between `guard` blocks or inside `thread/future` call. */
+C_API void_t calloc_local(int count, size_t size);
+#define _calloc(count, size) calloc_local(count, size)
 
 /* Defer execution `LIFO` of given function with argument,
-execution begins when current `guard` scope exits or panic/throw. */
-#define _defer(func, ptr)
+Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call.
 
-/* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _recover(err)
+Execution begins when current `guard` scope exits or panic/throw. */
+C_API size_t deferring(func_t func, void_t data);
+#define _defer(func, ptr) deferring(func, ptr)
 
-/* Compare `err` to scoped error condition,
-will mark exception handled, if `true`.
-DO NOT PUT `err` in quote's like "err". */
-#define _is_caught(err)
+/* Compare `err` to scoped error condition, will mark exception handled, if `true`.
+Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+C_API bool is_recovered(const char *err);
+#define _recover(err) is_recovered(err)
 
-/* Get scoped error condition string. */
-#define _get_message()
+/* Get scoped error condition string.
+Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+C_API const char *err_message(void);
+#define _get_message() err_message()
 
 /* Stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */

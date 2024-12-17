@@ -27,8 +27,4 @@ jobs:
       - name: Run tests
         run: |
             cd build
-            ./test-defer
-            ./test-exceptions
-            ./test-cthread
-            ./test-arena
-            ./test-tls
+            ctest -C Debug --output-on-failure -F

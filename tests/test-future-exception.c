@@ -21,6 +21,7 @@ void *is_future(args_t args) {
 
 TEST(thrd_async) {
     future fut = thrd_async(is_future, args_for("six", "hello world", 128, some_worker));
+    raii_defer((func_t)thrd_delete, fut);
 
     ASSERT_TRUE(is_type(fut, RAII_FUTURE));
     ASSERT_FALSE(thrd_is_done(fut));
@@ -31,7 +32,6 @@ TEST(thrd_async) {
         ASSERT_STR(err, "division_by_zero");
     } end_trying;
 
-    thrd_delete(fut);
     return 0;
 }
 

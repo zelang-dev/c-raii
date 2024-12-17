@@ -1,6 +1,7 @@
 #include "raii.h"
 
 thrd_local(memory_t, raii, NULL)
+const raii_values_t raii_values_empty[1] = {0};
 
 int raii_array_init(raii_array_t *a) {
     if (UNLIKELY(!a))
@@ -41,7 +42,7 @@ static inline bool umull_overflow(size_t a, size_t b, size_t *out) {
 #else
 #define umull_overflow __builtin_mul_overflow
 #endif
-void *realloc_array(void *optr, size_t nmemb, size_t size) {
+void_t realloc_array(void_t optr, size_t nmemb, size_t size) {
     size_t total_size;
     if (UNLIKELY(umull_overflow(nmemb, size, &total_size))) {
         errno = ENOMEM;
@@ -64,9 +65,9 @@ static inline bool add_overflow(size_t a, size_t b, size_t *out) {
 #define add_overflow __builtin_add_overflow
 #endif
 
-void *raii_array_append(raii_array_t *a, size_t element_size) {
+void_t raii_array_append(raii_array_t *a, size_t element_size) {
     if (!(a->elements % INCREMENT)) {
-        void *new_base;
+        void_t new_base;
         size_t new_cap;
 
         if (UNLIKELY(add_overflow(a->elements, INCREMENT, &new_cap))) {
@@ -90,9 +91,9 @@ RAII_INLINE int raii_deferred_init(defer_t *array) {
 
 void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message) {
     memory_t *scope = raii_init();
-    scope->err = (void *)ex;
+    scope->err = (void_t)ex;
     scope->panic = message;
-    ex_swap_set(ctx, (void *)scope);
+    ex_swap_set(ctx, (void_t)scope);
     ex_unwind_set(ctx, scope->is_protected);
 }
 
@@ -107,17 +108,21 @@ memory_t *raii_init(void) {
         if (UNLIKELY(raii_deferred_init(&scope->defer) < 0))
             raii_panic("Deferred initialization failed!");
 
+        scope->threading = 0;
         scope->arena = NULL;
         scope->protector = NULL;
         scope->panic = NULL;
         scope->err = NULL;
+        scope->threaded = NULL;
+        scope->local = NULL;
+        scope->queued = NULL;
         scope->is_protected = false;
         scope->is_recovered = false;
         scope->mid = -1;
 
         ex_context_t *ctx = ex_init();
-        ctx->data = (void *)scope;
-        ctx->prev = (void *)scope;
+        ctx->data = (void_t)scope;
+        ctx->prev = (void_t)scope;
         ctx->is_raii = true;
         if (!exception_signal_set)
             ex_signal_setup();
@@ -136,8 +141,8 @@ RAII_INLINE size_t raii_last_mid(memory_t *scope) {
     return scope->mid;
 }
 
-void *try_calloc(int count, size_t size) {
-    void *ptr = RAII_CALLOC(count, size);
+void_t try_calloc(int count, size_t size) {
+    void_t ptr = RAII_CALLOC(count, size);
     if (ptr == NULL) {
         errno = ENOMEM;
         raii_panic("Calloc failed!");
@@ -146,8 +151,8 @@ void *try_calloc(int count, size_t size) {
     return ptr;
 }
 
-void *try_malloc(size_t size) {
-    void *ptr = RAII_MALLOC(size);
+void_t try_malloc(size_t size) {
+    void_t ptr = RAII_MALLOC(size);
     if (ptr == NULL) {
         errno = ENOMEM;
         raii_panic("Malloc failed!");
@@ -156,8 +161,8 @@ void *try_malloc(size_t size) {
     return ptr;
 }
 
-void *try_realloc(void *old_ptr, size_t size) {
-    void *ptr = RAII_REALLOC(old_ptr, size);
+void_t try_realloc(void_t old_ptr, size_t size) {
+    void_t ptr = RAII_REALLOC(old_ptr, size);
     if (ptr == NULL) {
         errno = ENOMEM;
         raii_panic("Realloc failed!");
@@ -209,16 +214,8 @@ unique_t *unique_init(void) {
     return raii;
 }
 
-unique_t *unique_init_arena(void) {
-    unique_t *raii = unique_init();
-    raii->arena = (void *)arena_init(0);
-    raii->is_arena = true;
-
-    return raii;
-}
-
-void *malloc_full(memory_t *scope, size_t size, func_t func) {
-    void *arena = try_malloc(size);
+void_t malloc_full(memory_t *scope, size_t size, func_t func) {
+    void_t arena = try_malloc(size);
     if (is_empty(scope->protector))
         scope->protector = try_malloc(sizeof(ex_ptr_t));
 
@@ -230,23 +227,16 @@ void *malloc_full(memory_t *scope, size_t size, func_t func) {
     return arena;
 }
 
-RAII_INLINE void *malloc_default(size_t size) {
+RAII_INLINE void_t malloc_this(size_t size) {
     return malloc_full(raii_init(), size, RAII_FREE);
 }
 
-void *malloc_by(memory_t *scope, size_t size) {
-    if (scope->is_arena)
-        return arena_alloc(scope->arena, size);
-
-    return malloc_full(scope, size, RAII_FREE);
+RAII_INLINE void_t malloc_local(size_t size) {
+    return malloc_full((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), size, RAII_FREE);
 }
 
-RAII_INLINE void *malloc_arena(memory_t *scope, size_t size) {
-    return arena_alloc(scope->arena, size);
-}
-
-void *calloc_full(memory_t *scope, int count, size_t size, func_t func) {
-    void *arena = try_calloc(count, size);
+void_t calloc_full(memory_t *scope, int count, size_t size, func_t func) {
+    void_t arena = try_calloc(count, size);
     if (is_empty(scope->protector))
         scope->protector = try_calloc(1, sizeof(ex_ptr_t));
 
@@ -258,19 +248,12 @@ void *calloc_full(memory_t *scope, int count, size_t size, func_t func) {
     return arena;
 }
 
-RAII_INLINE void *calloc_default(int count, size_t size) {
+RAII_INLINE void_t calloc_this(int count, size_t size) {
     return calloc_full(raii_init(), count, size, RAII_FREE);
 }
 
-void *calloc_by(memory_t *scope, int count, size_t size) {
-    if (scope->is_arena)
-        return arena_calloc(scope->arena, (long)count, (long)size);
-
-    return calloc_full(scope, count, size, RAII_FREE);
-}
-
-RAII_INLINE void *calloc_arena(memory_t *scope, int count, size_t size) {
-    return arena_calloc(scope->arena, (long)count, (long)size);
+RAII_INLINE void_t calloc_local(int count, size_t size) {
+    return calloc_full((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), count, size, RAII_FREE);
 }
 
 void raii_delete(memory_t *ptr) {
@@ -280,10 +263,11 @@ void raii_delete(memory_t *ptr) {
     raii_deferred_free(ptr);
 
 #ifdef emulate_tls
-    if (ptr != raii_local()) {
+    if (ptr != raii_local())
 #else
-    if (ptr != &thrd_raii_buffer) {
+    if (ptr != &thrd_raii_buffer)
 #endif
+    {
         memset(ptr, -1, sizeof(memory_t));
         RAII_FREE(ptr);
     }
@@ -291,27 +275,11 @@ void raii_delete(memory_t *ptr) {
     ptr = NULL;
 }
 
-void free_arena(memory_t *ptr) {
-    if (ptr == NULL)
-        return;
-
-    arena_t arena = NULL;
-    if (!is_empty(ptr->arena))
-        arena = (arena_t)ptr->arena;
-
-    raii_delete(ptr);
-    if (!is_empty(arena))
-        arena_free(arena);
-
-    ptr = NULL;
-    arena = NULL;
-}
-
 RAII_INLINE void raii_destroy(void) {
     raii_delete(raii_local());
 }
 
-static void raii_array_free(void *data) {
+static void raii_array_free(void_t data) {
     raii_array_t *array = data;
 
     raii_array_reset(array);
@@ -356,7 +324,7 @@ static RAII_INLINE size_t raii_deferred_array_len(const defer_t *array) {
     return array->base.elements;
 }
 
-static void deferred_canceled(void *data) {}
+static void deferred_canceled(void_t data) {}
 
 static void raii_deferred_internal(memory_t *scope, defer_func_t *deferred) {
     const size_t num_defers = raii_deferred_array_len(&scope->defer);
@@ -446,7 +414,7 @@ RAII_INLINE void raii_deferred_clean(void) {
     raii_deferred_free(raii_local());
 }
 
-static size_t raii_deferred_any(memory_t *scope, func_t func, void *data, void *check) {
+static size_t raii_deferred_any(memory_t *scope, func_t func, void_t data, void_t check) {
     defer_func_t *deferred;
 
     RAII_ASSERT(func);
@@ -464,25 +432,29 @@ static size_t raii_deferred_any(memory_t *scope, func_t func, void *data, void *
     }
 }
 
-RAII_INLINE size_t raii_deferred(memory_t *scope, func_t func, void *data) {
+RAII_INLINE size_t raii_deferred(memory_t *scope, func_t func, void_t data) {
     return raii_deferred_any(scope, func, data, NULL);
 }
 
-RAII_INLINE size_t raii_defer(func_t func, void *data) {
+RAII_INLINE size_t raii_defer(func_t func, void_t data) {
     return raii_deferred(raii_local(), func, data);
 }
 
-RAII_INLINE void raii_recover(func_t func, void *data) {
-    raii_deferred_any(raii_local(), func, data, (void *)"err");
+RAII_INLINE size_t deferring(func_t func, void_t data) {
+    return raii_deferred((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), func, data);
 }
 
-RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void *data) {
-    raii_deferred_any(scope, func, data, (void *)"err");
+RAII_INLINE void raii_recover(func_t func, void_t data) {
+    raii_deferred_any(raii_local(), func, data, (void_t)"err");
+}
+
+RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void_t data) {
+    raii_deferred_any(scope, func, data, (void_t)"err");
 }
 
 bool raii_caught(const char *err) {
     memory_t *scope = raii_local();
-    const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
+    const char *exception = (const char *)(!is_empty((void_t)scope->panic) ? scope->panic : scope->err);
 
     if (exception == NULL && is_str_eq(err, ex_local()->ex)) {
         ex_local()->state = ex_catch_st;
@@ -495,22 +467,30 @@ bool raii_caught(const char *err) {
     return scope->is_recovered;
 }
 
-bool raii_is_caught(memory_t *scope, const char *err) {
-    const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
+RAII_INLINE bool raii_is_caught(memory_t *scope, const char *err) {
+    const char *exception = (const char *)(!is_empty((void_t)scope->panic) ? scope->panic : scope->err);
     if ((scope->is_recovered = is_str_eq(err, exception)))
         ex_local()->state = ex_catch_st;
 
     return scope->is_recovered;
 }
 
-const char *raii_message(void) {
+RAII_INLINE bool is_recovered(const char *err) {
+    return raii_is_caught((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), err);
+}
+
+RAII_INLINE const char *raii_message(void) {
     memory_t *scope = raii_local();
-    const char *exception = (const char *)(!is_empty((void *)scope->panic) ? scope->panic : scope->err);
+    const char *exception = (const char *)(!is_empty((void_t)scope->panic) ? scope->panic : scope->err);
     return exception == NULL ? ex_local()->ex : exception;
 }
 
 RAII_INLINE const char *raii_message_by(memory_t *scope) {
-    return !is_empty((void *)scope->panic) ? scope->panic : scope->err;
+    return !is_empty((void_t)scope->panic) ? scope->panic : scope->err;
+}
+
+RAII_INLINE const char *err_message(void) {
+    return raii_message_by((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena));
 }
 
 RAII_INLINE void raii_defer_cancel(size_t index) {
@@ -523,14 +503,14 @@ RAII_INLINE void raii_defer_fire(size_t index) {
 
 void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
     memory_t *scope = raii_local()->arena;
-    scope->err = (void *)ex;
+    scope->err = (void_t)ex;
     scope->panic = message;
     ctx->is_guarded = true;
-    ex_swap_set(ctx, (void *)scope);
+    ex_swap_set(ctx, (void_t)scope);
     ex_unwind_set(ctx, scope->is_protected);
 }
 
-void guard_reset(void *scope, ex_setup_func set, ex_unwind_func unwind) {
+void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind) {
     raii_local()->arena = scope;
     ex_swap_reset(ex_local());
     ex_local()->is_guarded = false;
@@ -546,12 +526,11 @@ void guard_delete(memory_t *ptr) {
     }
 }
 
-RAII_INLINE values_type raii_value(void *data) {
+RAII_INLINE values_type raii_value(void_t data) {
     if (data)
         return ((raii_values_t *)data)->value;
 
-    RAII_LOG("attempt to get value on null");
-    return;
+    return raii_values_empty->value;
 }
 
 void args_free(args_t params) {
@@ -581,13 +560,16 @@ RAII_INLINE values_type get_arg(void_t params) {
 }
 
 RAII_INLINE values_type get_args(args_t params, int item) {
-    return raii_get_args(nullptr, (void_t)params, item);
+    if (is_type(params, RAII_ARGS))
+        return raii_get_args(nullptr, (void_t)params, item);
+
+    return get_arg(params);
 }
 
 RAII_INLINE values_type args_in(args_t params, size_t index) {
     return (index >= 0 && index < params->n_args)
         ? params->args[index].value
-        : ((raii_values_t *)0)->value;
+        : raii_values_empty->value;
 }
 
 args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
@@ -629,10 +611,13 @@ args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
                 // string argument
                 s = (char *)va_arg(argp, char *);
                 len = simd_strlen(s);
-                if (len > sizeof(raii_values_t)) {
-                    params->args_size += len + 1;
+                if (len > sizeof(values_type)) {
+                    params->args_size += len + sizeof(string);
                     params->args = try_realloc(params->args, params->args_size);
-                    strncpy(params->args[i].value.char_ptr, s, len);
+                    strncpy((string)params->args[i].extended, s, len);
+                    //memcpy(params->args[i].extended, s, len);
+                    params->args[i].value.char_ptr = params->args[i].extended;
+                    //strncpy(params->args[i].value.char_ptr, s, len);
                 } else {
                     params->args[i].value.char_ptr = s;
                 }
@@ -651,9 +636,9 @@ args_t raii_args_ex(memory_t *scope, const char *desc, va_list argp) {
                 break;
             case 'p':
                 // void pointer (any arbitrary pointer) argument
-                params->args[i].value.object = va_arg(argp, void *);
+                params->args[i].value.object = va_arg(argp, void_t);
             default:
-                p = va_arg(argp, void *);
+                p = va_arg(argp, void_t);
                 len = sizeof(p);
                 params->args_size += len;
                 params->args = try_realloc(params->args, params->args_size);
@@ -691,31 +676,35 @@ args_t args_for(const char *desc, ...) {
     return params;
 }
 
-RAII_INLINE raii_type type_of(void *self) {
+RAII_INLINE raii_type type_of(void_t self) {
     return ((var_t *)self)->type;
 }
 
-RAII_INLINE bool is_guard(void *self) {
+RAII_INLINE bool is_guard(void_t self) {
     return !is_empty(self) && ((unique_t *)self)->status == RAII_GUARDED_STATUS;
 }
 
-RAII_INLINE bool is_type(void *self, raii_type check) {
+RAII_INLINE bool is_type(void_t self, raii_type check) {
     return type_of(self) == check;
 }
 
-RAII_INLINE bool is_instance_of(void *self, void *check) {
+RAII_INLINE bool is_void(void_t self) {
+    return ((void_t)self == (void_t)0xffffffffffffffff);
+}
+
+RAII_INLINE bool is_instance_of(void_t self, void_t check) {
     return type_of(self) == type_of(check);
 }
 
-RAII_INLINE bool is_value(void *self) {
+RAII_INLINE bool is_value(void_t self) {
     return (type_of(self) > RAII_NULL) && (type_of(self) < RAII_NAN);
 }
 
-RAII_INLINE bool is_instance(void *self) {
+RAII_INLINE bool is_instance(void_t self) {
     return (type_of(self) > RAII_NAN) && (type_of(self) < RAII_NO_INSTANCE);
 }
 
-RAII_INLINE bool is_valid(void *self) {
+RAII_INLINE bool is_valid(void_t self) {
     return is_value(self) || is_instance(self);
 }
 
@@ -723,7 +712,7 @@ RAII_INLINE bool is_zero(size_t self) {
     return self == 0;
 }
 
-RAII_INLINE bool is_empty(void *self) {
+RAII_INLINE bool is_empty(void_t self) {
     return self == NULL;
 }
 

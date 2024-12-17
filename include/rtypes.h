@@ -80,7 +80,7 @@ typedef const unsigned char *u_string_t;
 typedef const unsigned char u_char_t;
 
 #ifndef __cplusplus
-#define nullptr ((void*)0)
+#define nullptr NULL
 #endif
 
 /**

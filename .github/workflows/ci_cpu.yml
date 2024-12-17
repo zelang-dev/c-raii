@@ -44,11 +44,7 @@ jobs:
             cd build
             cmake -DCMAKE_BUILD_TYPE=Debug ..
             cmake --build .
-            ./test-defer
-            ./test-exceptions
-            ./test-cthread
-            ./test-arena
-            ./test-tls
+            ctest -C Debug --output-on-failure -F
       - name: Show the artifact
         run: |
           ls -al "${PWD}/artifacts"

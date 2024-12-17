@@ -32,11 +32,7 @@ jobs:
       - name: Run tests
         run: |
             cd build
-            ./test-defer
-            ./test-exceptions
-            ./test-cthread
-            ./test-arena
-            ./test-tls
+            ctest -C Debug --output-on-failure -F
 
   build-windows:
     name: Windows (${{ matrix.arch }})
@@ -59,12 +55,8 @@ jobs:
       - name: Run tests
         shell: cmd
         run: |
-            cd build\Debug
-            .\test-defer.exe
-            .\test-exceptions.exe
-            .\test-cthread.exe
-            .\test-arena.exe
-            .\test-tls.exe
+            cd build
+            ctest -C Debug --output-on-failure -F
 
   build-macos:
     name: macOS
@@ -80,8 +72,4 @@ jobs:
       - name: Run tests
         run: |
             cd build
-            ./test-defer
-            ./test-exceptions
-            ./test-cthread
-            ./test-arena
-            ./test-tls
+            ctest -C Debug --output-on-failure -F

@@ -97,7 +97,7 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 }
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
-    if (is_type(const_ptr, ex_protected_st) && !is_except_empty()) {
+    if (!is_except_empty() && is_type(const_ptr, ex_protected_st)) {
         const_ptr->type = -1;
         ex_local()->stack = const_ptr->next;
     }

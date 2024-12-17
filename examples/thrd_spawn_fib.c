@@ -3,7 +3,7 @@
 void_t fib(args_t args) {
     int n = get_arg(args).integer;
     if (n < 2) {
-        return thrd_data(n);
+        return thrd_value(n);
     } else {
         result_t x, y;
         future_t f = thrd_scope();
@@ -23,15 +23,12 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    result_t results;
-    future_t fut = thrd_scope();
     int n = atoi(argv[1]);
-
-    results = thrd_spawn(fib, thrd_data(n - 2));
+    future_t fut = thrd_scope();
+    result_t results = thrd_spawn(fib, thrd_value(n));
 
     thrd_sync(fut);
     printf("Result: %d\n", thrd_result(results).integer);
-    thrd_destroy(fut);
 
     return 0;
 }
