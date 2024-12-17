@@ -326,6 +326,10 @@ C_API values_type args_in(args_t params, size_t index);
 C_API memory_t *raii_local(void);
 /* Return current `thread` smart memory pointer. */
 C_API memory_t *raii_init(void);
+
+/* Return current `centext` ~scope~ smart pointer, in use! */
+C_API memory_t *get_scope(void);
+
 C_API void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API int raii_deferred_init(defer_t *array);
 

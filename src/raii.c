@@ -3,6 +3,18 @@
 thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
 
+RAII_INLINE memory_t *get_scope(void) {
+    memory_t *scope;
+    if (raii_init()->threading && raii_local()->local)
+        scope = raii_local()->local;
+    else if (raii_local()->status == RAII_GUARDED_STATUS)
+        scope = (memory_t *)raii_local()->arena;
+    else
+        scope = raii_local();
+
+    return scope;
+}
+
 int raii_array_init(raii_array_t *a) {
     if (UNLIKELY(!a))
         return -EINVAL;
@@ -232,7 +244,7 @@ RAII_INLINE void_t malloc_this(size_t size) {
 }
 
 RAII_INLINE void_t malloc_local(size_t size) {
-    return malloc_full((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), size, RAII_FREE);
+    return malloc_full(get_scope(), size, RAII_FREE);
 }
 
 void_t calloc_full(memory_t *scope, int count, size_t size, func_t func) {
@@ -253,7 +265,7 @@ RAII_INLINE void_t calloc_this(int count, size_t size) {
 }
 
 RAII_INLINE void_t calloc_local(int count, size_t size) {
-    return calloc_full((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), count, size, RAII_FREE);
+    return calloc_full(get_scope(), count, size, RAII_FREE);
 }
 
 void raii_delete(memory_t *ptr) {
@@ -412,6 +424,7 @@ void raii_deferred_free(memory_t *scope) {
 
 RAII_INLINE void raii_deferred_clean(void) {
     raii_deferred_free(raii_local());
+    raii_deferred_init(&raii_local()->defer);
 }
 
 static size_t raii_deferred_any(memory_t *scope, func_t func, void_t data, void_t check) {
@@ -441,7 +454,7 @@ RAII_INLINE size_t raii_defer(func_t func, void_t data) {
 }
 
 RAII_INLINE size_t deferring(func_t func, void_t data) {
-    return raii_deferred((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), func, data);
+    return raii_deferred(get_scope(), func, data);
 }
 
 RAII_INLINE void raii_recover(func_t func, void_t data) {
@@ -476,7 +489,7 @@ RAII_INLINE bool raii_is_caught(memory_t *scope, const char *err) {
 }
 
 RAII_INLINE bool is_recovered(const char *err) {
-    return raii_is_caught((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena), err);
+    return raii_is_caught(get_scope(), err);
 }
 
 RAII_INLINE const char *raii_message(void) {
@@ -490,7 +503,7 @@ RAII_INLINE const char *raii_message_by(memory_t *scope) {
 }
 
 RAII_INLINE const char *err_message(void) {
-    return raii_message_by((raii_local()->threading && raii_local()->local ? raii_local()->local : raii_local()->arena));
+    return raii_message_by(get_scope());
 }
 
 RAII_INLINE void raii_defer_cancel(size_t index) {

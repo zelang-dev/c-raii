@@ -176,7 +176,6 @@ static void deque_destroy(void) {
 
         atomic_flag_test_and_set(&queue->shutdown);
         raii_delete(scope);
-        deque_free(queue);
     }
 }
 
@@ -205,7 +204,6 @@ static void promise_set(promise *p, void_t res, bool is_args) {
 
     atomic_unlock(&p->mutex);
     atomic_flag_test_and_set(&p->done);
-    raii_deferred_clean();
 }
 
 static RAII_INLINE raii_values_t *promise_get(promise *p) {
@@ -236,7 +234,7 @@ static future future_create(thrd_func_t start_routine) {
 
 static void future_close(future f) {
     if (is_type(f, RAII_FUTURE)) {
-        if (is_zero(f->is_pool))
+        if (!f->is_pool)
             thrd_join(f->thread, NULL);
 
         memset(f, 0, sizeof(f));
@@ -411,7 +409,7 @@ RAII_INLINE raii_values_t *thrd_data(void_t value) {
     if (is_empty(value))
         return (raii_values_t *)raii_values_empty;
 
-    raii_values_t *result = (raii_values_t *)malloc_this(sizeof(raii_values_t));
+    raii_values_t *result = (raii_values_t *)malloc_local(sizeof(raii_values_t));
     result->value.object = value;
     result->size = 0;
     return result;
@@ -421,7 +419,7 @@ RAII_INLINE raii_values_t *thrd_value(uintptr_t value) {
     if (is_zero(value))
         return (raii_values_t *)raii_values_empty;
 
-    raii_values_t *result = (raii_values_t *)malloc_this(sizeof(raii_values_t));
+    raii_values_t *result = (raii_values_t *)malloc_local(sizeof(raii_values_t));
     result->value.ulong_long = value;
     result->size = 0;
     return result;
@@ -466,7 +464,7 @@ void thrd_init(size_t queue_size) {
         thrd_queue_set = true;
         size_t i, cpu = thrd_cpu_count();
         unique_t *scope = unique_init(), *global = raii_init();
-        future_deque_t **local, *queue = (future_deque_t *)try_malloc(sizeof(future_deque_t));
+        future_deque_t **local, *queue = (future_deque_t *)malloc_full(scope, sizeof(future_deque_t), (func_t)deque_free);
         deque_init(queue, cpu);
         if (queue_size > 0) {
             local = (future_deque_t **)calloc_full(scope, cpu, sizeof(local[0]), RAII_FREE);
@@ -515,7 +513,7 @@ future_t thrd_scope(void) {
     }
 
     scope = unique_init();
-    pool = (future_t)try_malloc(sizeof(struct future_pool));
+    pool = (future_t)try_calloc(1, sizeof(struct future_pool));
     pool->futures = nullptr;
     pool->scope = scope;
     pool->queue = queue;
@@ -539,8 +537,8 @@ result_t thrd_spawn(thrd_func_t fn, void_t args) {
 
     result = (result_t)malloc_full(queue->scope, sizeof(struct result_data), RAII_FREE);
     result_count = atomic_fetch_add(&queue->result_count, 1) + 1;
-    results = (result_t *)atomic_load_explicit(&queue->results, memory_order_acquire);
     result_id = result_count - 1;
+    results = (result_t *)atomic_load_explicit(&queue->results, memory_order_acquire);
     if (result_id % queue->queue_size == 0)
         results = try_realloc(results, (result_id + queue->queue_size) * sizeof(results[0]));
 
@@ -604,9 +602,6 @@ future_t thrd_sync(future_t pool) {
     int i, id;
     memory_t *scope = pool->queue->scope;
     for (i = pool->start; i < pool->end; i++) {
-        if (is_empty(pool->futures[i]) || is_empty(pool->futures[i]->value))
-            continue;
-
         id = pool->futures[i]->id;
         raii_values_t *result = promise_get(pool->futures[i]->value);
         result_t *results = (result_t *)atomic_load_explicit(&pool->queue->results, memory_order_acquire);
@@ -627,7 +622,7 @@ future_t thrd_sync(future_t pool) {
     }
 
     raii_deferred_clean();
-    thrd_destroy(pool);
+    deferring((func_t)thrd_destroy, pool);
     return pool;
 }
 
@@ -643,8 +638,8 @@ void thrd_destroy(future_t f) {
     if (is_type(f, RAII_SPAWN)) {
         memory_t *scope = f->scope;
         f->type = -1;
-        RAII_FREE(f->futures);
         raii_delete(scope);
+        RAII_FREE(f->futures);
         RAII_FREE(f);
     }
 }
