@@ -327,7 +327,7 @@ C_API memory_t *raii_local(void);
 /* Return current `thread` smart memory pointer. */
 C_API memory_t *raii_init(void);
 
-/* Return current `centext` ~scope~ smart pointer, in use! */
+/* Return current `context` ~scope~ smart pointer, in use! */
 C_API memory_t *get_scope(void);
 
 C_API void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message);
@@ -417,26 +417,16 @@ C_API u_string raii_decode64(u_string_t src);
 for use with `malloc_*` `calloc_*` wrapper functions to request/return raw memory. */
 C_API unique_t *unique_init(void);
 
-/* Request/return raw memory of given `size`,
-uses current `thread` smart pointer,
-DO NOT `free`, will be `RAII_FREE`
-when `raii_deferred_clean` is called. */
-C_API void_t malloc_this(size_t size);
-
-/* Returns protected raw memory pointer,
+/* Returns protected raw memory pointer of given `size`,
 DO NOT FREE, will `throw/panic` if memory request fails.
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+This uses current `thread` smart pointer, unless called
+between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
 C_API void_t malloc_local(size_t size);
 
-/* Request/return raw memory of given `size`,
-uses current `thread` smart pointer,
-DO NOT `free`, will be `RAII_FREE`
-when `raii_deferred_clean` is called. */
-C_API void_t calloc_this(int count, size_t size);
-
-/* Returns protected raw memory pointer,
+/* Returns protected raw memory pointer of given `size`,
 DO NOT FREE, will `throw/panic` if memory request fails.
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+This uses current `thread` smart pointer, unless called
+between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
 C_API void_t calloc_local(int count, size_t size);
 
 C_API values_type raii_value(void_t);

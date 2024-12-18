@@ -426,17 +426,20 @@ C_API void raii_delete(memory_t *ptr);
 ### Using `thread local storage` for an default smart pointer, the following functions always available
 
 ```c
-/* Request/return raw memory of given `size`,
-uses current `thread` smart pointer,
-DO NOT `free`, will be `RAII_FREE`
-when `raii_deferred_clean` is called. */
-C_API void *malloc_this(size_t size);
+/* Return current `context` ~scope~ smart pointer, in use! */
+C_API memory_t *get_scope(void);
 
-/* Request/return raw memory of given `size`,
-uses current `thread` smart pointer,
-DO NOT `free`, will be `RAII_FREE`
-when `raii_deferred_clean` is called. */
-C_API void *calloc_this(int count, size_t size);
+/* Returns protected raw memory pointer of given `size`,
+DO NOT FREE, will `throw/panic` if memory request fails.
+This uses current `thread` smart pointer, unless called
+between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
+C_API void *malloc_local(size_t size);
+
+/* Returns protected raw memory pointer of given `size`,
+DO NOT FREE, will `throw/panic` if memory request fails.
+This uses current `thread` smart pointer, unless called
+between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
+C_API void *calloc_local(int count, size_t size);
 
 /* Defer execution `LIFO` of given function with argument,
 to current `thread` scope lifetime/destruction. */
@@ -499,16 +502,7 @@ return given `result` when done, use `NONE` for no return. */
 On exit will begin executing deferred functions. */
 #define guarded
 
-/* Returns protected raw memory pointer,
-DO NOT FREE, will `throw/panic` if memory request fails.
-Only valid between `guard` blocks or inside `thread/future` call. */
-C_API void_t malloc_local(size_t size);
 #define _malloc(size) malloc_local(size)
-
-/* Returns protected raw memory pointer,
-DO NOT FREE, will `throw/panic` if memory request fails.
-Only valid between `guard` blocks or inside `thread/future` call. */
-C_API void_t calloc_local(int count, size_t size);
 #define _calloc(count, size) calloc_local(count, size)
 
 /* Defer execution `LIFO` of given function with argument,

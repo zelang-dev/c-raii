@@ -180,8 +180,8 @@ static void deque_destroy(void) {
 }
 
 static promise *promise_create(void) {
-    promise *p = malloc_this(sizeof(promise));
-    p->scope = raii_local();
+    promise *p = malloc_local(sizeof(promise));
+    p->scope = get_scope();
     atomic_flag_clear(&p->mutex);
     atomic_flag_clear(&p->done);
     p->type = RAII_PROMISE;

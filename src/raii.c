@@ -4,13 +4,11 @@ thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
 
 RAII_INLINE memory_t *get_scope(void) {
-    memory_t *scope;
-    if (raii_init()->threading && raii_local()->local)
-        scope = raii_local()->local;
-    else if (raii_local()->status == RAII_GUARDED_STATUS)
-        scope = (memory_t *)raii_local()->arena;
-    else
-        scope = raii_local();
+    memory_t *scope = raii_init();
+    if (scope->threading && scope->local)
+        scope = scope->local;
+    else if (scope->status == RAII_GUARDED_STATUS)
+        scope = ((memory_t *)scope->arena);
 
     return scope;
 }
@@ -239,10 +237,6 @@ void_t malloc_full(memory_t *scope, size_t size, func_t func) {
     return arena;
 }
 
-RAII_INLINE void_t malloc_this(size_t size) {
-    return malloc_full(raii_init(), size, RAII_FREE);
-}
-
 RAII_INLINE void_t malloc_local(size_t size) {
     return malloc_full(get_scope(), size, RAII_FREE);
 }
@@ -258,10 +252,6 @@ void_t calloc_full(memory_t *scope, int count, size_t size, func_t func) {
     scope->mid = raii_deferred(scope, func, arena);
 
     return arena;
-}
-
-RAII_INLINE void_t calloc_this(int count, size_t size) {
-    return calloc_full(raii_init(), count, size, RAII_FREE);
 }
 
 RAII_INLINE void_t calloc_local(int count, size_t size) {
@@ -560,7 +550,7 @@ values_type raii_get_args(memory_t *scope, void_t params, int item) {
     if (!args->defer_set) {
         args->defer_set = true;
         if (is_empty(scope))
-            scoped = is_empty(args->context) ? raii_init() : args->context;
+            scoped = is_empty(args->context) ? get_scope() : args->context;
 
         raii_deferred(scoped, (func_t)args_free, params);
     }
