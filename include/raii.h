@@ -616,6 +616,45 @@ C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
 C_API bool is_base64(u_string_t src);
 C_API int strpos(const char *text, char *pattern);
 
+typedef struct vector_s *vector_t;
+typedef struct vector_s vector;
+struct vector_s {
+    raii_values_t *items;
+    int capacity;
+    int total;
+};
+
+#define vector(vec) vector vec; vector_init(&vec); deferring((func_t)vector_free, &vec)
+#define vectors(vec, count, ...) vector vec;    \
+    vector_init(&vec);                          \
+    deferring((func_t)vector_free, &vec);       \
+    vector_of(&vec, count, __VA_ARGS__)
+
+#define vec_push(vec, item) vector_add(&vec, (void_t) item)
+#define vec_set(vec, index, item) vector_set(&vec, index, (void_t) item)
+#define vec_len(vec) vector_size(&vec)
+#define vec_del(vec, index) vector_delete(&vec, index)
+#define vec_free(vec) vector_free(&vec)
+
+#define $(vec, index) vector_get(&vec, index)
+
+#define in ,
+#define foreach_xp(X, A) X A
+#define foreach_in(X, S) values_type X; int i_##X;   \
+    for (i_##X = 0; i_##X < vec_len(S); i_##X++)        \
+        if ((X.object = $(S, i_##X).object))
+#define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
+
+C_API void vector_init(vector_t);
+C_API void vector_of(vector_t v, int, ...);
+C_API void vector_add(vector_t, void_t);
+C_API void vector_set(vector_t, int, void_t);
+C_API int vector_size(vector_t);
+C_API int vector_capacity(vector_t v);
+C_API void vector_delete(vector_t, int);
+C_API void vector_free(vector_t);
+C_API values_type vector_get(vector_t, int);
+
 #ifdef __cplusplus
     }
 #endif

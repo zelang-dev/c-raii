@@ -12,6 +12,7 @@ set(TARGET_LIST
  test-swar
  test-thrd_local
  test-thrd_spawn
+ test-vector
 )
 
 foreach (TARGET ${TARGET_LIST})
