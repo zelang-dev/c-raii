@@ -14,6 +14,25 @@ RAII_INLINE void vector_init(vector_t v) {
     v->capacity = thrd_cpu_count();
     v->total = 0;
     v->items = try_malloc(sizeof(raii_values_t) * v->capacity);
+    v->type = RAII_VECTOR;
+}
+
+vector_t vector_local(int count, ...) {
+    va_list ap;
+    int i;
+    memory_t *scope = unique_init();
+    vector_t v = (vector_t)malloc_full(scope, sizeof(struct vector_s), RAII_FREE);
+    v->scope = scope;
+    vector_init(v);
+    deferring((func_t)vector_free, v);
+    if (count > 0) {
+        va_start(ap, count);
+        for (i = 0; i < count; i++)
+            vector_add(v, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    return v;
 }
 
 void vector_of(vector_t v, int item_count, ...) {
@@ -72,5 +91,10 @@ void vector_delete(vector_t v, int index) {
 }
 
 RAII_INLINE void vector_free(vector_t v) {
-    RAII_FREE(v->items);
+    if (is_type(v, RAII_VECTOR)) {
+        memory_t *scope = v->scope;
+        RAII_FREE(v->items);
+        v->type = -1;
+        raii_delete(scope);
+    }
 }

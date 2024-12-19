@@ -84,6 +84,7 @@ typedef enum {
     RAII_ARENA,
     RAII_THREAD,
     RAII_GUARDED_STATUS,
+    RAII_VECTOR,
     RAII_QUEUE,
     RAII_SPAWN,
     RAII_POOL,
@@ -617,34 +618,35 @@ C_API bool is_base64(u_string_t src);
 C_API int strpos(const char *text, char *pattern);
 
 typedef struct vector_s *vector_t;
-typedef struct vector_s vector;
 struct vector_s {
-    raii_values_t *items;
+    raii_type type;
     int capacity;
     int total;
+    memory_t *scope;
+    raii_values_t *items;
 };
 
-#define vector(vec) vector vec; vector_init(&vec); deferring((func_t)vector_free, &vec)
-#define vectors(vec, count, ...) vector vec;    \
-    vector_init(&vec);                          \
-    deferring((func_t)vector_free, &vec);       \
-    vector_of(&vec, count, __VA_ARGS__)
+#define vector(vec, count, ...) vector_t vec = vector_local(count, __VA_ARGS__)
+#define vec_push(vec, item) vector_add(vec, (void_t) item)
+#define vec_set(vec, index, item) vector_set(vec, index, (void_t) item)
+#define vec_len(vec) vector_size(vec)
+#define vec_del(vec, index) vector_delete(vec, index)
+#define vec_free(vec) vector_free(vec)
 
-#define vec_push(vec, item) vector_add(&vec, (void_t) item)
-#define vec_set(vec, index, item) vector_set(&vec, index, (void_t) item)
-#define vec_len(vec) vector_size(&vec)
-#define vec_del(vec, index) vector_delete(&vec, index)
-#define vec_free(vec) vector_free(&vec)
-
-#define $(vec, index) vector_get(&vec, index)
+#define $(vec, index) vector_get((vec), index)
+#define $$(vec, value) vec_push((vec), (value))
+#define $set(vec, index, value) vec_set((vec), (index), (value))
+#define $del(vec, index) vec_del((vec), index)
+#define $size(vec) vec_len((vec))
 
 #define in ,
 #define foreach_xp(X, A) X A
 #define foreach_in(X, S) values_type X; int i_##X;   \
     for (i_##X = 0; i_##X < vec_len(S); i_##X++)        \
-        if ((X.object = $(S, i_##X).object))
+        if ((X.object = $(S, i_##X).object) || X.object == nullptr)
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 
+C_API vector_t vector_local(int count, ...);
 C_API void vector_init(vector_t);
 C_API void vector_of(vector_t v, int, ...);
 C_API void vector_add(vector_t, void_t);
