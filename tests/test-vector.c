@@ -35,6 +35,21 @@ TEST(vector_local) {
         printf("%d ", ii.integer);
     printf("\n");
 
+    vector_clear(vec);
+    ASSERT_TRUE(($size(vec) == 0));
+
+    return 0;
+}
+
+TEST(vector_values) {
+    vectorize(v);
+
+    $push(v, strdup("hello"));
+    ASSERT_STR("hello", v[0].char_ptr);
+
+    $push(v, strdup("world"));
+    ASSERT_STR("world", v[1].char_ptr);
+
     return 0;
 }
 
@@ -42,6 +57,7 @@ TEST(list) {
     int result = 0;
 
     EXEC_TEST(vector_local);
+    EXEC_TEST(vector_values);
 
     return result;
 }

@@ -83,6 +83,8 @@ typedef const unsigned char u_char_t;
 #define nullptr NULL
 #endif
 
+#define nil nullptr
+
 /**
  * Simple macro for making sure memory addresses are aligned
  * to the nearest power of two

@@ -124,7 +124,6 @@ typedef union {
     intptr_t **array_int;
     uintptr_t **array_uint;
     raii_func_t func;
-    const char const_char[256];
     char buffer[256];
 } values_type;
 
@@ -630,7 +629,7 @@ struct vector_s {
 #define vec_push(vec, item) vector_add(vec, (void_t) item)
 #define vec_set(vec, index, item) vector_set(vec, index, (void_t) item)
 #define vec_len(vec) vector_size(vec)
-#define vec_del(vec, index) vector_delete(vec, index)
+#define vec_del(vec, index) vector_erase(vec, index)
 #define vec_free(vec) vector_free(vec)
 
 #define $(vec, index) vector_get((vec), index)
@@ -644,7 +643,11 @@ struct vector_s {
 #define foreach_in(X, S) values_type X; int i_##X;   \
     for (i_##X = 0; i_##X < vec_len(S); i_##X++)        \
         if ((X.object = $(S, i_##X).object) || X.object == nullptr)
+#define foreach_in_back(X, S) values_type X; int i_##X, e_##X = vec_len(S) - 1;  \
+    for (i_##X = e_##X; i_##X >= 0; i_##X--)        \
+        if ((X.object = $(S, i_##X).object) || X.object == nullptr)
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
+#define foreach_back(...) foreach_xp(foreach_in_back, (__VA_ARGS__))
 
 C_API vector_t vector_local(int count, ...);
 C_API void vector_init(vector_t);
@@ -653,9 +656,49 @@ C_API void vector_add(vector_t, void_t);
 C_API void vector_set(vector_t, int, void_t);
 C_API int vector_size(vector_t);
 C_API int vector_capacity(vector_t v);
-C_API void vector_delete(vector_t, int);
-C_API void vector_free(vector_t);
+C_API void vector_erase(vector_t, int);
+C_API void vector_clear(vector_t);
 C_API values_type vector_get(vector_t, int);
+
+typedef struct vector_metadata_s {
+    size_t size;
+    size_t capacity;
+    func_t destructor;
+} vector_metadata_t;
+
+#define vector_address(vec) (&((vector_metadata_t *)(vec))[-1])
+#define vector_base(ptr) ((void_t)&((vector_metadata_t *)(ptr))[1])
+#define vector_set_capacity(vec, size) vector_address(vec)->capacity = (size)
+#define vector_set_size(vec, _size) vector_address(vec)->size = (_size)
+#define vector_set_destructor(vec, elem_destructor_fn) vector_address(vec)->destructor = (elem_destructor_fn)
+#define vector_destructor(vec) vector_address(vec)->destructor
+#define vector_length(vec) ((vec) ? vector_address(vec)->size : (size_t)0)
+#define vector_cap(vec) ((vec) ? vector_address(vec)->capacity : (size_t)0)
+#define vector_at(vec, n) ((vec) ? (((int)(n) < 0 || (size_t)(n) >= vector_length(vec)) ? NULL : &(vec)[n]) : NULL)
+#define vector_front(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, 0) : NULL) : NULL)
+#define vector_back(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, vector_length(vec) - 1) : NULL) : NULL)
+#define vector_grow(vec, count)                                                        \
+    do {                                                                                \
+        const size_t cv_sz__ = (count) * sizeof(*(vec)) + sizeof(vector_metadata_t);    \
+        if (vec) {                                  \
+            void *cv_p1__ = vector_address(vec);    \
+            void *cv_p2__ = try_realloc(cv_p1__, cv_sz__);  \
+            (vec) = vector_base(cv_p2__);           \
+        } else {                                    \
+            void *cv_p__ = try_malloc(cv_sz__);     \
+            (vec) = vector_base(cv_p__);                    \
+            vector_set_size((vec), 0);                      \
+            vector_set_destructor((vec), NULL);             \
+        }                                                   \
+        vector_set_capacity((vec), (count));                \
+    } while (0)
+
+C_API void vector_delete(values_type *vec);
+C_API void vector_push_back(values_type *, void_t);
+#define $push(vec, value) vector_push_back((vec), (void_t)value)
+#define vectorize(vec) values_type *vec;    \
+    vector_grow(vec, 1);                    \
+    deferring((func_t)vector_delete, vec);
 
 #ifdef __cplusplus
     }
