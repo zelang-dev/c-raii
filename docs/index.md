@@ -322,7 +322,6 @@ C_API raii_values_t *thrd_value(uintptr_t value);
 C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
-C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
 C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
 C_API values_type thrd_result(result_t value);
 
@@ -333,38 +332,32 @@ C_API void thrd_destroy(future_t);
 C_API bool thrd_is_finish(future_t);
 
 /**
-* Creates an scoped container for arbitrary arguments passing to an single `args` function.
-* Use `get_args()` or `args_in()` for retrieval.
+* Creates an scoped `vector/array/container` for arbitrary arguments passing into an single `paramater` function.
+* - Use standard `array access` for retrieval of an `union` storage type.
 *
-* @param scope callers context to bind `allocated` arguments to
-* @param desc format, similar to `printf()`:
-* * `i` unsigned integer,
-* * `d` signed integer,
-* * `l` signed long,
-* * `z` size_t - max size,
-* * `c` character,
-* * `s` string,
-* * `a` array,
-* * `x` function,
-* * `f` double/float,
-* * `p` void pointer for any arbitrary object
-* @param arguments indexed by `desc` format order
+* - MUST CALL `args_destructor_set()` to have memory auto released
+*   within ~callers~ current scoped `context`, will happen either at return/exist or panics.
+*
+* - OTHERWISE `memory leak` will be shown in DEBUG build.
+*
+* NOTE: `vector_for` does auto memory cleanup.
+*
+* @param count numbers of parameters, `0` will create empty `vector/array`.
+* @param arguments indexed in given order.
 */
-C_API args_t raii_args_for(memory_t *scope, const char *desc, ...);
-C_API args_t args_for(const char *desc, ...);
+C_API args_t args_for(size_t, ...);
 
-/**
-* Returns generic union `values_type` of argument, will auto `release/free`
-* allocated memory when scoped return/exit.
-*
-* Must be called at least once to release `allocated` memory.
-*
-* @param params arbitrary arguments
-* @param item index number
-*/
-C_API values_type raii_get_args(memory_t *scope, void_t params, int item);
-C_API values_type get_args(void *params, int item);
-C_API values_type get_arg(void_t params);
+#define array(count, ...) args_for(count, __VA_ARGS__)
+#define array_defer(arr) args_destructor_set(arr)
+#define vectorize(vec) vectors_t vec = vector_any()
+#define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
+
+#define $push_back(vec, value) vector_push_back(vec, (void_t)value)
+#define $insert(vec, index, value) vector_insert(vec, index, (void_t)value)
+#define $clear(vec) vector_clear(vec)
+#define $size(vec) vector_size(vec)
+#define $capacity(vec) vector_capacity(vec)
+#define $erase(vec, index) vector_erase(vec, index)
 ```
 
 ### There is _1 way_ to create an smart memory pointer

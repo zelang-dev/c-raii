@@ -319,7 +319,7 @@ static int thrd_raii_wrapper(void_t arg) {
             res = f->func((args_t)f->arg);
         } guarded_exception(f->value->scope);
 
-        promise_set(f->value, res, (is_type(f->arg, RAII_ARGS) && ((args_t)f->arg)->is_returning));
+        promise_set(f->value, res, is_args_returning((args_t)f->arg));
         if (is_type(f, RAII_FUTURE_ARG)) {
             if (is_pool) {
                 if (!is_empty(f->local))
@@ -375,8 +375,11 @@ values_type thrd_get(future f) {
             result->value.array = r->value.array;
         }
 
-        if (thrd_join(f->thread, NULL) == thrd_success)
+        if (thrd_join(f->thread, NULL) == thrd_success) {
+            if (!is_empty(f->value->scope->err))
+                raii_defer((func_t)thrd_delete, f);
             promise_close(f->value);
+        }
 
         thrd_delete(f);
 
@@ -396,12 +399,12 @@ RAII_INLINE void thrd_wait(future f, wait_func yield) {
 }
 
 RAII_INLINE raii_values_t *thrd_returning(args_t args, void_t value, size_t size) {
-    raii_deferred(args->context, RAII_FREE, value);
-    raii_values_t *result = (raii_values_t *)malloc_full(args->context, sizeof(raii_values_t), RAII_FREE);
+    raii_deferred(vector_scope(args), RAII_FREE, value);
+    raii_values_t *result = (raii_values_t *)malloc_full(vector_scope(args), sizeof(raii_values_t), RAII_FREE);
     result->value.object = value;
     result->size = size;
     result->extended = value;
-    args->is_returning = true;
+    args_returning_set(args);
     return result;
 }
 
@@ -586,15 +589,6 @@ result_t thrd_spawn(thrd_func_t fn, void_t args) {
     return result;
 }
 
-result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...) {
-    va_list args;
-    va_start(args, desc);
-    args_t params = raii_args_ex(raii_local(), desc, args);
-    va_end(args);
-
-    return thrd_spawn(fn, (void_t)params);
-}
-
 future_t thrd_sync(future_t pool) {
     if (!is_type(pool, RAII_SPAWN))
         throw(logic_error);
@@ -618,6 +612,9 @@ future_t thrd_sync(future_t pool) {
         results[id]->is_ready = true;
         atomic_store_explicit(&pool->queue->results, results, memory_order_release);
         future_close(pool->futures[i]);
+        if (!is_empty(pool->futures[i]->value->scope->err))
+            raii_defer((func_t)thrd_delete, pool->futures[i]);
+
         promise_close(pool->futures[i]->value);
     }
 

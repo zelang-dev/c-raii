@@ -1,7 +1,7 @@
 #include "raii.h"
 #include "test_assert.h"
 
-TEST(vector_of) {
+TEST(vector_for) {
     vector(vec, 4, "Bonjour", "tout", "le", "monde");
 
     ASSERT_TRUE(($size(vec) == 4));
@@ -50,13 +50,13 @@ TEST(vector_any) {
     $push_back(v, strdup("world"));
     ASSERT_STR("world", v[1].char_ptr);
 
-    vector_of(v, 4, "Bonjour", "tout", "le", "monde");
+    vector_for(v, 4, "Bonjour", "tout", "le", "monde");
     ASSERT_STR("Bonjour", v[2].char_ptr);
     ASSERT_STR("tout", v[3].char_ptr);
     ASSERT_STR("le", v[4].char_ptr);
     ASSERT_STR("monde", v[5].char_ptr);
 
-    vectors_t vec = vector_of(nil, 2, "mixed", 123);
+    vectors_t vec = vector_for(nil, 2, "mixed", 123);
     ASSERT_STR("mixed", vec[0].char_ptr);
     ASSERT_EQ(123, vec[1].integer);
 
@@ -66,7 +66,7 @@ TEST(vector_any) {
 TEST(list) {
     int result = 0;
 
-    EXEC_TEST(vector_of);
+    EXEC_TEST(vector_for);
     EXEC_TEST(vector_any);
 
     return result;

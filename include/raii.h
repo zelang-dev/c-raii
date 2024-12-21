@@ -125,7 +125,7 @@ typedef union {
     uintptr_t **array_uint;
     raii_func_t func;
     char buffer[256];
-} values_type, *vectors_t;
+} values_type, *vectors_t, *args_t;
 
 typedef struct {
     values_type value;
@@ -179,20 +179,6 @@ struct memory_s {
     const char *volatile panic;
     future_deque_t *queued;
 };
-
-typedef struct args_s {
-    raii_type type;
-    int defer_set;
-    int is_returning;
-
-    unique_t *context;
-    size_t args_size;
-    /* total number of args in set */
-    size_t n_args;
-
-    /* allocated array of arguments */
-    raii_values_t *args;
-} *args_t;
 
 typedef void (*for_func_t)(i64, i64);
 typedef void_t (*thrd_func_t)(args_t);
@@ -263,7 +249,6 @@ C_API raii_values_t *thrd_value(uintptr_t value);
 C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
-C_API result_t thrd_spawn_ex(thrd_func_t fn, const char *desc, ...);
 C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
 C_API values_type thrd_result(result_t value);
 
@@ -272,56 +257,6 @@ C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
 C_API void thrd_then(result_func_t callback, future_t iter, void_t result);
 C_API void thrd_destroy(future_t);
 C_API bool thrd_is_finish(future_t);
-
-/**
-* `Release/free` allocated memory, must be called if not using `get_args()` function.
-*
-* @param params arbitrary arguments
-*/
-C_API void args_free(args_t params);
-
-/**
-* Creates an scoped container for arbitrary arguments passing to an single `args` function.
-* Use `get_args()` or `args_in()` for retrieval.
-*
-* @param scope callers context to bind `allocated` arguments to
-* @param desc format, similar to `printf()`:
-* * `i` unsigned integer,
-* * `d` signed integer,
-* * `l` signed long,
-* * `z` size_t - max size,
-* * `c` character,
-* * `s` string,
-* * `a` array,
-* * `x` function,
-* * `f` double/float,
-* * `p` void pointer for any arbitrary object
-* @param arguments indexed by `desc` format order
-*/
-C_API args_t raii_args_for(memory_t *scope, const char *desc, ...);
-C_API args_t args_for(const char *desc, ...);
-C_API args_t raii_args_ex(memory_t *scope, const char *desc, va_list);
-
-/**
-* Returns generic union `values_type` of argument, will auto `release/free`
-* allocated memory when scoped return/exit.
-*
-* Must be called at least once to release `allocated` memory.
-*
-* @param params arbitrary arguments
-* @param item index number
-*/
-C_API values_type raii_get_args(memory_t *scope, void_t params, int item);
-C_API values_type get_args(args_t params, int item);
-C_API values_type get_arg(void_t params);
-
-/**
-* Returns generic union `values_type` of argument.
-*
-* @param params arguments instance
-* @param index item number
-*/
-C_API values_type args_in(args_t params, size_t index);
 
 C_API memory_t *raii_local(void);
 /* Return current `thread` smart memory pointer. */
@@ -615,16 +550,40 @@ C_API bool is_base64(u_string_t src);
 C_API int strpos(const char *text, char *pattern);
 
 C_API vectors_t vector_any(void);
-C_API vectors_t vector_of(vectors_t, size_t, ...);
+C_API vectors_t vector_for(vectors_t, size_t, ...);
 C_API void vector_insert(vectors_t vec, int pos, void_t val);
 C_API void vector_clear(vectors_t);
 C_API void vector_erase(vectors_t, int);
 C_API size_t vector_size(vectors_t);
-C_API size_t vector_capacity(vectors_t v);
+C_API size_t vector_capacity(vectors_t);
+C_API memory_t *vector_scope(vectors_t);
 C_API void vector_push_back(vectors_t, void_t);
 
-#define vectorize(vec) vectors_t vec = vector_any();
-#define vector(vec, count, ...) vectors_t vec = nullptr; vec = vector_of(vec, count, __VA_ARGS__)
+/**
+* Creates an scoped `vector/array/container` for arbitrary arguments passing into an single `paramater` function.
+* - Use standard `array access` for retrieval of an `union` storage type.
+*
+* - MUST CALL `args_destructor_set()` to have memory auto released
+*   within ~callers~ current scoped `context`, will happen either at return/exist or panics.
+*
+* - OTHERWISE `memory leak` will be shown in DEBUG build.
+*
+* NOTE: `vector_for` does auto memory cleanup.
+*
+* @param count numbers of parameters, `0` will create empty `vector/array`.
+* @param arguments indexed in given order.
+*/
+C_API args_t args_for(size_t, ...);
+C_API void args_destructor_set(args_t);
+C_API void args_returning_set(args_t);
+C_API bool is_args(args_t);
+C_API bool is_args_returning(args_t);
+C_API values_type get_arg(void_t);
+
+#define array(count, ...) args_for(count, __VA_ARGS__)
+#define array_defer(arr) args_destructor_set(arr)
+#define vectorize(vec) vectors_t vec = vector_any()
+#define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 
 #define $push_back(vec, value) vector_push_back(vec, (void_t)value)
 #define $insert(vec, index, value) vector_insert(vec, index, (void_t)value)
