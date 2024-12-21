@@ -26,7 +26,7 @@ This library uses an custom version of [rpmalloc](https://github.com/mjansson/rp
 
 > As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
 
-> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_async(thread_func, args_for("six", "text & num & another func", 3, worker_func))` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
+> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_async(thread_func, args_for(3, "text & num & another func", 3, worker_func))` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
 
 The C++ version from <https://cplusplus.com/reference/future/future/wait/>
 

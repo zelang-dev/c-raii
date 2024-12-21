@@ -144,7 +144,7 @@ vectors_t vector_for(vectors_t v, size_t item_count, ...) {
 }
 
 RAII_INLINE vectors_t vector_any(void) {
-    vectors_t vec;
+    vectors_t vec = nullptr;
     size_t cores = thrd_cpu_count();
     vector_grow(vec, cores);
     deferring((func_t)vector_delete, vec);
