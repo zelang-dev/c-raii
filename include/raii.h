@@ -125,7 +125,7 @@ typedef union {
     uintptr_t **array_uint;
     raii_func_t func;
     char buffer[256];
-} values_type;
+} values_type, *vectors_t;
 
 typedef struct {
     values_type value;
@@ -341,9 +341,7 @@ to current `thread` scope lifetime/destruction. */
 C_API size_t raii_defer(func_t, void_t);
 
 /* Defer execution `LIFO` of given function with argument,
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call.
-
-Execution begins when current `guard` scope exits or panic/throw. */
+execution begins when current `context` scope exits or panic/throw. */
 C_API size_t deferring(func_t func, void_t data);
 
 C_API void raii_defer_cancel(size_t index);
@@ -473,7 +471,7 @@ DO NOT FREE, will `throw/panic` if memory request fails. */
 #define _calloc(count, size)    calloc_local(count, size)
 
 /* Defer execution `LIFO` of given function with argument,
-execution begins when current `guard` scope exits or panic/throw. */
+execution begins when current `context` scope exits or panic/throw. */
 #define _defer(func, ptr)       deferring((func_t)func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
@@ -616,89 +614,35 @@ C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
 C_API bool is_base64(u_string_t src);
 C_API int strpos(const char *text, char *pattern);
 
-typedef struct vector_s *vector_t;
-struct vector_s {
-    raii_type type;
-    int capacity;
-    int total;
-    memory_t *scope;
-    raii_values_t *items;
-};
+C_API vectors_t vector_any(void);
+C_API vectors_t vector_of(vectors_t, size_t, ...);
+C_API void vector_insert(vectors_t vec, int pos, void_t val);
+C_API void vector_clear(vectors_t);
+C_API void vector_erase(vectors_t, int);
+C_API size_t vector_size(vectors_t);
+C_API size_t vector_capacity(vectors_t v);
+C_API void vector_push_back(vectors_t, void_t);
 
-#define vector(vec, count, ...) vector_t vec = vector_local(count, __VA_ARGS__)
-#define vec_push(vec, item) vector_add(vec, (void_t) item)
-#define vec_set(vec, index, item) vector_set(vec, index, (void_t) item)
-#define vec_len(vec) vector_size(vec)
-#define vec_del(vec, index) vector_erase(vec, index)
-#define vec_free(vec) vector_free(vec)
+#define vectorize(vec) vectors_t vec = vector_any();
+#define vector(vec, count, ...) vectors_t vec = nullptr; vec = vector_of(vec, count, __VA_ARGS__)
 
-#define $(vec, index) vector_get((vec), index)
-#define $$(vec, value) vec_push((vec), (value))
-#define $set(vec, index, value) vec_set((vec), (index), (value))
-#define $del(vec, index) vec_del((vec), index)
-#define $size(vec) vec_len((vec))
+#define $push_back(vec, value) vector_push_back(vec, (void_t)value)
+#define $insert(vec, index, value) vector_insert(vec, index, (void_t)value)
+#define $clear(vec) vector_clear(vec)
+#define $size(vec) vector_size(vec)
+#define $capacity(vec) vector_capacity(vec)
+#define $erase(vec, index) vector_erase(vec, index)
 
 #define in ,
 #define foreach_xp(X, A) X A
-#define foreach_in(X, S) values_type X; int i_##X;   \
-    for (i_##X = 0; i_##X < vec_len(S); i_##X++)        \
-        if ((X.object = $(S, i_##X).object) || X.object == nullptr)
-#define foreach_in_back(X, S) values_type X; int i_##X, e_##X = vec_len(S) - 1;  \
+#define foreach_in(X, S) values_type X; int i_##X;  \
+    for (i_##X = 0; i_##X < $size(S); i_##X++)      \
+        if ((X.object = S[i_##X].object) || X.object == nullptr)
+#define foreach_in_back(X, S) values_type X; int i_##X, e_##X = $size(S) - 1;   \
     for (i_##X = e_##X; i_##X >= 0; i_##X--)        \
-        if ((X.object = $(S, i_##X).object) || X.object == nullptr)
+        if ((X.object = S[i_##X].object) || X.object == nullptr)
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 #define foreach_back(...) foreach_xp(foreach_in_back, (__VA_ARGS__))
-
-C_API vector_t vector_local(int count, ...);
-C_API void vector_init(vector_t);
-C_API void vector_of(vector_t v, int, ...);
-C_API void vector_add(vector_t, void_t);
-C_API void vector_set(vector_t, int, void_t);
-C_API int vector_size(vector_t);
-C_API int vector_capacity(vector_t v);
-C_API void vector_erase(vector_t, int);
-C_API void vector_clear(vector_t);
-C_API values_type vector_get(vector_t, int);
-
-typedef struct vector_metadata_s {
-    size_t size;
-    size_t capacity;
-    func_t destructor;
-} vector_metadata_t;
-
-#define vector_address(vec) (&((vector_metadata_t *)(vec))[-1])
-#define vector_base(ptr) ((void_t)&((vector_metadata_t *)(ptr))[1])
-#define vector_set_capacity(vec, size) vector_address(vec)->capacity = (size)
-#define vector_set_size(vec, _size) vector_address(vec)->size = (_size)
-#define vector_set_destructor(vec, elem_destructor_fn) vector_address(vec)->destructor = (elem_destructor_fn)
-#define vector_destructor(vec) vector_address(vec)->destructor
-#define vector_length(vec) ((vec) ? vector_address(vec)->size : (size_t)0)
-#define vector_cap(vec) ((vec) ? vector_address(vec)->capacity : (size_t)0)
-#define vector_at(vec, n) ((vec) ? (((int)(n) < 0 || (size_t)(n) >= vector_length(vec)) ? NULL : &(vec)[n]) : NULL)
-#define vector_front(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, 0) : NULL) : NULL)
-#define vector_back(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, vector_length(vec) - 1) : NULL) : NULL)
-#define vector_grow(vec, count)                                                        \
-    do {                                                                                \
-        const size_t cv_sz__ = (count) * sizeof(*(vec)) + sizeof(vector_metadata_t);    \
-        if (vec) {                                  \
-            void *cv_p1__ = vector_address(vec);    \
-            void *cv_p2__ = try_realloc(cv_p1__, cv_sz__);  \
-            (vec) = vector_base(cv_p2__);           \
-        } else {                                    \
-            void *cv_p__ = try_malloc(cv_sz__);     \
-            (vec) = vector_base(cv_p__);                    \
-            vector_set_size((vec), 0);                      \
-            vector_set_destructor((vec), NULL);             \
-        }                                                   \
-        vector_set_capacity((vec), (count));                \
-    } while (0)
-
-C_API void vector_delete(values_type *vec);
-C_API void vector_push_back(values_type *, void_t);
-#define $push(vec, value) vector_push_back((vec), (void_t)value)
-#define vectorize(vec) values_type *vec;    \
-    vector_grow(vec, 1);                    \
-    deferring((func_t)vector_delete, vec);
 
 #ifdef __cplusplus
     }

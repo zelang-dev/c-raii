@@ -1,113 +1,41 @@
 #include "raii.h"
 
-static void vector_free(vector_t v) {
-    if (is_type(v, RAII_VECTOR)) {
-        memory_t *scope = v->scope;
-        RAII_FREE(v->items);
-        v->type = -1;
-        raii_delete(scope);
-    }
-}
+typedef struct vector_metadata_s {
+    size_t size;
+    size_t capacity;
+    func_t destructor;
+} vector_metadata_t;
 
-static void vector_resize(vector_t v, int capacity) {
-    RAII_INFO("vector_resize: %d to %d\n", v->capacity, capacity);
+#define vector_address(vec) (&((vector_metadata_t *)(vec))[-1])
+#define vector_base(ptr) ((void_t)&((vector_metadata_t *)(ptr))[1])
+#define vector_set_capacity(vec, size) vector_address(vec)->capacity = (size)
+#define vector_set_size(vec, _size) vector_address(vec)->size = (_size)
+#define vector_set_destructor(vec, elem_destructor_fn) vector_address(vec)->destructor = (elem_destructor_fn)
+#define vector_destructor(vec) vector_address(vec)->destructor
+#define vector_length(vec) ((vec) ? vector_address(vec)->size : (size_t)0)
+#define vector_cap(vec) ((vec) ? vector_address(vec)->capacity : (size_t)0)
+#define vector_at(vec, n) ((vec) ? (((int)(n) < 0 || (size_t)(n) >= vector_length(vec)) ? NULL : &(vec)[n]) : NULL)
+#define vector_front(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, 0) : NULL) : NULL)
+#define vector_back(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, vector_length(vec) - 1) : NULL) : NULL)
+#define vector_grow(vec, count)                     \
+    do {                                            \
+        const size_t cv_sz__ = (count) * sizeof(*(vec)) + sizeof(vector_metadata_t);    \
+        if (vec) {                                  \
+            void *cv_p1__ = vector_address(vec);    \
+            void *cv_p2__ = try_realloc(cv_p1__, cv_sz__);  \
+            (vec) = vector_base(cv_p2__);           \
+        } else {                                    \
+            void *cv_p__ = try_malloc(cv_sz__);     \
+            (vec) = vector_base(cv_p__);            \
+            vector_set_size((vec), 0);              \
+            vector_set_destructor((vec), NULL);     \
+        }                                           \
+        vector_set_capacity((vec), (count));        \
+    } while (0)
 
-    raii_values_t *items = try_realloc(v->items, sizeof(raii_values_t) * capacity);
-    if (items) {
-        v->items = items;
-        v->capacity = capacity;
-    }
-}
-
-RAII_INLINE void vector_init(vector_t v) {
-    v->capacity = thrd_cpu_count();
-    v->total = 0;
-    v->items = try_malloc(sizeof(raii_values_t) * v->capacity);
-    v->type = RAII_VECTOR;
-}
-
-vector_t vector_local(int count, ...) {
-    va_list ap;
-    int i;
-    memory_t *scope = unique_init();
-    vector_t v = (vector_t)malloc_full(scope, sizeof(struct vector_s), RAII_FREE);
-    v->scope = scope;
-    vector_init(v);
-    deferring((func_t)vector_free, v);
-    if (count > 0) {
-        va_start(ap, count);
-        for (i = 0; i < count; i++)
-            vector_add(v, va_arg(ap, void_t));
-        va_end(ap);
-    }
-
-    return v;
-}
-
-void vector_of(vector_t v, int item_count, ...) {
-    va_list ap;
-    int i;
-
-    va_start(ap, item_count);
-    for (i = 0; i < item_count; i++)
-        vector_add(v, va_arg(ap, void_t));
-    va_end(ap);
-}
-
-RAII_INLINE int vector_size(vector_t v) {
-    return v->total;
-}
-
-RAII_INLINE int vector_capacity(vector_t v) {
-    return v->capacity;
-}
-
-RAII_INLINE void vector_add(vector_t v, void_t item) {
-    if (v->capacity == v->total)
-        vector_resize(v, v->capacity * 2);
-
-    v->items[v->total++].value.object = item;
-}
-
-RAII_INLINE void vector_set(vector_t v, int index, void_t item) {
-    if (index >= 0 && index < v->total)
-        v->items[index].value.object = item;
-}
-
-RAII_INLINE values_type vector_get(vector_t v, int index) {
-    if (index >= 0 && index < v->total)
-        return v->items[index].value;
-
-    return raii_values_empty->value;
-}
-
-void vector_erase(vector_t v, int index) {
-    int i;
-    if (index < 0 || index >= v->total)
-        return;
-
-    v->items[index].value.object = nullptr;
-
-    for (i = index; i < v->total - 1; i++) {
-        v->items[i].value.object = v->items[i + 1].value.object;
-        v->items[i + 1].value.object = nullptr;
-    }
-
-    v->total--;
-
-    if (v->total > 0 && v->total == v->capacity / 4)
-        vector_resize(v, v->capacity / 2);
-}
-
-RAII_INLINE void vector_clear(vector_t v) {
-    int i, end = vector_size(v) - 1;
-    for (i = end; i >= 0 ; i--)
-        vector_erase(v, i);
-}
-
-RAII_INLINE void vector_delete(values_type *vec) {
+static RAII_INLINE void vector_delete(vectors_t vec) {
     if (vec) {
-        void *p1__ = vector_address(vec);
+        void_t p1__ = vector_address(vec);
         func_t destructor__ = vector_destructor(vec);
         if (destructor__) {
             size_t i__;
@@ -120,7 +48,50 @@ RAII_INLINE void vector_delete(values_type *vec) {
     }
 }
 
-RAII_INLINE void vector_push_back(values_type *vec, void_t value) {
+RAII_INLINE void vector_insert(vectors_t vec, int pos, void_t val) {
+    size_t cv_cap__ = vector_cap(vec);
+    if (cv_cap__ <= vector_length(vec)) {
+        vector_grow((vec), cv_cap__);
+    }
+
+    if ((pos) < vector_length(vec)) {
+        memmove((vec)+(pos)+1, (vec)+(pos), sizeof(*(vec)) * ((vector_length(vec)) - (pos)));
+    }
+
+    (vec)[(pos)].object = (val);
+    vector_set_size((vec), vector_length(vec) + 1);
+}
+
+void vector_erase(vectors_t vec, int i) {
+    if (vec) {
+        const size_t cv_sz__ = vector_length(vec);
+        if ((i) < cv_sz__) {
+            func_t destructor__ = vector_destructor(vec);
+            if (destructor__) {
+                destructor__(&(vec)[i]);
+            }
+
+            vector_set_size((vec), cv_sz__ - 1);
+            memmove((vec)+(i), (vec)+(i)+1, sizeof(*(vec)) * (cv_sz__ - 1 - (i)));
+        }
+    }
+}
+
+RAII_INLINE void vector_clear(vectors_t vec) {
+    if (vec) {
+        func_t destructor__ = vector_destructor(vec);
+        if (destructor__) {
+            size_t i__;
+            for (i__ = 0; i__ < vector_length(vec); ++i__) {
+                destructor__(&(vec)[i__]);
+            }
+        }
+
+        vector_set_size(vec, 0);
+    }
+}
+
+RAII_INLINE void vector_push_back(vectors_t vec, void_t value) {
     size_t cv_cap__ = vector_cap(vec);
     if (cv_cap__ <= vector_length(vec)) {
         vector_grow(vec, 1);
@@ -128,4 +99,38 @@ RAII_INLINE void vector_push_back(values_type *vec, void_t value) {
 
     vec[vector_length(vec)].object = value;
     vector_set_size(vec, vector_length(vec) + 1);
+}
+
+vectors_t vector_of(vectors_t v, size_t item_count, ...) {
+    va_list ap;
+    size_t i;
+
+    if (is_empty(v))
+        v = vector_any();
+
+    if (item_count > 0) {
+        va_start(ap, item_count);
+        for (i = 0; i < item_count; i++)
+            vector_push_back(v, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    return v;
+}
+
+RAII_INLINE vectors_t vector_any(void) {
+    vectors_t vec;
+    size_t cores = thrd_cpu_count();
+    vector_grow(vec, cores);
+    deferring((func_t)vector_delete, vec);
+
+    return vec;
+}
+
+RAII_INLINE size_t vector_size(vectors_t v) {
+    return vector_length(v);
+}
+
+RAII_INLINE size_t vector_capacity(vectors_t v) {
+    return vector_cap(v);
 }
