@@ -349,7 +349,7 @@ C_API args_t args_for(size_t, ...);
 
 #define array(count, ...) args_for(count, __VA_ARGS__)
 #define array_defer(arr) args_destructor_set(arr)
-#define vectorize(vec) vectors_t vec = vector_any()
+#define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 
 #define $push_back(vec, value) vector_push_back(vec, (void_t)value)

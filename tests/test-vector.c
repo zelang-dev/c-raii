@@ -41,7 +41,7 @@ TEST(vector_for) {
     return 0;
 }
 
-TEST(vector_any) {
+TEST(vector_variant) {
     vectorize(v);
 
     $push_back(v, strdup("hello"));
@@ -67,7 +67,7 @@ TEST(list) {
     int result = 0;
 
     EXEC_TEST(vector_for);
-    EXEC_TEST(vector_any);
+    EXEC_TEST(vector_variant);
 
     return result;
 }

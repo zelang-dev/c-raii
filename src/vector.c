@@ -131,7 +131,7 @@ vectors_t vector_for(vectors_t v, size_t item_count, ...) {
     size_t i;
 
     if (is_empty(v))
-        v = vector_any();
+        v = vector_variant();
 
     if (item_count > 0) {
         va_start(ap, item_count);
@@ -143,7 +143,7 @@ vectors_t vector_for(vectors_t v, size_t item_count, ...) {
     return v;
 }
 
-RAII_INLINE vectors_t vector_any(void) {
+RAII_INLINE vectors_t vector_variant(void) {
     vectors_t vec = nullptr;
     size_t cores = thrd_cpu_count();
     vector_grow(vec, cores);

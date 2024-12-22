@@ -549,7 +549,7 @@ C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
 C_API bool is_base64(u_string_t src);
 C_API int strpos(const char *text, char *pattern);
 
-C_API vectors_t vector_any(void);
+C_API vectors_t vector_variant(void);
 C_API vectors_t vector_for(vectors_t, size_t, ...);
 C_API void vector_insert(vectors_t vec, int pos, void_t val);
 C_API void vector_clear(vectors_t);
@@ -582,7 +582,7 @@ C_API values_type get_arg(void_t);
 
 #define array(count, ...) args_for(count, __VA_ARGS__)
 #define array_defer(arr) args_destructor_set(arr)
-#define vectorize(vec) vectors_t vec = vector_any()
+#define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 
 #define $push_back(vec, value) vector_push_back(vec, (void_t)value)
