@@ -171,6 +171,13 @@ RAII_INLINE void args_destructor_set(args_t params) {
     }
 }
 
+RAII_INLINE void args_deferred_set(args_t params, memory_t *scope) {
+    if (vector_type(params) == RAII_ARGS && !vector_deferred(params)) {
+        vector_defer_set(params);
+        raii_deferred(scope, (func_t)vector_delete, params);
+    }
+}
+
 RAII_INLINE void args_returning_set(args_t params) {
     if (vector_type(params) == RAII_ARGS) {
         vector_return_set(params);
