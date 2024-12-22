@@ -63,11 +63,35 @@ TEST(vector_variant) {
     return 0;
 }
 
+int some_func(int args) {
+    return args * 2;
+}
+
+TEST(vector_variant_overflow) {
+    vector(vec, 5, "hello world", 123, some_func, "four", 600);
+
+    string data = "hello again!";
+    ASSERT_STR("hello world", vec[0].char_ptr);
+    ASSERT_XEQ(246, ((raii_callable_t)vec[2].func)(vec[1].integer));
+    ASSERT_STR("four", vec[3].char_ptr);
+
+    vec[3].char_ptr = data;
+    printf("vec[3].char_ptr = data\n");
+    ASSERT_EQ(600, vec[4].integer);
+    ASSERT_STR("hello again!", vec[3].char_ptr);
+
+    vec[4].char_ptr = "string 600";
+    ASSERT_STR("string 600", vec[4].char_ptr);
+
+    return 0;
+}
+
 TEST(list) {
     int result = 0;
 
     EXEC_TEST(vector_for);
     EXEC_TEST(vector_variant);
+    EXEC_TEST(vector_variant_overflow);
 
     return result;
 }
