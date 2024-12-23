@@ -21,8 +21,11 @@ int some_args(args_t args) {
 }
 
 TEST(args_for) {
-    args_t d = args_for(3, "hello", "world", 32);
-    args_destructor_set(d);
+    memory_t *s = unique_init();
+    args_t d = args_for_ex(s, 3, "hello", "world", 32);
+    args_deferred_set(d, s);
+    _defer(raii_delete, s);
+
     string arg1 = d[0].char_ptr;
     string arg2 = d[1].char_ptr;
     int num = d[2].integer;

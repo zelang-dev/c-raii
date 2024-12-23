@@ -337,11 +337,12 @@ C_API void thrd_destroy(future_t);
 C_API bool thrd_is_finish(future_t);
 
 /**
-* Creates an scoped `vector/array/container` for arbitrary arguments passing into an single `paramater` function.
+* Creates an scoped `vector/array/container` for arbitrary arguments passing
+* into an single `parameter` function.
 * - Use standard `array access` for retrieval of an `union` storage type.
 *
 * - MUST CALL `args_destructor_set()` to have memory auto released
-*   within ~callers~ current scoped `context`, will happen either at return/exist or panics.
+*   within ~callers~ scoped `context`, will happen either at return/exist or panics.
 *
 * - OTHERWISE `memory leak` will be shown in DEBUG build.
 *
@@ -351,6 +352,21 @@ C_API bool thrd_is_finish(future_t);
 * @param arguments indexed in given order.
 */
 C_API args_t args_for(size_t, ...);
+
+/**
+* Creates an scoped `vector/array/container` for arbitrary arguments passing
+* into an single `parameter` function.
+* - Use standard `array access` for retrieval of an `union` storage type.
+*
+* - MUST CALL `args_deferred_set` to have memory auto released
+*   when given `scope` context return/exist or panics.
+*
+* - OTHERWISE `memory leak` will be shown in DEBUG build.
+*
+* @param count numbers of parameters, `0` will create empty `vector/array`.
+* @param arguments indexed in given order.
+*/
+C_API args_t args_for_ex(memory_t *, size_t, ...);
 
 #define array(count, ...) args_for(count, __VA_ARGS__)
 #define array_defer(arr) args_destructor_set(arr)

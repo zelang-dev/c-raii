@@ -560,11 +560,12 @@ C_API memory_t *vector_scope(vectors_t);
 C_API void vector_push_back(vectors_t, void_t);
 
 /**
-* Creates an scoped `vector/array/container` for arbitrary arguments passing into an single `paramater` function.
+* Creates an scoped `vector/array/container` for arbitrary arguments passing
+* into an single `paramater` function.
 * - Use standard `array access` for retrieval of an `union` storage type.
 *
 * - MUST CALL `args_destructor_set()` to have memory auto released
-*   within ~callers~ current scoped `context`, will happen either at return/exist or panics.
+*   within ~callers~ scoped `context`, will happen either at return/exist or panics.
 *
 * - OTHERWISE `memory leak` will be shown in DEBUG build.
 *
@@ -574,8 +575,23 @@ C_API void vector_push_back(vectors_t, void_t);
 * @param arguments indexed in given order.
 */
 C_API args_t args_for(size_t, ...);
+
+/**
+* Creates an scoped `vector/array/container` for arbitrary arguments passing
+* into an single `paramater` function.
+* - Use standard `array access` for retrieval of an `union` storage type.
+*
+* - MUST CALL `args_deferred_set` to have memory auto released
+*   when given `scope` context return/exist or panics.
+*
+* - OTHERWISE `memory leak` will be shown in DEBUG build.
+*
+* @param count numbers of parameters, `0` will create empty `vector/array`.
+* @param arguments indexed in given order.
+*/
+C_API args_t args_for_ex(memory_t *, size_t, ...);
+
 C_API void args_destructor_set(args_t);
-C_API args_t args_for_ex(memory_t *, size_t count, ...);
 C_API void args_deferred_set(args_t, memory_t *);
 C_API void args_returning_set(args_t);
 C_API bool is_args(args_t);
