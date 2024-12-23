@@ -38,7 +38,7 @@ typedef struct vector_metadata_s {
 #define vector_at(vec, n) ((vec) ? (((int)(n) < 0 || (size_t)(n) >= vector_length(vec)) ? NULL : &(vec)[n]) : NULL)
 #define vector_front(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, 0) : NULL) : NULL)
 #define vector_back(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, vector_length(vec) - 1) : NULL) : NULL)
-#define vector_grow(vec, count)                     \
+#define vector_grow(vec, count, scope)                     \
     do {                                            \
         const size_t cv_sz__ = (count) * sizeof(*(vec)) + sizeof(vector_metadata_t);    \
         if (vec) {                                  \
@@ -50,7 +50,7 @@ typedef struct vector_metadata_s {
             (vec) = vector_base(cv_p__);            \
             vector_set_size((vec), 0);              \
             vector_set_destructor((vec), NULL);     \
-            vector_set_context((vec), get_scope()); \
+            vector_set_context((vec), (scope));     \
             vector_defer_unset(vec);                \
             vector_return_unset(vec);               \
             vector_set_type((vec), RAII_VECTOR);    \
@@ -75,8 +75,9 @@ static RAII_INLINE void vector_delete(vectors_t vec) {
 
 RAII_INLINE void vector_insert(vectors_t vec, int pos, void_t val) {
     size_t cv_cap__ = vector_cap(vec);
+    memory_t *scope = vector_context(vec);
     if (cv_cap__ <= vector_length(vec)) {
-        vector_grow((vec), cv_cap__);
+        vector_grow((vec), cv_cap__, scope);
     }
 
     if ((pos) < vector_length(vec)) {
@@ -118,8 +119,9 @@ RAII_INLINE void vector_clear(vectors_t vec) {
 
 RAII_INLINE void vector_push_back(vectors_t vec, void_t value) {
     size_t cv_cap__ = vector_cap(vec);
+    memory_t *scope = vector_context(vec);
     if (cv_cap__ <= vector_length(vec)) {
-        vector_grow(vec, 1);
+        vector_grow(vec, 1, scope);
     }
 
     vec[vector_length(vec)].object = value;
@@ -146,7 +148,8 @@ vectors_t vector_for(vectors_t v, size_t item_count, ...) {
 RAII_INLINE vectors_t vector_variant(void) {
     vectors_t vec = nullptr;
     size_t cores = thrd_cpu_count();
-    vector_grow(vec, cores);
+    memory_t *scope = get_scope();
+    vector_grow(vec, cores, scope);
     deferring((func_t)vector_delete, vec);
 
     return vec;
@@ -189,7 +192,26 @@ args_t args_for(size_t count, ...) {
     size_t i;
     args_t params = nullptr;
     size_t size = count ? count : thrd_cpu_count();
-    vector_grow(params, size);
+    memory_t *scope = get_scope();
+    vector_grow(params, size, scope);
+
+    if (count > 0) {
+        va_start(ap, count);
+        for (i = 0; i < count; i++)
+            vector_push_back(params, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    vector_set_type(params, RAII_ARGS);
+    return params;
+}
+
+args_t args_for_ex(memory_t *scope, size_t count, ...) {
+    va_list ap;
+    size_t i;
+    args_t params = nullptr;
+    size_t size = count ? count : thrd_cpu_count();
+    vector_grow(params, size, scope);
 
     if (count > 0) {
         va_start(ap, count);

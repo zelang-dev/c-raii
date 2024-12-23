@@ -575,6 +575,7 @@ C_API void vector_push_back(vectors_t, void_t);
 */
 C_API args_t args_for(size_t, ...);
 C_API void args_destructor_set(args_t);
+C_API args_t args_for_ex(memory_t *, size_t count, ...);
 C_API void args_deferred_set(args_t, memory_t *);
 C_API void args_returning_set(args_t);
 C_API bool is_args(args_t);
