@@ -179,9 +179,9 @@ static void deque_destroy(void) {
     }
 }
 
-static promise *promise_create(void) {
-    promise *p = malloc_local(sizeof(promise));
-    p->scope = get_scope();
+static promise *promise_create(memory_t *scope) {
+    promise *p = malloc_full(scope, sizeof(promise), RAII_FREE);
+    p->scope = scope;
     atomic_flag_clear(&p->mutex);
     atomic_flag_clear(&p->done);
     p->type = RAII_PROMISE;
@@ -354,7 +354,16 @@ static void thrd_start(future f, promise *value, void_t arg) {
 }
 
 future thrd_async(thrd_func_t fn, void_t args) {
-    promise *p = promise_create();
+    promise *p = promise_create(get_scope());
+    future f = future_create(fn);
+    f->value = p;
+    thrd_start(f, p, args);
+    return f;
+}
+
+
+future thrd_async_ex(memory_t *scope, thrd_func_t fn, void_t args) {
+    promise *p = promise_create(scope);
     future f = future_create(fn);
     f->value = p;
     thrd_start(f, p, args);

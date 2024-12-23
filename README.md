@@ -303,6 +303,10 @@ for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
 C_API future thrd_async(thrd_func_t fn, void_t args);
 
+/* Same as `thrd_async`, allows passing custom `context` scope for internal `promise`
+for auto cleanup within caller's `scope`. */
+C_API future thrd_async_ex(memory_t *scope, thrd_func_t fn, void_t args);
+
 /* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
 C_API values_type thrd_get(future);
