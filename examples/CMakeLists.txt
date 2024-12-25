@@ -18,6 +18,7 @@ set(TARGET_LIST defer_thread
  work-steal
  thrd_async
  thrd_spawn_fib
+ thrd_spawn_fib_pool
  fib )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )

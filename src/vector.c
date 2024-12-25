@@ -35,9 +35,6 @@ typedef struct vector_metadata_s {
 #define vector_deferred(vec) vector_address(vec)->defer_set
 #define vector_returning(vec) vector_address(vec)->is_returning
 #define vector_cap(vec) ((vec) ? vector_address(vec)->capacity : (size_t)0)
-#define vector_at(vec, n) ((vec) ? (((int)(n) < 0 || (size_t)(n) >= vector_length(vec)) ? NULL : &(vec)[n]) : NULL)
-#define vector_front(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, 0) : NULL) : NULL)
-#define vector_back(vec) ((vec) ? ((vector_length(vec) > 0) ? vector_at(vec, vector_length(vec) - 1) : NULL) : NULL)
 #define vector_grow(vec, count, scope)                     \
     do {                                            \
         const size_t cv_sz__ = (count) * sizeof(*(vec)) + sizeof(vector_metadata_t);    \

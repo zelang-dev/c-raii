@@ -2,7 +2,7 @@
 #include "test_assert.h"
 
 void *is_prime(args_t arg) {
-    array_defer(arg);
+    args_destructor_set(arg);
     int x = arg[0].integer;
     ASSERT_THREAD((x == 194232491));
     usleep(10);
@@ -29,10 +29,10 @@ TEST(thrd_spawn) {
     future_t fut = thrd_scope();
     ASSERT_TRUE(is_type(fut, RAII_SPAWN));
 
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, array(1, prime)), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, array(1, prime)), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, array(1, prime)), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, array(1, prime)), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
 
     ASSERT_FALSE(thrd_is_finish(fut));
 

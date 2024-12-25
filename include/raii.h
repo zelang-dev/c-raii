@@ -29,6 +29,21 @@ typedef void_t(*raii_func_t)(void_t);
 typedef intptr_t(*raii_callable_t)(intptr_t);
 typedef uintptr_t(*raii_callable_args_t)(uintptr_t, ...);
 typedef uintptr_t *(*raii_callable_const_t)(const char *, ...);
+#define make_deque(func_type)                       \
+    make_atomic(func_type *, atomic_##func_type)    \
+    typedef struct {                    \
+        atomic_size_t size;             \
+        atomic_##func_type buffer[];    \
+    } func_type##_array;                \
+    make_atomic(func_type##_array *, atomic_array_##func_type)  \
+    typedef struct {                    \
+        size_t capacity;                \
+        /* Assume that they never overflow */   \
+        atomic_size_t top, bottom;      \
+        atomic_array_##func_type array; \
+    } deque_##func_type;                \
+    make_atomic(deque_##func_type *, atomic_deque_##func_type)
+
 typedef enum {
     RAII_NULL,
     RAII_INT,
@@ -110,6 +125,7 @@ typedef union {
     thrd_t thread;
     float point;
     double precision;
+    long double long_double;
     bool boolean;
     signed short s_short;
     unsigned short u_short;
@@ -124,8 +140,9 @@ typedef union {
     intptr_t **array_int;
     uintptr_t **array_uint;
     raii_func_t func;
-    char buffer[256];
+    char buffer[128];
 } values_type, *vectors_t, *args_t;
+make_deque(values_type)
 
 typedef struct {
     values_type value;
@@ -176,7 +193,7 @@ struct memory_s {
     ex_ptr_t *protector;
     ex_backtrace_t *backtrace;
     void_t volatile err;
-    const char *volatile panic;
+    string_t volatile panic;
     future_deque_t *queued;
 };
 
@@ -602,8 +619,6 @@ C_API bool is_args(args_t);
 C_API bool is_args_returning(args_t);
 C_API values_type get_arg(void_t);
 
-#define array(count, ...) args_for(count, __VA_ARGS__)
-#define array_defer(arr) args_destructor_set(arr)
 #define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 

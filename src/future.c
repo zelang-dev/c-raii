@@ -170,8 +170,10 @@ static void deque_destroy(void) {
         memory_t *scope = queue->scope;
         queue->type = -1;
         if (!is_empty(queue->local)) {
-            for (i = 0; i < queue->cpus; i++)
+            for (i = 0; i < queue->cpus; i++) {
                 atomic_flag_test_and_set(&queue->local[i]->shutdown);
+                thrd_join(queue->local[i]->thread, NULL);
+            }
         }
 
         atomic_flag_test_and_set(&queue->shutdown);
@@ -279,20 +281,24 @@ static int thrd_raii_wrapper(void_t arg) {
             f = deque_take(pool->queue);
             /* Currently, there is no work present in my own queue */
             if (f == RAII_EMPTY) {
-                for (i = 0; i < thrd_queue_global->cpus; i++) {
-                    if (i == tid)
-                        continue;
-                    f = deque_steal(thrd_queue_global->local[i]);
-                    if (f == RAII_ABORT) {
-                        --i;
-                        continue; /* Try again at the same i */
-                    } else if (f == RAII_EMPTY) {
-                        continue;
-                    }
+                    for (i = 0; i < thrd_queue_global->cpus; i++) {
+                        if (i == tid)
+                            continue;
 
-                    /* Found some work to do */
-                    break;
-                }
+                        if (is_empty(thrd_queue_global->local))
+                            break;
+
+                        f = deque_steal(thrd_queue_global->local[i]);
+                        if (f == RAII_ABORT) {
+                            --i;
+                            continue; /* Try again at the same i */
+                        } else if (f == RAII_EMPTY) {
+                            continue;
+                        }
+
+                        /* Found some work to do */
+                        break;
+                    }
 
                 if (f == RAII_EMPTY) {
                     /* Despite the previous observation of all queues being devoid
@@ -322,8 +328,10 @@ static int thrd_raii_wrapper(void_t arg) {
         promise_set(f->value, res, is_args_returning((args_t)f->arg));
         if (is_type(f, RAII_FUTURE_ARG)) {
             if (is_pool) {
-                if (!is_empty(f->local))
+                raii_deferred_clean();
+                if (!is_empty(f->local)) {
                     raii_delete(f->local);
+                }
 
                 if (atomic_load(&pool->queue->available) == 0)
                     try_stealing = true;
@@ -360,7 +368,6 @@ future thrd_async(thrd_func_t fn, void_t args) {
     thrd_start(f, p, args);
     return f;
 }
-
 
 future thrd_async_ex(memory_t *scope, thrd_func_t fn, void_t args) {
     promise *p = promise_create(scope);
@@ -535,6 +542,19 @@ future_t thrd_scope(void) {
     spawn->threaded = pool;
 
     return pool;
+}
+
+result_t thrd_add(result_t result, future f, future_deque_t *queue, int result_id,
+                  worker_t *f_arg, thrd_func_t fn, void_t args) {
+    f->is_pool++;
+    f_arg->id = result_id;
+    f_arg->local = unique_init();
+    int tid = atomic_fetch_add(&queue->cpu_core, 1) % queue->cpus;
+    deque_push(queue->local[tid], f_arg);
+    if (!atomic_flag_load(&queue->local[tid]->started))
+        atomic_flag_test_and_set(&queue->local[tid]->started);
+
+    atomic_fetch_add(&queue->local[tid]->available, 1);
 }
 
 result_t thrd_spawn(thrd_func_t fn, void_t args) {
