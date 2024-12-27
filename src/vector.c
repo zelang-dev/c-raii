@@ -171,8 +171,26 @@ RAII_INLINE void args_destructor_set(args_t params) {
     }
 }
 
-RAII_INLINE void args_deferred_set(args_t params, memory_t *scope) {
-    if (vector_type(params) == RAII_ARGS && !vector_deferred(params)) {
+arrays_t array_of(memory_t *scope, size_t count, ...) {
+    va_list ap;
+    size_t i;
+    args_t params = nullptr;
+    size_t size = count ? count : thrd_cpu_count();
+    vector_grow(params, size, scope);
+
+    if (count > 0) {
+        va_start(ap, count);
+        for (i = 0; i < count; i++)
+            vector_push_back(params, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    vector_set_type(params, RAII_ARRAY);
+    return params;
+}
+
+RAII_INLINE void array_deferred_set(arrays_t params, memory_t *scope) {
+    if (vector_type(params) == RAII_ARRAY && !vector_deferred(params)) {
         vector_defer_set(params);
         raii_deferred(scope, (func_t)vector_delete, params);
     }
@@ -203,26 +221,13 @@ args_t args_for(size_t count, ...) {
     return params;
 }
 
-args_t args_for_ex(memory_t *scope, size_t count, ...) {
-    va_list ap;
-    size_t i;
-    args_t params = nullptr;
-    size_t size = count ? count : thrd_cpu_count();
-    vector_grow(params, size, scope);
 
-    if (count > 0) {
-        va_start(ap, count);
-        for (i = 0; i < count; i++)
-            vector_push_back(params, va_arg(ap, void_t));
-        va_end(ap);
-    }
-
-    vector_set_type(params, RAII_ARGS);
-    return params;
+RAII_INLINE bool is_array(void_t params) {
+    return vector_type((arrays_t)params) == RAII_ARRAY;
 }
 
-RAII_INLINE bool is_args(args_t params) {
-    return vector_type(params) == RAII_ARGS;
+RAII_INLINE bool is_args(void_t params) {
+    return vector_type((args_t)params) == RAII_ARGS;
 }
 
 RAII_INLINE bool is_args_returning(args_t params) {

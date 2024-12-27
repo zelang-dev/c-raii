@@ -337,7 +337,7 @@ C_API bool thrd_is_finish(future_t);
 
 /**
 * Creates an scoped `vector/array/container` for arbitrary arguments passing
-* into an single `paramater` function.
+* into an single `parameter` function.
 * - Use standard `array access` for retrieval of an `union` storage type.
 *
 * - MUST CALL `args_destructor_set()` to have memory auto released
@@ -351,13 +351,14 @@ C_API bool thrd_is_finish(future_t);
 * @param arguments indexed in given order.
 */
 C_API args_t args_for(size_t, ...);
+C_API void args_destructor_set(args_t);
+C_API void args_returning_set(args_t);
 
 /**
-* Creates an scoped `vector/array/container` for arbitrary arguments passing
-* into an single `paramater` function.
+* Creates an scoped `vector/array/container` for arbitrary item types.
 * - Use standard `array access` for retrieval of an `union` storage type.
 *
-* - MUST CALL `args_deferred_set` to have memory auto released
+* - MUST CALL `array_deferred_set` to have memory auto released
 *   when given `scope` context return/exist or panics.
 *
 * - OTHERWISE `memory leak` will be shown in DEBUG build.
@@ -365,10 +366,10 @@ C_API args_t args_for(size_t, ...);
 * @param count numbers of parameters, `0` will create empty `vector/array`.
 * @param arguments indexed in given order.
 */
-C_API args_t args_for_ex(memory_t *, size_t, ...);
+C_API arrays_t array_of(memory_t *, size_t, ...);
+C_API void array_deferred_set(arrays_t, memory_t *);
+C_API bool is_array(void_t);
 
-#define array(count, ...) args_for(count, __VA_ARGS__)
-#define array_defer(arr) args_destructor_set(arr)
 #define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 
@@ -378,6 +379,12 @@ C_API args_t args_for_ex(memory_t *, size_t, ...);
 #define $size(vec) vector_size(vec)
 #define $capacity(vec) vector_capacity(vec)
 #define $erase(vec, index) vector_erase(vec, index)
+
+/* The `foreach(item in vector/array)` macro, similar to `C#`,
+executes a statement or a block of statements for each element in
+an instance of `vectors_t/args_t/arrays_t` */
+#define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
+#define foreach_back(...) foreach_xp(foreach_in_back, (__VA_ARGS__))
 ```
 
 ### There is _1 way_ to create an smart memory pointer

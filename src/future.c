@@ -10,6 +10,7 @@ Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
 
 #include "raii.h"
 
+static void thrd_set_result(raii_values_t *result, int id, future_deque_t *queue);
 static volatile bool thrd_queue_set = false;
 static future_deque_t *thrd_queue_global = {0};
 struct future_deque {
@@ -31,8 +32,7 @@ struct future_deque {
 
 struct future_pool {
     raii_type type;
-    int start;
-    int end;
+    arrays_t jobs;
     memory_t *scope;
     future *futures;
     future_deque_t *queue;
@@ -181,6 +181,26 @@ static void deque_destroy(void) {
     }
 }
 
+static void thrd_set_result(raii_values_t *result, int id, future_deque_t *queue) {
+    result_t *results = (result_t *)atomic_load_explicit(&queue->results, memory_order_acquire);
+    results[id]->result = (raii_values_t *)calloc_full(queue->scope, 1, sizeof(raii_values_t), RAII_FREE);
+    size_t size = result->size;
+    if (size > 0) {
+        results[id]->result->extended = calloc_full(queue->scope, 1, size, RAII_FREE);
+        memcpy(results[id]->result->extended, result->extended, size);
+        results[id]->result->value.object = results[id]->result->extended;
+    } else if (!is_zero(result->value.integer)) {
+        results[id]->result->value.object = result->value.object;
+    }
+
+    results[id]->is_ready = true;
+    atomic_store_explicit(&queue->results, results, memory_order_release);
+}
+
+static result_t thrd_get_result(int id, future_deque_t *queue) {
+    return (result_t)atomic_load_explicit(&queue->results[id], memory_order_relaxed);
+}
+
 static promise *promise_create(memory_t *scope) {
     promise *p = malloc_full(scope, sizeof(promise), RAII_FREE);
     p->scope = scope;
@@ -191,26 +211,31 @@ static promise *promise_create(memory_t *scope) {
     return p;
 }
 
-static void promise_set(promise *p, void_t res, bool is_args) {
-    atomic_lock(&p->mutex);
-    if (is_args) {
-        p->result = (raii_values_t *)res;
-    } else {
-        p->result = (raii_values_t *)malloc_full(p->scope, sizeof(raii_values_t), RAII_FREE);
-        if (!is_empty(res))
-            p->result->value.object = ((raii_values_t *)res)->value.object;
+static void promise_set(promise *p, void_t res, bool is_args, future_deque_t *q) {
+    if (!thrd_get_result(p->id, q)->is_ready) {
+        atomic_lock(&p->mutex);
+        if (is_args) {
+            p->result = (raii_values_t *)res;
+        } else {
+            p->result = (raii_values_t *)malloc_full(p->scope, sizeof(raii_values_t), RAII_FREE);
+            if (!is_empty(res))
+                p->result->value.object = ((raii_values_t *)res)->value.object;
 
-        p->result->size = 0;
-        p->result->extended = nullptr;
+            p->result->size = 0;
+            p->result->extended = nullptr;
+        }
+
+        thrd_set_result(p->result, p->id, q);
+        atomic_unlock(&p->mutex);
     }
 
-    atomic_unlock(&p->mutex);
     atomic_flag_test_and_set(&p->done);
 }
 
 static RAII_INLINE raii_values_t *promise_get(promise *p) {
-    while (!atomic_flag_load(&p->done))
-        thrd_yield();
+    if (!thrd_get_result(p->id, thrd_queue_global)->is_ready)
+        while (!atomic_flag_load(&p->done))
+            thrd_yield();
 
     return p->result;
 }
@@ -268,7 +293,7 @@ static int thrd_raii_wrapper(void_t arg) {
     do {
         if (is_pool) {
             if (!try_stealing) {
-                while (atomic_load_explicit(&pool->queue->available, memory_order_relaxed) == 0
+                while (atomic_load(&pool->queue->available) == 0
                        && !atomic_flag_load_explicit(&pool->queue->shutdown, memory_order_relaxed))
                     thrd_yield();
 
@@ -281,22 +306,19 @@ static int thrd_raii_wrapper(void_t arg) {
             f = deque_take(pool->queue);
             /* Currently, there is no work present in my own queue */
             if (f == RAII_EMPTY) {
-                    for (i = 0; i < thrd_queue_global->cpus; i++) {
+                for (i = 0; i < thrd_queue_global->cpus; i++) {
                         if (i == tid)
                             continue;
-
-                        if (is_empty(thrd_queue_global->local))
-                            break;
 
                         f = deque_steal(thrd_queue_global->local[i]);
                         if (f == RAII_ABORT) {
                             --i;
-                            continue; /* Try again at the same i */
+                            continue; // Try again at the same i
                         } else if (f == RAII_EMPTY) {
                             continue;
                         }
 
-                        /* Found some work to do */
+                        // Found some work to do
                         break;
                     }
 
@@ -325,7 +347,7 @@ static int thrd_raii_wrapper(void_t arg) {
             res = f->func((args_t)f->arg);
         } guarded_exception(f->value->scope);
 
-        promise_set(f->value, res, is_args_returning((args_t)f->arg));
+        promise_set(f->value, res, is_args_returning((args_t)f->arg), f->queue);
         if (is_type(f, RAII_FUTURE_ARG)) {
             if (is_pool) {
                 raii_deferred_clean();
@@ -352,12 +374,12 @@ static int thrd_raii_wrapper(void_t arg) {
 }
 
 static void thrd_start(future f, promise *value, void_t arg) {
-    worker_t *f_arg = try_malloc(sizeof(worker_t));
-    f_arg->func = f->func;
-    f_arg->arg = arg;
-    f_arg->value = value;
-    f_arg->type = RAII_FUTURE_ARG;
-    if (thrd_create(&f->thread, thrd_raii_wrapper, f_arg) != thrd_success)
+    worker_t *f_work = try_malloc(sizeof(worker_t));
+    f_work->func = f->func;
+    f_work->arg = arg;
+    f_work->value = value;
+    f_work->type = RAII_FUTURE_ARG;
+    if (thrd_create(&f->thread, thrd_raii_wrapper, f_work) != thrd_success)
         throw(future_error);
 }
 
@@ -492,14 +514,14 @@ void thrd_init(size_t queue_size) {
                 deque_init(local[i], queue_size);
                 local[i]->cpus = cpu;
                 local[i]->scope = nullptr;
-                worker_t *f_arg = try_malloc(sizeof(worker_t));
-                f_arg->func = nullptr;
-                f_arg->id = (int)i;
-                f_arg->value = nullptr;
-                f_arg->queue = local[i];
-                f_arg->type = RAII_FUTURE_ARG;
+                worker_t *f_work = try_malloc(sizeof(worker_t));
+                f_work->func = nullptr;
+                f_work->id = (int)i;
+                f_work->value = nullptr;
+                f_work->queue = local[i];
+                f_work->type = RAII_FUTURE_ARG;
 
-                if (thrd_create(&local[i]->thread, thrd_raii_wrapper, f_arg) != thrd_success)
+                if (thrd_create(&local[i]->thread, thrd_raii_wrapper, f_work) != thrd_success)
                     throw(future_error);
             }
             queue->local = local;
@@ -536,21 +558,21 @@ future_t thrd_scope(void) {
     pool->futures = nullptr;
     pool->scope = scope;
     pool->queue = queue;
-    pool->start = atomic_load(&queue->result_count);
-    pool->end = pool->start;
+    pool->jobs = array_of(scope, 0);
+    array_deferred_set(pool->jobs, scope);
     pool->type = RAII_SPAWN;
     spawn->threaded = pool;
 
     return pool;
 }
 
-result_t thrd_add(result_t result, future f, future_deque_t *queue, int result_id,
-                  worker_t *f_arg, thrd_func_t fn, void_t args) {
+void thrd_add(future f, future_deque_t *queue,
+                  worker_t *f_work, thrd_func_t fn, void_t args) {
     f->is_pool++;
-    f_arg->id = result_id;
-    f_arg->local = unique_init();
+    f_work->id = f->id;
+    f_work->local = unique_init();
     int tid = atomic_fetch_add(&queue->cpu_core, 1) % queue->cpus;
-    deque_push(queue->local[tid], f_arg);
+    deque_push(queue->local[tid], f_work);
     if (!atomic_flag_load(&queue->local[tid]->started))
         atomic_flag_test_and_set(&queue->local[tid]->started);
 
@@ -564,12 +586,11 @@ result_t thrd_spawn(thrd_func_t fn, void_t args) {
     unique_t *scope = raii_local();
     future_t pool = scope->threaded;
     future_deque_t *queue = scope->queued;
-    size_t tid, result_id, result_count;
+    size_t tid, result_id;
     result_t result, *results;
 
     result = (result_t)malloc_full(queue->scope, sizeof(struct result_data), RAII_FREE);
-    result_count = atomic_fetch_add(&queue->result_count, 1) + 1;
-    result_id = result_count - 1;
+    result_id = atomic_fetch_add(&queue->result_count, 1);
     results = (result_t *)atomic_load_explicit(&queue->results, memory_order_acquire);
     if (result_id % queue->queue_size == 0)
         results = try_realloc(results, (result_id + queue->queue_size) * sizeof(results[0]));
@@ -583,38 +604,26 @@ result_t thrd_spawn(thrd_func_t fn, void_t args) {
     if (result_id % queue->queue_size == 0 || is_empty(pool->futures))
         pool->futures = try_realloc(pool->futures, (result_id + queue->queue_size) * sizeof(pool->futures[0]));
 
-    promise *p = malloc_full(pool->scope, sizeof(promise), RAII_FREE);
-    atomic_flag_clear(&p->mutex);
-    atomic_flag_clear(&p->done);
-    p->scope = pool->scope;
-    p->type = RAII_PROMISE;
-
+    promise *p = promise_create(pool->scope);
     future f = future_create(fn);
-    worker_t *f_arg = try_malloc(sizeof(worker_t));
-    f_arg->func = f->func;
-    f_arg->arg = args;
-    f_arg->value = p;
-    f_arg->queue = queue;
-    f_arg->type = RAII_FUTURE_ARG;
+    p->id = result_id;
     f->value = p;
     f->id = result_id;
-    if (!is_empty(queue->local)) {
-        f->is_pool++;
-        f_arg->id = result_id;
-        f_arg->local = unique_init();
-        tid = atomic_fetch_add(&queue->cpu_core, 1) % queue->cpus;
-        deque_push(queue->local[tid], f_arg);
-        if (!atomic_flag_load(&queue->local[tid]->started))
-            atomic_flag_test_and_set(&queue->local[tid]->started);
 
-        atomic_fetch_add(&queue->local[tid]->available, 1);
-    } else {
-        if (thrd_create(&f->thread, thrd_raii_wrapper, f_arg) != thrd_success)
-            throw(future_error);
-    }
+    worker_t *f_work = try_malloc(sizeof(worker_t));
+    f_work->func = f->func;
+    f_work->arg = args;
+    f_work->value = p;
+    f_work->queue = queue;
+    f_work->type = RAII_FUTURE_ARG;
 
-    pool->futures[pool->end] = f;
-    pool->end++;
+    $push_back(pool->jobs, result_id);
+    pool->futures[result_id] = f;
+    if (!is_empty(queue->local))
+        thrd_add(f, queue, f_work, nil, nil);
+    else if (thrd_create(&f->thread, thrd_raii_wrapper, f_work) != thrd_success)
+        throw(future_error);
+
     return result;
 }
 
@@ -622,24 +631,15 @@ future_t thrd_sync(future_t pool) {
     if (!is_type(pool, RAII_SPAWN))
         throw(logic_error);
 
-    int i, id;
-    memory_t *scope = pool->queue->scope;
-    for (i = pool->start; i < pool->end; i++) {
-        id = pool->futures[i]->id;
-        raii_values_t *result = promise_get(pool->futures[i]->value);
-        result_t *results = (result_t *)atomic_load_explicit(&pool->queue->results, memory_order_acquire);
-        results[id]->result = (raii_values_t *)calloc_full(scope, 1, sizeof(raii_values_t), RAII_FREE);
-        size_t size = result->size;
-        if (size > 0) {
-            results[id]->result->extended = calloc_full(scope, 1, size, RAII_FREE);
-            memcpy(results[id]->result->extended, result->extended, size);
-            results[id]->result->value.object = results[id]->result->extended;
-        } else if (!is_zero(result->value.integer)) {
-            results[id]->result->value.object = result->value.object;
+    int i;
+    foreach(num in pool->jobs) {
+        i = num.integer;
+        if (!thrd_get_result(i, pool->queue)->is_ready) {
+            raii_values_t *result = promise_get(pool->futures[i]->value);
+            if (!raii_local()->threading)
+                thrd_set_result(result, i, pool->queue);
         }
 
-        results[id]->is_ready = true;
-        atomic_store_explicit(&pool->queue->results, results, memory_order_release);
         future_close(pool->futures[i]);
         if (!is_empty(pool->futures[i]->value->scope->err))
             raii_defer((func_t)thrd_delete, pool->futures[i]);
@@ -653,11 +653,13 @@ future_t thrd_sync(future_t pool) {
 }
 
 void thrd_then(result_func_t callback, future_t iter, void_t result) {
-    int i, max = iter->end;
+    int i;
     result_t *results = (result_t *)atomic_load_explicit(&iter->queue->results, memory_order_relaxed);
-    for (i = iter->start; i < max; i++)
+    foreach(num in iter->jobs) {
+        i = num.integer;
         if (results[i]->is_ready)
             result = callback(result, i, results[i]->result->value);
+    }
 }
 
 void thrd_destroy(future_t f) {
@@ -682,7 +684,8 @@ void thrd_delete(future f) {
 
 RAII_INLINE bool thrd_is_finish(future_t f) {
     size_t i;
-    for (i = f->start; i < f->end; i++) {
+    foreach(num in f->jobs) {
+        i = num.max_size;
         if (!thrd_is_done(f->futures[i]))
             return false;
     }

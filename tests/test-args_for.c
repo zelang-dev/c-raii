@@ -6,6 +6,7 @@ int some_func(int args) {
 }
 
 int some_args(args_t args) {
+    ASSERT_TRUE(is_args(args));
     args_destructor_set(args);
     string arg1 = args[0].char_ptr;
     string arg2 = args[1].char_ptr;
@@ -22,16 +23,17 @@ int some_args(args_t args) {
 
 TEST(args_for) {
     memory_t *s = unique_init();
-    args_t d = args_for_ex(s, 3, "hello", "world", 32);
-    args_deferred_set(d, s);
+    arrays_t d = array_of(s, 3, "hello", "world", 32);
+    ASSERT_TRUE(is_array(d));
+    array_deferred_set(d, s);
     _defer(raii_delete, s);
 
-    string arg1 = d[0].char_ptr;
-    string arg2 = d[1].char_ptr;
+    string ar1 = d[0].char_ptr;
+    string ar2 = d[1].char_ptr;
     int num = d[2].integer;
 
-    ASSERT_EQ(is_str_eq(arg1, "hello"), true);
-    ASSERT_EQ(is_str_eq(arg2, "world"), true);
+    ASSERT_EQ(is_str_eq(ar1, "hello"), true);
+    ASSERT_EQ(is_str_eq(ar2, "world"), true);
     ASSERT_EQ(num, 32);
 
     return some_args(args_for(4, "no no", "hello world", 64, some_func));

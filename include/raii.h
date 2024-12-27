@@ -140,8 +140,8 @@ typedef union {
     intptr_t **array_int;
     uintptr_t **array_uint;
     raii_func_t func;
-    char buffer[128];
-} values_type, *vectors_t, *args_t;
+    char buffer[64];
+} values_type, *vectors_t, *args_t, *arrays_t;
 make_deque(values_type)
 
 typedef struct {
@@ -596,13 +596,15 @@ C_API void vector_push_back(vectors_t, void_t);
 * @param arguments indexed in given order.
 */
 C_API args_t args_for(size_t, ...);
+C_API void args_destructor_set(args_t);
+C_API void args_returning_set(args_t);
 
 /**
-* Creates an scoped `vector/array/container` for arbitrary arguments passing
-* into an single `paramater` function.
+* Creates an scoped `vector/array/container` for arbitrary item types.
+*
 * - Use standard `array access` for retrieval of an `union` storage type.
 *
-* - MUST CALL `args_deferred_set` to have memory auto released
+* - MUST CALL `array_deferred_set` to have memory auto released
 *   when given `scope` context return/exist or panics.
 *
 * - OTHERWISE `memory leak` will be shown in DEBUG build.
@@ -610,12 +612,11 @@ C_API args_t args_for(size_t, ...);
 * @param count numbers of parameters, `0` will create empty `vector/array`.
 * @param arguments indexed in given order.
 */
-C_API args_t args_for_ex(memory_t *, size_t, ...);
+C_API arrays_t array_of(memory_t *, size_t, ...);
+C_API void array_deferred_set(arrays_t, memory_t *);
+C_API bool is_array(void_t);
 
-C_API void args_destructor_set(args_t);
-C_API void args_deferred_set(args_t, memory_t *);
-C_API void args_returning_set(args_t);
-C_API bool is_args(args_t);
+C_API bool is_args(void_t);
 C_API bool is_args_returning(args_t);
 C_API values_type get_arg(void_t);
 
@@ -634,9 +635,13 @@ C_API values_type get_arg(void_t);
 #define foreach_in(X, S) values_type X; int i_##X;  \
     for (i_##X = 0; i_##X < $size(S); i_##X++)      \
         if ((X.object = S[i_##X].object) || X.object == nullptr)
-#define foreach_in_back(X, S) values_type X; int i_##X, e_##X = $size(S) - 1;   \
-    for (i_##X = e_##X; i_##X >= 0; i_##X--)        \
+#define foreach_in_back(X, S) values_type X; int i_##X; \
+    for (i_##X = $size(S) - 1; i_##X >= 0; i_##X--)     \
         if ((X.object = S[i_##X].object) || X.object == nullptr)
+
+/* The `foreach(`item `in` vector/array`)` macro, similar to `C#`,
+executes a statement or a block of statements for each element in
+an instance of `vectors_t/args_t/arrays_t` */
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 #define foreach_back(...) foreach_xp(foreach_in_back, (__VA_ARGS__))
 
