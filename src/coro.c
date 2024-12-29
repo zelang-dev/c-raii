@@ -707,12 +707,12 @@ static u32 create_routine(raii_func_t fn, void_t arg, u32 stack, run_mode code) 
     if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
         t->is_waiting = true;
-        $push_back(c->event_group, t);
+        $append(c->event_group, t);
         c->event_active = false;
     } else if (c->wait_active && !is_empty(c->wait_group) && !c->is_group_finish) {
         t->is_waiting = true;
         t->is_address = true;
-        $push_back(c->wait_group, t);
+        $append(c->wait_group, t);
     }
 
     if (c->interrupt_active) {

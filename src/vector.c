@@ -177,7 +177,18 @@ RAII_INLINE void args_destructor_set(args_t params) {
 }
 
 RAII_INLINE void array_remove(arrays_t arr, int i) {
-    vector_erase((vectors_t)arr, i);
+    if (arr) {
+        const size_t cv_sz__ = vector_length(arr);
+        if ((i) < cv_sz__) {
+            func_t destructor__ = vector_destructor(arr);
+            if (destructor__) {
+                destructor__(&(arr)[i]);
+            }
+
+            vector_set_size((arr), cv_sz__ - 1);
+            memmove((arr)+(i), (arr)+(i)+1, sizeof(*(arr)) * (cv_sz__ - 1 - (i)));
+        }
+    }
 }
 
 RAII_INLINE void array_delete(arrays_t arr) {

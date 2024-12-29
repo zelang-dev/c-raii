@@ -12,6 +12,7 @@ TEST(array_of) {
                           "hello world", 123, some_func,
                           "four", 600);
     ASSERT_TRUE(is_array(d));
+    ASSERT_TRUE(($size(d) == 8));
     array_deferred_set(d, s);
     _defer(raii_delete, s);
 
@@ -39,6 +40,10 @@ TEST(array_of) {
 
     $append(d, 256);
     ASSERT_EQ(256, d[8].integer);
+    ASSERT_TRUE(($size(d) == 9));
+    $remove(d, 7);
+    ASSERT_TRUE(($size(d) == 8));
+    ASSERT_EQ(256, d[7].integer);
 
     return 0;
 }
