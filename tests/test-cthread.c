@@ -69,7 +69,7 @@ void run_emulated_tls(void) {
     assert(*gLocalVar() == 1);
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     puts("start thread test");
     run_thread_test();
     puts("end thread test\n");

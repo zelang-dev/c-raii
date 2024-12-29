@@ -6,10 +6,25 @@
 #include "catomic.h"
 #include <stdio.h>
 #include <time.h>
+#include "coro.h"
 
 #ifndef O_BINARY
 #   define O_BINARY 0
 #endif
+
+#ifndef CACHELINE_SIZE
+/* The estimated size of the CPU's cache line when atomically updating memory.
+ Add this much padding or align to this boundary to avoid atomically-updated
+ memory from forcing cache invalidations on near, but non-atomic, memory.
+
+ https://en.wikipedia.org/wiki/False_sharing
+ https://github.com/golang/go/search?q=CacheLinePadSize
+ https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
+*/
+#   define CACHELINE_SIZE __ATOMIC_CACHE_LINE
+#endif
+
+typedef char cacheline_pad_t[CACHELINE_SIZE];
 
 #ifdef __cplusplus
     extern "C" {
@@ -20,7 +35,8 @@ all other fields private, this object binds any additional requests to it's life
 typedef struct memory_s memory_t;
 typedef struct _future *future;
 typedef struct future_pool *future_t;
-typedef struct future_deque future_deque_t;
+typedef struct raii_deque_s raii_deque_t;
+typedef struct raii_results_s future_results_t;
 typedef memory_t unique_t;
 typedef void (*func_t)(void_t);
 typedef void (*func_args_t)(void_t, ...);
@@ -122,10 +138,8 @@ typedef union {
     long long long_long;
     size_t max_size;
     uintptr_t ulong_long;
-    thrd_t thread;
     float point;
     double precision;
-    long double long_double;
     bool boolean;
     signed short s_short;
     unsigned short u_short;
@@ -141,8 +155,35 @@ typedef union {
     uintptr_t **array_uint;
     raii_func_t func;
     char buffer[64];
-} values_type, *vectors_t, *args_t, *arrays_t;
-make_deque(values_type)
+} values_type, *vectors_t, *args_t;
+
+/* Generic simple union storage types. */
+typedef union {
+    int integer;
+    unsigned int u_int;
+    int *int_ptr;
+    signed long s_long;
+    unsigned long u_long;
+    long long long_long;
+    size_t max_size;
+    uintptr_t ulong_long;
+    float point;
+    double precision;
+    bool boolean;
+    signed short s_short;
+    unsigned short u_short;
+    unsigned short *u_short_ptr;
+    unsigned char *uchar_ptr;
+    signed char schar;
+    unsigned char uchar;
+    char *char_ptr;
+    void_t object;
+    ptrdiff_t **array;
+    char **array_char;
+    intptr_t **array_int;
+    uintptr_t **array_uint;
+    raii_func_t func;
+} value_t, *arrays_t, *wait_group_t, *wait_result_t;
 
 typedef struct {
     values_type value;
@@ -194,7 +235,7 @@ struct memory_s {
     ex_backtrace_t *backtrace;
     void_t volatile err;
     string_t volatile panic;
-    future_deque_t *queued;
+    raii_deque_t *queued;
 };
 
 typedef void (*for_func_t)(i64, i64);
@@ -218,7 +259,7 @@ struct _future_arg {
     void_t arg;
     thrd_func_t func;
     promise *value;
-    future_deque_t *queue;
+    raii_deque_t *queue;
 };
 make_atomic(worker_t, atomic_worker_t)
 
@@ -235,6 +276,43 @@ typedef struct result_data {
     raii_values_t *result;
 } *result_t;
 make_atomic(result_t, atomic_result_t)
+
+struct raii_results_s {
+    raii_type type;
+    volatile sig_atomic_t is_takeable;
+
+    /* Stack size when creating a coroutine. */
+    u32 stacksize;
+    u32 capacity;
+
+    /* Number of CPU cores this machine has,
+    it determents the number of threads to use. */
+    size_t cpu_count;
+    size_t thread_count;
+    size_t thread_invalid;
+
+    size_t queue_size;
+    memory_t *scope;
+    cacheline_pad_t pad;
+
+    /* Exception/error indicator, only private `co_awaitable()`
+    will clear to break any possible infinite wait/loop condition,
+    normal cleanup code will not be executed. */
+    atomic_flag is_errorless;
+    atomic_flag is_interruptable;
+    atomic_flag is_finish;
+    atomic_size_t take_count;
+
+    /* track the number of global coroutines active/available */
+    atomic_size_t active_count;
+
+    /* coroutine unique id generator */
+    atomic_size_t id_generate;
+    atomic_size_t result_count;
+    atomic_result_t *results;
+};
+
+C_API future_results_t gq_result;
 
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
@@ -272,6 +350,7 @@ C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
 C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
 C_API values_type thrd_result(result_t value);
+C_API void thrd_set_result(raii_values_t *, int);
 
 C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
 
@@ -614,7 +693,12 @@ C_API void args_returning_set(args_t);
 */
 C_API arrays_t array_of(memory_t *, size_t, ...);
 C_API void array_deferred_set(arrays_t, memory_t *);
+C_API void array_append(arrays_t, void_t);
+C_API void array_delete(arrays_t);
+C_API void array_remove(arrays_t, int);
 C_API bool is_array(void_t);
+#define $append(arr, value) array_append((arrays_t)arr, (void_t)value)
+#define $remove(arr, index) array_remove((arrays_t)arr, index)
 
 C_API bool is_args(void_t);
 C_API bool is_args_returning(args_t);
@@ -623,12 +707,12 @@ C_API values_type get_arg(void_t);
 #define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 
-#define $push_back(vec, value) vector_push_back(vec, (void_t)value)
-#define $insert(vec, index, value) vector_insert(vec, index, (void_t)value)
-#define $clear(vec) vector_clear(vec)
-#define $size(vec) vector_size(vec)
-#define $capacity(vec) vector_capacity(vec)
-#define $erase(vec, index) vector_erase(vec, index)
+#define $push_back(vec, value) vector_push_back((vectors_t)vec, (void_t)value)
+#define $insert(vec, index, value) vector_insert((vectors_t)vec, index, (void_t)value)
+#define $clear(vec) vector_clear((vectors_t)vec)
+#define $size(vec) vector_size((vectors_t)vec)
+#define $capacity(vec) vector_capacity((vectors_t)vec)
+#define $erase(vec, index) vector_erase((vectors_t)vec, index)
 
 #define in ,
 #define foreach_xp(X, A) X A

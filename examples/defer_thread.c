@@ -18,7 +18,7 @@ static unsigned int names[max_threads];
 static thrd_t threads[max_threads];
 
 void defer_capture(void *arg) {
-    thrd_t thrd = raii_value(arg).thread;
+    thrd_t thrd = *(thrd_t *)raii_value(arg).object;
     if (thrd_success != thrd_join(thrd, NULL)) {
         puts("main: thrd_join failure");
         thrd_exit(EXIT_FAILURE);

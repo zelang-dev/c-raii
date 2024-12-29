@@ -4,6 +4,7 @@
 void_t fib(args_t args) {
     int n = get_arg(args).integer;
     if (n < 2) {
+        RAII_HERE;
         return thrd_value(n);
     } else {
         result_t x, y;
@@ -32,6 +33,7 @@ int main(int argc, char **argv) {
     result_t results = thrd_spawn(fib, thrd_value(n));
 
     thrd_sync(fut);
+    RAII_HERE;
     printf("Result: %d\n", thrd_result(results).integer);
 
     return 0;

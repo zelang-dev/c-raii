@@ -9,7 +9,7 @@ static void pfree(void *p) {
     free(p);
 }
 
-int main(void) {
+int main(int argc, char **argv){
     try {
         char *p1 = 0; protected(p1, pfree);
         char *p2 = 0; protected(p2, pfree);

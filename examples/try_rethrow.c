@@ -7,7 +7,7 @@ static int idiv(int a, int b) {
     return a / b;
 }
 
-int main(void) {
+int main(int argc, char **argv){
     try {
         idiv(1, 0);
         printf("never reached\n");

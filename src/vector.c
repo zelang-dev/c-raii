@@ -71,10 +71,11 @@ static RAII_INLINE void vector_delete(vectors_t vec) {
 }
 
 RAII_INLINE void vector_insert(vectors_t vec, int pos, void_t val) {
-    size_t cv_cap__ = vector_cap(vec);
+    size_t size, cv_cap__ = vector_cap(vec);
     memory_t *scope = vector_context(vec);
     if (cv_cap__ <= vector_length(vec)) {
-        vector_grow((vec), cv_cap__, scope);
+        size = cv_cap__ << 1;
+        vector_grow((vec), size, scope);
     }
 
     if ((pos) < vector_length(vec)) {
@@ -115,10 +116,11 @@ RAII_INLINE void vector_clear(vectors_t vec) {
 }
 
 RAII_INLINE void vector_push_back(vectors_t vec, void_t value) {
-    size_t cv_cap__ = vector_cap(vec);
+    size_t size, cv_cap__ = vector_cap(vec);
     memory_t *scope = vector_context(vec);
     if (cv_cap__ <= vector_length(vec)) {
-        vector_grow(vec, 1, scope);
+        size = cv_cap__ << 1;
+        vector_grow(vec, size, scope);
     }
 
     vec[vector_length(vec)].object = value;
@@ -144,10 +146,11 @@ vectors_t vector_for(vectors_t v, size_t item_count, ...) {
 
 RAII_INLINE vectors_t vector_variant(void) {
     vectors_t vec = nullptr;
-    size_t cores = thrd_cpu_count();
-    memory_t *scope = get_scope();
+    size_t cores = 1 << (thrd_cpu_count() * 2);
+    memory_t *scope = unique_init();
     vector_grow(vec, cores, scope);
-    deferring((func_t)vector_delete, vec);
+    raii_deferred(scope, (func_t)vector_delete, vec);
+    _defer(raii_delete, scope);
 
     return vec;
 }
@@ -167,21 +170,43 @@ RAII_INLINE memory_t *vector_scope(vectors_t v) {
 RAII_INLINE void args_destructor_set(args_t params) {
     if (vector_type(params) == RAII_ARGS && !vector_deferred(params)) {
         vector_defer_set(params);
-        deferring((func_t)vector_delete, params);
+        memory_t *scope = vector_context(params);
+        raii_deferred(scope, (func_t)vector_delete, params);
+        _defer(raii_delete, scope);
     }
+}
+
+RAII_INLINE void array_remove(arrays_t arr, int i) {
+    vector_erase((vectors_t)arr, i);
+}
+
+RAII_INLINE void array_delete(arrays_t arr) {
+    vector_delete((vectors_t)arr);
+}
+
+RAII_INLINE void array_append(arrays_t arr, void_t value) {
+    size_t size, cv_cap__ = vector_cap(arr);
+    memory_t *scope = vector_context(arr);
+    if (cv_cap__ <= vector_length(arr)) {
+        size = cv_cap__ << 1;
+        vector_grow(arr, size, scope);
+    }
+
+    arr[vector_length(arr)].object = value;
+    vector_set_size(arr, vector_length(arr) + 1);
 }
 
 arrays_t array_of(memory_t *scope, size_t count, ...) {
     va_list ap;
     size_t i;
-    args_t params = nullptr;
-    size_t size = count ? count : thrd_cpu_count();
+    arrays_t params = nullptr;
+    size_t size = count ? count + 1 : 1 << (thrd_cpu_count() * 2);
     vector_grow(params, size, scope);
 
     if (count > 0) {
         va_start(ap, count);
         for (i = 0; i < count; i++)
-            vector_push_back(params, va_arg(ap, void_t));
+            array_append(params, va_arg(ap, void_t));
         va_end(ap);
     }
 
@@ -192,7 +217,7 @@ arrays_t array_of(memory_t *scope, size_t count, ...) {
 RAII_INLINE void array_deferred_set(arrays_t params, memory_t *scope) {
     if (vector_type(params) == RAII_ARRAY && !vector_deferred(params)) {
         vector_defer_set(params);
-        raii_deferred(scope, (func_t)vector_delete, params);
+        raii_deferred(scope, (func_t)array_delete, params);
     }
 }
 
@@ -206,8 +231,8 @@ args_t args_for(size_t count, ...) {
     va_list ap;
     size_t i;
     args_t params = nullptr;
-    size_t size = count ? count : thrd_cpu_count();
-    memory_t *scope = get_scope();
+    size_t size = count ? count : 1 << (thrd_cpu_count() * 2);
+    memory_t *scope = unique_init();
     vector_grow(params, size, scope);
 
     if (count > 0) {

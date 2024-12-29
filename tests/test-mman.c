@@ -316,7 +316,7 @@ int test_map_mprotect() {
     return result;
 }
 
-int main()
+int main(int argc, char **argv)
 {
     int result = 0;
 

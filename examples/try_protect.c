@@ -12,7 +12,7 @@ static void pfree(void *p) {
     free(p);
 }
 
-int main(void) {
+int main(int argc, char **argv){
     try {
         char *p = 0; protected(p, pfree);
 

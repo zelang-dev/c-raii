@@ -14,6 +14,7 @@ set(TARGET_LIST
  test-thrd_local
  test-thrd_spawn
  test-vector
+ test-array_of
 )
 
 foreach (TARGET ${TARGET_LIST})

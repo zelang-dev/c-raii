@@ -82,7 +82,7 @@ static void test_memory(void) {
      }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     puts("start thread-local test");
     run_tls();
     puts("end thread-local test\n");

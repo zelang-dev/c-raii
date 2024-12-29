@@ -1,4 +1,5 @@
 #include "raii.h"
+
 /* Plain C89 version of https://cplusplus.com/reference/future/future/wait/
 
 // future::wait

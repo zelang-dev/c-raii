@@ -368,17 +368,22 @@ C_API void args_returning_set(args_t);
 */
 C_API arrays_t array_of(memory_t *, size_t, ...);
 C_API void array_deferred_set(arrays_t, memory_t *);
+C_API void array_append(arrays_t, void_t);
+C_API void array_delete(arrays_t);
+C_API void array_remove(arrays_t, int);
 C_API bool is_array(void_t);
+#define $append(arr, value) array_append((arrays_t)arr, (void_t)value)
+#define $remove(arr, index) array_remove((arrays_t)arr, index)
 
 #define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
 
-#define $push_back(vec, value) vector_push_back(vec, (void_t)value)
-#define $insert(vec, index, value) vector_insert(vec, index, (void_t)value)
-#define $clear(vec) vector_clear(vec)
-#define $size(vec) vector_size(vec)
-#define $capacity(vec) vector_capacity(vec)
-#define $erase(vec, index) vector_erase(vec, index)
+#define $push_back(vec, value) vector_push_back((vectors_t)vec, (void_t)value)
+#define $insert(vec, index, value) vector_insert((vectors_t)vec, index, (void_t)value)
+#define $clear(vec) vector_clear((vectors_t)vec)
+#define $size(vec) vector_size((vectors_t)vec)
+#define $capacity(vec) vector_capacity((vectors_t)vec)
+#define $erase(vec, index) vector_erase((vectors_t)vec, index)
 
 /* The `foreach(item in vector/array)` macro, similar to `C#`,
 executes a statement or a block of statements for each element in

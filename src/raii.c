@@ -5,7 +5,7 @@ const raii_values_t raii_values_empty[1] = {0};
 
 RAII_INLINE memory_t *get_scope(void) {
     memory_t *scope = raii_init();
-    if (scope->threading && scope->local)
+    if (scope->threading && !is_empty(scope->local))
         scope = scope->local;
     else if (scope->status == RAII_GUARDED_STATUS)
         scope = ((memory_t *)scope->arena);
