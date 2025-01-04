@@ -9,7 +9,6 @@ Modified from https://gist.github.com/Geal/8f85e02561d101decf9a
 */
 
 #include "raii.h"
-future_results_t gq_result = {0};
 
 struct future_pool {
     raii_type type;
@@ -39,17 +38,17 @@ static promise *promise_create(memory_t *scope) {
     return p;
 }
 
-static void promise_set(promise *p, void_t res, bool is_args) {
+static void promise_set(promise *p, void_t res) {
     atomic_lock(&p->mutex);
-    if (is_args) {
-        p->result = (raii_values_t *)res;
-    } else {
-        p->result = (raii_values_t *)malloc_full(p->scope, sizeof(raii_values_t), RAII_FREE);
-        if (!is_empty(res))
+    p->result = (raii_values_t *)calloc_full(p->scope, 1, sizeof(raii_values_t), RAII_FREE);
+    if (!is_empty(res)) {
+        if (is_args(res) || is_vector(res)) {
+            p->result->is_vectored = is_vector(res);
+            p->result->is_arrayed = !p->result->is_vectored;
+            p->result->value.object = vector_copy(p->scope, (vectors_t)p->result->extended, res);
+        } else {
             p->result->value.object = ((raii_values_t *)res)->value.object;
-
-        p->result->size = 0;
-        p->result->extended = nullptr;
+        }
     }
     atomic_unlock(&p->mutex);
     atomic_flag_test_and_set(&p->done);
@@ -64,7 +63,7 @@ static RAII_INLINE raii_values_t *promise_get(promise *p) {
 
 static void promise_close(promise *p) {
     if (is_type(p, RAII_PROMISE)) {
-        p->type = -1;
+        p->type = RAII_ERR;
         atomic_flag_clear(&p->mutex);
         atomic_flag_clear(&p->done);
         if (!is_empty(p->scope->err))
@@ -93,19 +92,19 @@ static void future_close(future f) {
 
 static int thrd_raii_wrapper(void_t arg) {
     worker_t *f = (worker_t *)arg;
-    int i, tid, err = 0;
-    void_t res = nullptr;
-    tid = f->id;
+    int err = 0;
+    values_type res[1] = {0};
     f->value->scope->err = nullptr;
-    raii_local()->threading++;
+    raii_init()->threading++;
     raii_local()->queued = f->queue;
     rpmalloc_init();
 
     guard {
-        res = f->func((args_t)f->arg);
+        args_destructor_set(f->arg);
+        res->object = f->func((args_t)f->arg);
     } guarded_exception(f->value->scope);
 
-    promise_set(f->value, res, is_args_returning((args_t)f->arg));
+    promise_set(f->value, res->object);
     if (is_type(f, RAII_FUTURE_ARG)) {
         memset(f, 0, sizeof(f));
         RAII_FREE(f);
@@ -127,7 +126,13 @@ static void thrd_start(future f, promise *value, void_t arg) {
         throw(future_error);
 }
 
-future thrd_async(thrd_func_t fn, void_t args) {
+future thrd_async(thrd_func_t fn, size_t num_of_args, ...) {
+    va_list ap;
+
+    va_start(ap, num_of_args);
+    args_t args = args_ex(num_of_args, ap);
+    va_end(ap);
+
     promise *p = promise_create(get_scope());
     future f = future_create(fn);
     f->value = p;
@@ -146,17 +151,6 @@ future thrd_async_ex(memory_t *scope, thrd_func_t fn, void_t args) {
 values_type thrd_get(future f) {
     if (is_type(f, RAII_FUTURE) && !is_empty(f->value) && is_type(f->value, RAII_PROMISE)) {
         raii_values_t *r = promise_get(f->value);
-        f->scope = unique_init();
-        size_t size = r->size;
-        raii_values_t *result = (raii_values_t *)malloc_full(f->scope, sizeof(raii_values_t), RAII_FREE);
-        if (size > 0) {
-            result->extended = malloc_full(f->scope, size, RAII_FREE);
-            memcpy(result->extended, r->extended, size);
-            result->value.object = result->extended;
-        } else {
-            result->value.array = r->value.array;
-        }
-
         if (thrd_join(f->thread, NULL) == thrd_success) {
             if (!is_empty(f->value->scope->err))
                 raii_defer((func_t)thrd_delete, f);
@@ -180,34 +174,39 @@ RAII_INLINE void thrd_wait(future f, wait_func yield) {
         yield();
 }
 
-RAII_INLINE raii_values_t *thrd_returning(args_t args, void_t value, size_t size) {
-    raii_deferred(vector_scope(args), RAII_FREE, value);
-    raii_values_t *result = (raii_values_t *)malloc_full(vector_scope(args), sizeof(raii_values_t), RAII_FREE);
-    result->value.object = value;
-    result->size = size;
-    result->extended = value;
-    args_returning_set(args);
-    return result;
+vectors_t thrd_val(size_t numof, ...) {
+    va_list ap;
+    vectors_t args = nullptr;
+    size_t i;
+    bool is_arguments = is_args(raii_init()->local);
+    if (!is_arguments) {
+        va_start(ap, numof);
+        args = args_ex(numof, ap);
+        va_end(ap);
+    } else {
+        args = raii_local()->local;
+        $clear(args);
+        va_start(ap, numof);
+        for (i = 0; i < numof; i++)
+            vector_push_back(args, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    return args;
 }
 
-RAII_INLINE raii_values_t *thrd_data(void_t value) {
+RAII_INLINE vectors_t thrd_data(void_t value) {
     if (is_empty(value))
-        return (raii_values_t *)raii_values_empty;
+        return (vectors_t)raii_values_empty->value.object;
 
-    raii_values_t *result = (raii_values_t *)malloc_local(sizeof(raii_values_t));
-    result->value.object = value;
-    result->size = 0;
-    return result;
+    return thrd_val(1, value);
 }
 
-RAII_INLINE raii_values_t *thrd_value(uintptr_t value) {
+RAII_INLINE vectors_t thrd_value(uintptr_t value) {
     if (is_zero(value))
-        return (raii_values_t *)raii_values_empty;
+        return (vectors_t)raii_values_empty->value.object;
 
-    raii_values_t *result = (raii_values_t *)malloc_local(sizeof(raii_values_t));
-    result->value.ulong_long = value;
-    result->size = 0;
-    return result;
+    return thrd_val(1, value);
 }
 
 RAII_INLINE values_type thrd_result(result_t value) {
@@ -244,40 +243,17 @@ size_t thrd_cpu_count(void) {
 }
 #endif
 
-void thrd_set_result(raii_values_t *result, int id) {
+void thrd_set_result(raii_values_t *r, int id) {
     result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
     results[id]->result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), RAII_FREE);
-    size_t size = result->size;
-    if (size > 0) {
-        results[id]->result->extended = calloc_full(gq_result.scope, 1, size, RAII_FREE);
-        memcpy(results[id]->result->extended, result->extended, size);
-        results[id]->result->value.object = results[id]->result->extended;
-    } else if (!is_zero(result->value.integer)) {
-        results[id]->result->value.object = result->value.object;
+    if (r->is_arrayed || r->is_vectored) {
+        results[id]->result = r;
+    } else if (!is_zero(r->value.integer)) {
+        results[id]->result->value.object = r->value.object;
     }
 
     results[id]->is_ready = true;
     atomic_store_explicit(&gq_result.results, results, memory_order_release);
-}
-
-static result_t thrd_get_result(int id) {
-    return (result_t)atomic_load_explicit(&gq_result.results[id], memory_order_relaxed);
-}
-
-static result_t thrd_result_create(int id) {
-    result_t result, *results;
-    result = (result_t)malloc_full(gq_result.scope, sizeof(struct result_data), RAII_FREE);
-    results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
-    if (id % gq_result.queue_size == 0)
-        results = try_realloc(results, (id + gq_result.queue_size) * sizeof(results[0]));
-
-    result->is_ready = false;
-    result->id = id;
-    result->result = nullptr;
-    result->type = RAII_VALUE;
-    results[id] = result;
-    atomic_store_explicit(&gq_result.results, results, memory_order_release);
-    return result;
 }
 
 future_t thrd_scope(void) {
@@ -308,14 +284,19 @@ future_t thrd_scope(void) {
     return pool;
 }
 
-result_t thrd_spawn(thrd_func_t fn, void_t args) {
+result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
+    va_list ap;
     if (is_raii_empty() || !is_type(raii_local()->threaded, RAII_SPAWN))
         raii_panic("No initialization, No `thrd_scope`!");
 
+    va_start(ap, num_of_args);
+    args_t args = args_ex(num_of_args, ap);
+    va_end(ap);
+
     unique_t *scope = raii_local();
     future_t pool = scope->threaded;
-    size_t tid, result_id = atomic_fetch_add(&gq_result.result_count, 1);
-    result_t result = thrd_result_create(result_id);
+    result_t result = raii_result_create();
+    size_t result_id = result->id;
 
     if (result_id % gq_result.queue_size == 0 || is_empty(pool->futures))
         pool->futures = try_realloc(pool->futures, (result_id + gq_result.queue_size) * sizeof(pool->futures[0]));
@@ -371,14 +352,14 @@ void thrd_then(result_func_t callback, future_t iter, void_t result) {
     foreach(num in iter->jobs) {
         i = num.integer;
         if (results[i]->is_ready)
-            result = callback(result, i, results[i]->result->value);
+            result = callback(result, i, results[i]->result->value.object);
     }
 }
 
 void thrd_destroy(future_t f) {
     if (is_type(f, RAII_SPAWN)) {
         memory_t *scope = f->scope;
-        f->type = -1;
+        f->type = RAII_ERR;
         raii_delete(scope);
         RAII_FREE(f->futures);
         RAII_FREE(f);
@@ -387,7 +368,7 @@ void thrd_destroy(future_t f) {
 
 void thrd_delete(future f) {
     if (is_type(f, RAII_FUTURE)) {
-        f->type = -1;
+        f->type = RAII_ERR;
         if (!is_empty(f->scope))
             raii_delete(f->scope);
 

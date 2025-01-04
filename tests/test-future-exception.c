@@ -7,7 +7,6 @@ int some_worker(int args) {
 }
 
 void *is_future(args_t args) {
-    args_destructor_set(args);
     string arg1 = args[0].char_ptr;
     int num = args[1].integer;
     raii_callable_t worker = (raii_callable_t)args[2].func;
@@ -21,7 +20,7 @@ void *is_future(args_t args) {
 }
 
 TEST(thrd_async) {
-    future fut = thrd_async(is_future, args_for(3, "hello world", 128, some_worker));
+    future fut = thrd_async(is_future, 3, "hello world", 128, some_worker);
 
     ASSERT_TRUE(is_type(fut, RAII_FUTURE));
     ASSERT_FALSE(thrd_is_done(fut));

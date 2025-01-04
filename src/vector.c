@@ -10,7 +10,6 @@ Modified version of https://github.com/eteran/c-vector
 typedef struct vector_metadata_s {
     raii_type type;
     int defer_set;
-    int is_returning;
     size_t size;
     size_t capacity;
     func_t destructor;
@@ -25,15 +24,12 @@ typedef struct vector_metadata_s {
 #define vector_set_type(vec, _type) vector_address(vec)->type = (_type)
 #define vector_defer_set(vec) vector_address(vec)->defer_set = true
 #define vector_defer_unset(vec) vector_address(vec)->defer_set = false
-#define vector_return_set(vec) vector_address(vec)->is_returning = true
-#define vector_return_unset(vec) vector_address(vec)->is_returning = false
 #define vector_set_destructor(vec, elem_destructor_fn) vector_address(vec)->destructor = (elem_destructor_fn)
 #define vector_destructor(vec) vector_address(vec)->destructor
 #define vector_context(vec) vector_address(vec)->context
 #define vector_length(vec) ((vec) ? vector_address(vec)->size : (size_t)0)
-#define vector_type(vec) ((vec) ? vector_address(vec)->type : -1)
+#define vector_type(vec) ((vec) ? vector_address(vec)->type : RAII_ERR)
 #define vector_deferred(vec) vector_address(vec)->defer_set
-#define vector_returning(vec) vector_address(vec)->is_returning
 #define vector_cap(vec) ((vec) ? vector_address(vec)->capacity : (size_t)0)
 #define vector_grow(vec, count, scope)                     \
     do {                                            \
@@ -49,7 +45,6 @@ typedef struct vector_metadata_s {
             vector_set_destructor((vec), NULL);     \
             vector_set_context((vec), (scope));     \
             vector_defer_unset(vec);                \
-            vector_return_unset(vec);               \
             vector_set_type((vec), RAII_VECTOR);    \
         }                                           \
         vector_set_capacity((vec), (count));        \
@@ -115,6 +110,19 @@ RAII_INLINE void vector_clear(vectors_t vec) {
     }
 }
 
+RAII_INLINE vectors_t vector_copy(memory_t *scope, vectors_t des, vectors_t src) {
+    if (src) {
+        des = args_for(0);
+        foreach(x in src)
+            vector_push_back(des, x.object);
+        vector_defer_set(des);
+        raii_deferred((gq_result.scope ? gq_result.scope : scope), RAII_FREE, vector_context(des));
+        raii_deferred(scope, (func_t)vector_delete, des);
+    }
+
+    return des;
+}
+
 RAII_INLINE void vector_push_back(vectors_t vec, void_t value) {
     size_t size, cv_cap__ = vector_cap(vec);
     memory_t *scope = vector_context(vec);
@@ -171,9 +179,42 @@ RAII_INLINE void args_destructor_set(args_t params) {
     if (vector_type(params) == RAII_ARGS && !vector_deferred(params)) {
         vector_defer_set(params);
         memory_t *scope = vector_context(params);
-        raii_deferred(scope, (func_t)vector_delete, params);
         _defer(raii_delete, scope);
+        raii_deferred(scope, (func_t)vector_delete, params);
+        raii_local()->local = params;
     }
+}
+
+args_t args_ex(size_t num_of, va_list ap_copy) {
+    va_list ap;
+    size_t i;
+
+    args_t params = nullptr;
+    if (num_of > 0) {
+        va_copy(ap, ap_copy);
+        params = args_for(0);
+        for (i = 0; i < num_of; i++)
+            $push_back(params, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    return params;
+}
+
+arrays_t array_ex(memory_t *scope, size_t num_of, va_list ap_copy) {
+    va_list ap;
+    size_t i;
+
+    arrays_t params = nullptr;
+    if (num_of > 0) {
+        va_copy(ap, ap_copy);
+        params = array_of(scope, 0);
+        for (i = 0; i < num_of; i++)
+            $append(params, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    return params;
 }
 
 RAII_INLINE void array_remove(arrays_t arr, int i) {
@@ -192,7 +233,18 @@ RAII_INLINE void array_remove(arrays_t arr, int i) {
 }
 
 RAII_INLINE void array_delete(arrays_t arr) {
-    vector_delete((vectors_t)arr);
+    if (arr) {
+        void_t p1__ = vector_address(arr);
+        func_t destructor__ = vector_destructor(arr);
+        if (destructor__) {
+            size_t i__;
+            for (i__ = 0; i__ < vector_length(arr); ++i__) {
+                destructor__(&(arr)[i__]);
+            }
+        }
+
+        RAII_FREE(p1__);
+    }
 }
 
 RAII_INLINE void array_append(arrays_t arr, void_t value) {
@@ -232,12 +284,6 @@ RAII_INLINE void array_deferred_set(arrays_t params, memory_t *scope) {
     }
 }
 
-RAII_INLINE void args_returning_set(args_t params) {
-    if (vector_type(params) == RAII_ARGS) {
-        vector_return_set(params);
-    }
-}
-
 args_t args_for(size_t count, ...) {
     va_list ap;
     size_t i;
@@ -257,6 +303,9 @@ args_t args_for(size_t count, ...) {
     return params;
 }
 
+RAII_INLINE bool is_vector(void_t params) {
+    return vector_type((vectors_t)params) == RAII_VECTOR;
+}
 
 RAII_INLINE bool is_array(void_t params) {
     return vector_type((arrays_t)params) == RAII_ARRAY;
@@ -264,10 +313,6 @@ RAII_INLINE bool is_array(void_t params) {
 
 RAII_INLINE bool is_args(void_t params) {
     return vector_type((args_t)params) == RAII_ARGS;
-}
-
-RAII_INLINE bool is_args_returning(args_t params) {
-    return is_args(params) && vector_returning(params);
 }
 
 RAII_INLINE values_type get_arg(void_t params) {

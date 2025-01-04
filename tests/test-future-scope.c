@@ -6,7 +6,6 @@ int some_worker(int args) {
 }
 
 void *is_future(args_t args) {
-    args_destructor_set(args);
     string arg1 = args[0].char_ptr;
     int num = args[1].integer;
     raii_callable_t worker = (raii_callable_t)args[2].func;

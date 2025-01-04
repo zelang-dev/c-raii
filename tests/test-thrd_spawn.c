@@ -2,18 +2,15 @@
 #include "test_assert.h"
 
 void *is_prime(args_t arg) {
-    args_destructor_set(arg);
     int x = arg[0].integer;
-    ASSERT_THREAD((x == 194232491));
+    ASSERT_THREAD(is_args(arg));
+    ASSERT_THREAD((arg[0].integer == 194232491));
     usleep(10);
-    values_type *result = try_calloc(2, sizeof(values_type));
-    result[1].integer = x;
-    result[0].boolean = true;
-    return thrd_returning(arg, result, sizeof(values_type) * 2);
+
+    return thrd_val(2, true, x);
 }
 
-void_t check_primes(void_t result, size_t id, values_type iter) {
-    values_type *object = (values_type *)iter.object;
+void_t check_primes(void_t result, size_t id, vectors_t object) {
     bool y = object[0].boolean;
     int prime = object[1].integer;
     ASSERT_TRUE((prime == 194232491));
@@ -29,10 +26,10 @@ TEST(thrd_spawn) {
     future_t fut = thrd_scope();
     ASSERT_TRUE(is_type(fut, RAII_SPAWN));
 
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, args_for(1, prime)), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
+    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
 
     ASSERT_FALSE(thrd_is_finish(fut));
 

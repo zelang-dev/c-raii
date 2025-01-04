@@ -1,15 +1,15 @@
 #include "raii.h"
 
 void_t fib(args_t args) {
-    int n = get_arg(args).integer;
+    int n = args[0].integer;
     if (n < 2) {
         return thrd_value(n);
     } else {
         result_t x, y;
         future_t f = thrd_scope();
 
-        x = thrd_spawn(fib, thrd_value(n - 1));
-        y = thrd_spawn(fib, thrd_value(n - 2));
+        x = thrd_spawn(fib, 1, (n - 1));
+        y = thrd_spawn(fib, 1, (n - 2));
 
         thrd_sync(f);
 
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
 
     int n = atoi(argv[1]);
     future_t fut = thrd_scope();
-    result_t results = thrd_spawn(fib, thrd_value(n));
+    result_t results = thrd_spawn(fib, 1, n);
 
     thrd_sync(fut);
     printf("Result: %d\n", thrd_result(results).integer);

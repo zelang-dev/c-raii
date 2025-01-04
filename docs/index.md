@@ -26,7 +26,7 @@ This library uses an custom version of [rpmalloc](https://github.com/mjansson/rp
 
 > As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
 
-> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_async(thread_func, args_for(3, "text & num & another func", 3, worker_func))` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
+> All aspect of this library as been incorporated into an **c++11** like _threading model_ as outlined in [std::async](https://cplusplus.com/reference/future/async/), any thread launched with signature `thrd_async(fn, num_of_args, ...)` has function executed within `guard` block as further described below, all allocations is automatically cleaned up and `defer` statements **run**.
 
 The C++ version from <https://cplusplus.com/reference/future/future/wait/>
 
@@ -43,7 +43,7 @@ The C++ version from <https://cplusplus.com/reference/future/future/wait/>
 
 // a non-optimized way of checking for prime numbers:
 void *is_prime(args_t arg) {
-    int i, x = get_arg(arg).integer;
+    int i, x = arg[0].integer;
     for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
     return thrd_value(true);
 }
@@ -51,7 +51,7 @@ void *is_prime(args_t arg) {
 int main(int argc, char **argv) {
     int prime = 194232491;
     // call function asynchronously:
-    future fut = thrd_async(is_prime, &prime);
+    future fut = thrd_async(is_prime, 1, prime);
 
     printf("checking...\n");
     thrd_wait(fut, thrd_yield);
@@ -296,7 +296,7 @@ Here too the same process is in effect through an **new** _typedef_ `unique_t` a
 /* Calls fn (with args as arguments) in separate thread, returning without waiting
 for the execution of fn to complete. The value returned by fn can be accessed
 by calling `thrd_get()`. */
-C_API future thrd_async(thrd_func_t fn, void_t args);
+C_API future thrd_async(thrd_func_t fn, size_t num_of_args, ...);
 
 /* Same as `thrd_async`, allows passing custom `context` scope for internal `promise`
 for auto cleanup within caller's `scope`. */
@@ -317,16 +317,15 @@ C_API void thrd_delete(future);
 C_API uintptr_t thrd_self(void);
 C_API size_t thrd_cpu_count(void);
 
-/* Return `value` any heap allocated instance/struct,
-only available in `thread` using `args_for`, DO NOT FREE! */
-C_API raii_values_t *thrd_returning(args_t, void_t value, size_t size);
-C_API raii_values_t *thrd_data(void_t value);
-C_API raii_values_t *thrd_value(uintptr_t value);
+/* Return any arbitrary set of `values` only available within `thread/future`, DO NOT FREE! */
+C_API vectors_t thrd_val(size_t, ...);
+C_API vectors_t thrd_data(void_t value);
+C_API vectors_t thrd_value(uintptr_t value);
 
 C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
-C_API result_t thrd_spawn(thrd_func_t fn, void_t args);
+C_API result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...);
 C_API values_type thrd_result(result_t value);
 
 // C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
@@ -351,8 +350,9 @@ C_API bool thrd_is_finish(future_t);
 * @param arguments indexed in given order.
 */
 C_API args_t args_for(size_t, ...);
+C_API args_t args_ex(size_t, va_list);
 C_API void args_destructor_set(args_t);
-C_API void args_returning_set(args_t);
+C_API bool is_args(void_t);
 
 /**
 * Creates an scoped `vector/array/container` for arbitrary item types.

@@ -1,7 +1,7 @@
 #include "raii.h"
 
 #if defined(__linux__) && defined(__GNUC__)
-#define CODE_SECTION __attribute__ ((section (".text#")))
+#define CODE_SECTION section(text)
 #else
 #define CODE_SECTION
 #endif
@@ -165,7 +165,7 @@ static RAII_INLINE uint32_t _memrchr(bool Printable, bool Known, const char *s, 
         p -= 8;
         if (!Known) {
             if (p == s)
-                return -1;
+                return RAII_ERR;
         }
     }
 }
@@ -195,14 +195,14 @@ static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, const char *s, u
         p += 8;
         if (!Known) {
             if (p == end)
-                return -1;
+                return RAII_ERR;
         }
     }
 }
 
 // Convert uint, of less than 100, to %02u, as int 16
 RAII_INLINE uint16_t utoa2p(uint64_t x) {
-    static const CODE_SECTION uint8_t pairs[50] = { // 0..49, little endian
+    static const section(text) uint8_t pairs[50] = { // 0..49, little endian
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90,
         0x01, 0x11, 0x21, 0x31, 0x41, 0x51, 0x61, 0x71, 0x81, 0x91,
         0x02, 0x12, 0x22, 0x32, 0x42, 0x52, 0x62, 0x72, 0x82, 0x92,
@@ -497,7 +497,7 @@ RAII_INLINE string simd_memchr(const char *s, uint8_t c, uint32_t len) {
 }
 
 RAII_INLINE string simd_memrchr(const char *s, uint8_t c, uint32_t len) {
-    return (char *)s + _memrchr(false, false, s, len, c) - 3;
+    return (char *)s + _memrchr(false, false, s, len, c);
 }
 
 // Find char in binary string. Char c is known to be in s + len
@@ -555,7 +555,7 @@ RAII_INLINE double simd_atod(const char *s, uint32_t len) {
     dpart = _copySign(ipart, dpart);
 
     // Array of 20 * 8 = 160 bytes
-    static const CODE_SECTION double scales[20] = {
+    static const section(text) double scales[20] = {
         1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10,
         1e-11, 1e-12, 1e-13, 1e-14, 1e-15, 1e-16, 1e-17, 1e-18, 1e-19, 1e-20};
 
@@ -601,13 +601,13 @@ RAII_INLINE char *utoap(int N, uint64_t x, char *s) {
 }
 
 int strpos(const char *text, char *pattern) {
-    size_t c, d, e, text_length, pattern_length, position = -1;
+    size_t c, d, e, text_length, pattern_length, position = RAII_ERR;
 
     text_length = simd_strlen(text);
     pattern_length = simd_strlen(pattern);
 
     if (pattern_length > text_length)
-        return -1;
+        return RAII_ERR;
 
     for (c = 0; c <= text_length - pattern_length; c++) {
         position = e = c;
@@ -621,7 +621,7 @@ int strpos(const char *text, char *pattern) {
             return (int)position;
     }
 
-    return -1;
+    return RAII_ERR;
 }
 
 string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count) {

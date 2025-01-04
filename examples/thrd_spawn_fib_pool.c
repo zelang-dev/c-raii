@@ -2,7 +2,7 @@
 
 
 void_t fib(args_t args) {
-    int n = get_arg(args).integer;
+    int n = args[0].integer;
     if (n < 2) {
         RAII_HERE;
         return thrd_value(n);
@@ -10,8 +10,8 @@ void_t fib(args_t args) {
         result_t x, y;
         future_t f = thrd_scope();
 
-        x = thrd_spawn(fib, thrd_value(n - 1));
-        y = thrd_spawn(fib, thrd_value(n - 2));
+        x = thrd_spawn(fib, 1, (n - 1));
+        y = thrd_spawn(fib, 1, (n - 2));
 
         RAII_HERE;
         thrd_sync(f);
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     int n = atoi(argv[1]);
     thrd_init(25);
     future_t fut = thrd_scope();
-    result_t results = thrd_spawn(fib, thrd_value(n));
+    result_t results = thrd_spawn(fib, 1, (n));
 
     thrd_sync(fut);
     RAII_HERE;

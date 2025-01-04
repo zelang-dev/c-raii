@@ -33,15 +33,14 @@ int main ()
 
 // a non-optimized way of checking for prime numbers:
 void *is_prime(args_t arg) {
-    int i, x = get_arg(arg).integer;
+    int i, x = arg[0].integer;
     for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
     return thrd_value(true);
 }
 
 int main(int argc, char **argv) {
-    int prime = 194232491;
     // call function asynchronously:
-    future fut = thrd_async(is_prime, thrd_value(prime));
+    future fut = thrd_async(is_prime, 1, 194232491);
 
     printf("checking...\n");
     thrd_wait(fut, thrd_yield);

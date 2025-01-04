@@ -19,6 +19,11 @@ set(TARGET_LIST defer_thread
  thrd_async
  thrd_spawn_fib
  thrd_spawn_fib_pool
+ benchmark
+ go_multi_args
+ go_panic
+ go_sleepfor
+ go_waitgroup
  fib )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )

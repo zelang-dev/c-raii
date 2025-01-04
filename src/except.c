@@ -98,7 +98,7 @@ ex_ptr_t ex_protect_ptr(ex_ptr_t *const_ptr, void *ptr, void (*func)(void *)) {
 
 void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
     if (!is_except_empty() && is_type(const_ptr, ex_protected_st)) {
-        const_ptr->type = -1;
+        const_ptr->type = RAII_ERR;
         ex_local()->stack = const_ptr->next;
     }
 }
@@ -119,7 +119,7 @@ static void ex_unwind_stack(ex_context_t *ctx) {
                 break;
 
             if (*p->ptr) {
-                p->type = -1;
+                p->type = RAII_ERR;
                 p->func(*p->ptr);
             }
 
@@ -340,7 +340,7 @@ ex_context_t *ex_init(void) {
         context->ex = NULL;
         context->panic = NULL;
         memset(context->backtrace->ctx, 0, sizeof(context->backtrace->ctx));
-        context->caught = -1;
+        context->caught = RAII_ERR;
         context->type = ex_context_st;
         ex_signal_unblock(all);
     }

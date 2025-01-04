@@ -2,12 +2,12 @@
 #ifndef _CORO_H
 #define _CORO_H
 
-#define _BSD_SOURCE
-
 /* Public API qualifier. */
 #ifndef C_API
 #   define C_API extern
 #endif
+
+#include "rtypes.h"
 
 /* Coroutine states. */
 typedef enum {
@@ -31,6 +31,24 @@ typedef enum {
 
 typedef struct routine_s routine_t;
 typedef struct raii_deque_s raii_deque_t;
+typedef int (*coro_sys_func)(int, char **);
+typedef struct awaitable_s {
+    raii_type type;
+    u32 cid;
+    waitgroup_t wg;
+} *awaitable_t;
+
+#define USE_UCONTEXT
+#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+#   undef USE_UCONTEXT
+#elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
+#   undef USE_UCONTEXT
+#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__)|| defined(__powerpc64__) || defined(__ARM_EABI__) || defined(__riscv))
+#   undef USE_UCONTEXT
+#endif
+
+#if defined(USE_UCONTEXT)
+#define _BSD_SOURCE
 #if __APPLE__ && __MACH__
 #   include <sys/ucontext.h>
 #elif defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER)
@@ -64,6 +82,7 @@ typedef struct raii_deque_s raii_deque_t;
 #else
 #   include <ucontext.h>
 #endif
+#endif
 
 #ifdef USE_CORO
 #define main(...)                       \
@@ -81,11 +100,7 @@ typedef struct raii_deque_s raii_deque_t;
 
 #ifndef CORO_STACK_SIZE
 /* Stack size when creating a coroutine. */
-#   define CORO_STACK_SIZE (8 * 1024)
-#endif
-
-#ifndef ERROR_SCRAPE_SIZE
-#   define ERROR_SCRAPE_SIZE 256
+#   define CORO_STACK_SIZE (16 * 1024)
 #endif
 
 #ifndef SCRAPE_SIZE
@@ -95,20 +110,126 @@ typedef struct raii_deque_s raii_deque_t;
 /* Number used only to assist checking for stack overflows. */
 #define CORO_MAGIC_NUMBER 0x7E3CB1A9
 
+/* In alignas(a), 'a' should be a power of two that is at least the type's
+   alignment and at most the implementation's alignment limit.  This limit is
+   2**13 on MSVC. To be portable to MSVC through at least version 10.0,
+   'a' should be an integer constant, as MSVC does not support expressions
+   such as 1 << 3.
+
+   The following C11 requirements are NOT supported on MSVC:
+
+   - If 'a' is zero, alignas has no effect.
+   - alignas can be used multiple times; the strictest one wins.
+   - alignas (TYPE) is equivalent to alignas (alignof (TYPE)).
+*/
+#if !defined(alignas)
+  #if defined(__STDC__) /* C Language */
+    #if defined(_MSC_VER) /* Don't rely on MSVC's C11 support */
+      #define alignas(bytes) __declspec(align(bytes))
+    #elif __STDC_VERSION__ >= 201112L /* C11 and above */
+      #include <stdalign.h>
+    #elif defined(__clang__) || defined(__GNUC__) /* C90/99 on Clang/GCC */
+      #define alignas(bytes) __attribute__ ((aligned (bytes)))
+    #else /* Otherwise, we ignore the directive (user should provide their own) */
+      #define alignas(bytes)
+    #endif
+  #elif defined(__cplusplus) /* C++ Language */
+    #if __cplusplus < 201103L
+      #if defined(_MSC_VER)
+        #define alignas(bytes) __declspec(align(bytes))
+      #elif defined(__clang__) || defined(__GNUC__) /* C++98/03 on Clang/GCC */
+        #define alignas(bytes) __attribute__ ((aligned (bytes)))
+      #else /* Otherwise, we ignore the directive (unless user provides their own) */
+        #define alignas(bytes)
+      #endif
+    #else /* C++ >= 11 has alignas keyword */
+      /* Do nothing */
+    #endif
+  #endif /* = !defined(__STDC_VERSION__) && !defined(__cplusplus) */
+#endif
+
+/*[amd64, arm, ppc, x86]:
+   by default, coro_swap_function is marked as a text (code) section
+   if not supported, uncomment the below line to use mprotect instead */
+#define MPROTECT 1
+
+/*[amd64]:
+   Win64 only: provides a substantial speed-up, but will thrash XMM regs
+   do not use this unless you are certain your application won't use SSE */
+/* #define NO_SSE */
+
+/*[amd64, aarch64]:
+   Win64 only: provides a small speed-up, but will break stack unwinding
+   do not use this if your application uses exceptions or setjmp/longjmp */
+#define NO_TIB 1
+
+#if defined(__clang__)
+  #pragma clang diagnostic ignored "-Wparentheses"
+
+  /* placing code in section(text) does not mark it executable with Clang. */
+  #undef  MPROTECT
+  #define MPROTECT
+#endif
+
+#if (defined(__clang__) || defined(__GNUC__)) && defined(__i386__)
+  #define fastcall __attribute__((fastcall))
+#elif defined(_MSC_VER) && defined(_M_IX86)
+  #define fastcall __fastcall
+#else
+  #define fastcall
+#endif
+
+#if defined(_MSC_VER)
+  #define section(name) __declspec(allocate("." #name))
+#elif defined(__APPLE__)
+  #define section(name) __attribute__((section("__TEXT,__" #name)))
+#else
+  #define section(name) __attribute__((section("." #name "#")))
+#endif
+
+#ifdef USE_VALGRIND
+#include <valgrind/valgrind.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-    C_API void coro_yield(void);
+    C_API u32 go_for(callable_t, u64, ...);
+    C_API value_t get_result(u32);
+    C_API u32 sleepfor(u32 ms);
+    C_API void launching(func_t, u64, ...);
+    C_API void yielding(void);
+    C_API void defer(func_t, void_t);
+
+    C_API void defer_recover(func_t, void_t);
+    C_API bool catching(string_t);
+    C_API string_t catch_message(void);
+
+    C_API waitgroup_t waitgroup(void);
+    C_API waitresult_t waitfor(waitgroup_t);
+
     C_API routine_t *coro_active(void);
-    C_API unsigned int coro_sleep_for(unsigned int ms);
-    C_API void coro_deferred_free(routine_t *);
+    C_API memory_t *coro_scope(void);
+    C_API value_t coro_await(callable_t, size_t, ...);
+    C_API value_t coro_interrupt(callable_t, size_t, ...);
+    C_API void coro_interrupt_switch(routine_t *);
+    C_API void coro_interrupt_complete(routine_t *, void_t);
+    C_API void coro_interrupt_setup(raii_callable_t);
+    C_API void coro_info_active(void);
+    C_API void coro_stacksize_set(u32);
+    C_API bool coro_is_valid(void);
+    C_API u32 coro_id(void);
+
+    C_API awaitable_t async(callable_t, u64, ...);
+    C_API value_t await(awaitable_t);
 
     /* This library provides its own ~main~,
     which call this function as an coroutine! */
     C_API int coro_main(int, char **);
     C_API int raii_main(int, char **);
 
-
+    C_API coro_sys_func coro_main_func;
+    C_API bool coro_sys_set;
 #ifdef __cplusplus
 }
 #endif

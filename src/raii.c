@@ -2,12 +2,31 @@
 
 thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
+future_results_t gq_result = {0};
+
+result_t raii_result_create(void) {
+    result_t result, *results;
+    size_t id = atomic_fetch_add(&gq_result.result_id_generate, 1);
+    result = (result_t)malloc_full(gq_result.scope, sizeof(struct result_data), RAII_FREE);
+    results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
+    if (id % gq_result.queue_size == 0)
+        results = try_realloc(results, (id + gq_result.queue_size) * sizeof(results[0]));
+
+    result->is_ready = false;
+    result->id = id;
+    result->result = nullptr;
+    result->type = RAII_VALUE;
+    results[id] = result;
+    atomic_store_explicit(&gq_result.results, results, memory_order_release);
+    return result;
+}
 
 RAII_INLINE memory_t *get_scope(void) {
+    if (coro_is_valid())
+        return coro_scope();
+
     memory_t *scope = raii_init();
-    if (scope->threading && !is_empty(scope->local))
-        scope = scope->local;
-    else if (scope->status == RAII_GUARDED_STATUS)
+    if (scope->status == RAII_GUARDED_STATUS)
         scope = ((memory_t *)scope->arena);
 
     return scope;
@@ -128,7 +147,7 @@ memory_t *raii_init(void) {
         scope->queued = NULL;
         scope->is_protected = false;
         scope->is_recovered = false;
-        scope->mid = -1;
+        scope->mid = RAII_ERR;
 
         ex_context_t *ctx = ex_init();
         ctx->data = (void_t)scope;
@@ -220,7 +239,7 @@ unique_t *unique_init(void) {
     raii->arena = NULL;
     raii->protector = NULL;
     raii->is_protected = false;
-    raii->mid = -1;
+    raii->mid = RAII_ERR;
     return raii;
 }
 
@@ -270,7 +289,7 @@ void raii_delete(memory_t *ptr) {
     if (ptr != &thrd_raii_buffer)
 #endif
     {
-        memset(ptr, -1, sizeof(memory_t));
+        memset(ptr, RAII_ERR, sizeof(memory_t));
         RAII_FREE(ptr);
     }
 
@@ -425,7 +444,7 @@ static size_t raii_deferred_any(memory_t *scope, func_t func, void_t data, void_
     deferred = raii_deferred_array_append(&scope->defer);
     if (UNLIKELY(!deferred)) {
         RAII_LOG("Could not add new deferred function.");
-        return -1;
+        return RAII_ERR;
     } else {
         deferred->func = func;
         deferred->data = data;
@@ -523,7 +542,7 @@ void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind) {
 
 void guard_delete(memory_t *ptr) {
     if (is_guard(ptr)) {
-        memset(ptr, -1, sizeof(ptr));
+        memset(ptr, RAII_ERR, sizeof(ptr));
         RAII_FREE(ptr);
         ptr = NULL;
     }

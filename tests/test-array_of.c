@@ -32,7 +32,7 @@ TEST(array_of) {
     ASSERT_EQ(600, d[7].integer);
 
     d[4].char_ptr = data;
-    printf("vec[4].char_ptr = data\n");
+    printf("d[4].char_ptr = data\n");
     ASSERT_STR("hello again!", d[4].char_ptr);
 
     d[7].char_ptr = "string 600";
