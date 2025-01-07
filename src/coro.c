@@ -1607,7 +1607,9 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     t->rid = (u32)raii_result_create()->id;
     t->cid = (u32)atomic_fetch_add(&gq_result.id_generate, 1) + 1;
     if (t->run_code == CORO_RUN_NORMAL && coro_sys_set && gq_result.queue) {
-        t->tid = atomic_fetch_add(&gq_result.queue->cpu_id_count, 1) % gq_result.thread_count;
+        t->tid = gq_result.queue->local
+            ? atomic_fetch_add(&gq_result.queue->cpu_id_count, 1) % gq_result.thread_count
+            : gq_result.cpu_count;
         atomic_fetch_add(&gq_result.active_count, 1);
     } else {
         t->taken = true;
