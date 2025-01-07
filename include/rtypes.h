@@ -117,6 +117,7 @@ typedef void_t(*callable_t)(params_t);
 
 enum {
     RAII_OK = 0,
+    /* invalid address indicator */
     RAII_ERR = -1,
 };
 

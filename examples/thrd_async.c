@@ -34,8 +34,8 @@ int main ()
 // a non-optimized way of checking for prime numbers:
 void *is_prime(args_t arg) {
     int i, x = arg[0].integer;
-    for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
-    return thrd_value(true);
+    for (i = 2; i < x; ++i) if (x % i == 0) return $(false);
+    return $(true);
 }
 
 int main(int argc, char **argv) {

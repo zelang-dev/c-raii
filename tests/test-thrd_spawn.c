@@ -7,7 +7,7 @@ void *is_prime(args_t arg) {
     ASSERT_THREAD((arg[0].integer == 194232491));
     usleep(10);
 
-    return thrd_val(2, true, x);
+    return $val(2, true, x);
 }
 
 void_t check_primes(void_t result, size_t id, vectors_t object) {

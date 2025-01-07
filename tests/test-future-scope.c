@@ -15,7 +15,7 @@ void *is_future(args_t args) {
     ASSERT_THREAD((num == 128));
     ASSERT_THREAD((worker(num) == 256));
 
-    return thrd_value(true);
+    return $(true);
 }
 
 TEST(thrd_async_ex) {

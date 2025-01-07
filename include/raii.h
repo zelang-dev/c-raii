@@ -170,6 +170,9 @@ C_API size_t thrd_cpu_count(void);
 C_API vectors_t thrd_val(size_t, ...);
 C_API vectors_t thrd_data(void_t value);
 C_API vectors_t thrd_value(uintptr_t value);
+#define $val(num, ...) thrd_val(num, __VA_ARGS__)
+#define $(val) thrd_value((uintptr_t)(val))
+#define $$(val) thrd_data((void_t *)(val))
 
 C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
@@ -557,6 +560,11 @@ executes a statement or a block of statements for each element in
 an instance of `vectors_t/args_t/arrays_t` */
 #define foreach(...) foreach_xp(foreach_in, (__VA_ARGS__))
 #define foreach_back(...) foreach_xp(foreach_in_back, (__VA_ARGS__))
+
+#define match(variable_type) switch (type_of(variable_type))
+#define and(ENUM) case ENUM:
+#define or(ENUM) break; case ENUM:
+#define otherwise break; default:
 
 #ifdef __cplusplus
     }

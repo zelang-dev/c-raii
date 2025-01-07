@@ -98,6 +98,9 @@ typedef struct awaitable_s {
     int coro_main(__VA_ARGS__)
 #endif
 
+/* Cast `val` to generic union value_t storage type */
+#define $$$(val) ((value_t *)(val))
+
 #ifndef CORO_STACK_SIZE
 /* Stack size when creating a coroutine. */
 #   define CORO_STACK_SIZE (16 * 1024)
@@ -194,30 +197,80 @@ typedef struct awaitable_s {
 #ifdef __cplusplus
 extern "C" {
 #endif
+    /* Creates an coroutine of given function with arguments,
+    and add to schedular, same behavior as Go. */
     C_API u32 go_for(callable_t, u64, ...);
+
+    /* Returns results of an completed coroutine, by result id, will panic,
+    if called before `waitfor` returns. */
     C_API value_t get_result(u32);
+
+    /* Explicitly give up the CPU for at least ms milliseconds.
+    Other tasks continue to run during this time. */
     C_API u32 sleepfor(u32 ms);
+
+    /* Creates an coroutine of given function with argument,
+    and immediately execute. */
     C_API void launching(func_t, u64, ...);
+
+    /* Yield execution to another coroutine and reschedule current. */
     C_API void yielding(void);
+
+    /* Defer execution `LIFO` of given function with argument,
+    to when current coroutine exits/returns. */
     C_API void defer(func_t, void_t);
 
+    /* Same as `defer` but allows recover from an Error condition throw/panic,
+    you must call `catching` inside function to mark Error condition handled. */
     C_API void defer_recover(func_t, void_t);
+
+    /* Compare `err` to current error condition of coroutine,
+    will mark exception handled, if `true`. */
     C_API bool catching(string_t);
+
+    /* Get current error condition string. */
     C_API string_t catch_message(void);
 
+    /* Creates/initialize the next series/collection of coroutine's created to be part of `wait group`,
+    same behavior of Go's waitGroups.
+
+    All coroutines here behaves like regular functions, meaning they return values,
+    and indicate a terminated/finish status.
+
+    The initialization ends when `waitfor` is called, as such current coroutine will pause,
+    and execution will begin and wait for the group of coroutines to finished. */
     C_API waitgroup_t waitgroup(void);
+
+    /* Pauses current coroutine, and begin execution of coroutines in `wait group` object,
+    will wait for all to finish. Returns `vector/array` of results,
+    directly accessible by index by order created,
+    also accessible by coroutine `result id`, with `get_result` function. */
     C_API waitresult_t waitfor(waitgroup_t);
 
+    /* Collect coroutines with references preventing immediate cleanup. */
+    C_API void coro_collector(routine_t *);
+
+    /* Return handle to current coroutine. */
     C_API routine_t *coro_active(void);
+
     C_API memory_t *coro_scope(void);
     C_API value_t coro_await(callable_t, size_t, ...);
     C_API value_t coro_interrupt(callable_t, size_t, ...);
+    C_API void_t coro_interrupt_erred(routine_t *, int);
+    C_API void coro_interrupt_cleanup(void_t);
     C_API void coro_interrupt_switch(routine_t *);
     C_API void coro_interrupt_complete(routine_t *, void_t);
     C_API void coro_interrupt_setup(raii_callable_t);
+
+    /* Print `current` coroutine internal data state, only active in `debug` builds. */
     C_API void coro_info_active(void);
+
+    /* Set global coroutine `runtime` stack size, default: 16Kb,
+    `coro_main` preset to `128Kb`, `8x 'CORO_STACK_SIZE'`. */
     C_API void coro_stacksize_set(u32);
     C_API bool coro_is_valid(void);
+
+    /* Return the unique `result id` for the current coroutine. */
     C_API u32 coro_id(void);
 
     C_API awaitable_t async(callable_t, u64, ...);

@@ -12,7 +12,7 @@ void *worker(params_t args) {
     coro_info_active();
 
     if (id == 4)
-        return (value_t*)32;
+        return $$$(32);
     else if (id == 3)
         return "hello world";
 
