@@ -1843,9 +1843,10 @@ static void coro_unwind_setup(ex_context_t *ctx, const char *ex, const char *mes
 }
 
 static void coro_take(raii_deque_t *queue) {
-    size_t i, available;
+    size_t i, available, active;
     if ((available = atomic_load_explicit(&queue->available, memory_order_relaxed)) > 0) {
-        for (i = 0; i < available; i++) {
+        active = available > (int)(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) / 2) ? available : 1;
+        for (i = 0; i < active ; i++) {
             routine_t *t = deque_steal(queue);
             if (t == RAII_ABORT_T) {
                 --i;
@@ -2046,7 +2047,6 @@ static void_t main_main(void_t v) {
 static void coro_initialize(void) {
     atomic_thread_fence(memory_order_seq_cst);
     coro_init_set = true;
-    gq_result.is_takeable = 0;
     gq_result.stacksize = CORO_STACK_SIZE;
     gq_result.cpu_count = thrd_cpu_count();
     gq_result.thread_count = gq_result.cpu_count + 1;

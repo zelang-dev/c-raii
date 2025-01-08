@@ -104,7 +104,6 @@ make_atomic(result_t, atomic_result_t)
 
 struct raii_results_s {
     raii_type type;
-    volatile sig_atomic_t is_takeable;
 
     /* Stack size when creating a coroutine. */
     u32 stacksize;
