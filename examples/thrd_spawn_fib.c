@@ -3,7 +3,7 @@
 void_t fib(args_t args) {
     int n = args[0].integer;
     if (n < 2) {
-        return thrd_value(n);
+        return $(n);
     } else {
         result_t x, y;
         future_t f = thrd_scope();
@@ -13,7 +13,7 @@ void_t fib(args_t args) {
 
         thrd_sync(f);
 
-        return thrd_value(thrd_result(x).integer + thrd_result(y).integer);
+        return $(thrd_result(x).integer + thrd_result(y).integer);
     }
 }
 

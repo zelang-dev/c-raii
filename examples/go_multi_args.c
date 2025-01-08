@@ -13,9 +13,9 @@ void *worker(params_t args) {
 }
 
 int main(int argc, char **argv) {
-    go_for(worker, 2, 4, "a");
-    go_for(worker, 2, 2, "b");
-    go_for(worker, 2, 3, "c");
+    go(worker, 2, 4, "a");
+    go(worker, 2, 2, "b");
+    go(worker, 2, 3, "c");
 
     sleepfor(100);
 

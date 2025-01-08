@@ -436,13 +436,9 @@ static void coro_awaitable(void) {
             co->func(co->args);
         } else {
             coro_result_set(co, co->func(co->args));
-            if (!co->system && coro_sys_set && gq_result.queue && !co->is_group)
-                atomic_fetch_sub(&gq_result.active_count, 1);
             coro_deferred_free(co);
         }
     } catch_if {
-        if (!co->system && coro_sys_set && gq_result.queue && !co->is_group)
-            atomic_fetch_sub(&gq_result.active_count, 1);
         coro_deferred_free(co);
         if (co->scope->is_recovered || raii_is_caught(co->scope, "sig_winch"))
             ex_flags_reset();
@@ -498,12 +494,15 @@ static void coro_remove(scheduler_t *l, routine_t *t) {
 /* Add coroutine to current scheduler queue, appending. */
 static RAII_INLINE void coro_enqueue(routine_t *t) {
     t->ready = true;
-    if ((!t->taken || t->run_code == CORO_RUN_NORMAL) && coro_sys_set && gq_result.queue) {
+    if (coro_sys_set && gq_result.queue) {
         raii_deque_t *queue = (t->tid == gq_result.cpu_count)
             ? gq_result.queue : gq_result.queue->local[t->tid];
         deque_push(queue, t);
         atomic_fetch_add(&queue->available, 1);
     } else {
+        if (t->run_code == CORO_RUN_NORMAL)
+            coro()->used_count++;
+
         coro_add(coro()->run_queue, t);
     }
 }
@@ -1606,12 +1605,15 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
 
     t->rid = (u32)raii_result_create()->id;
     t->cid = (u32)atomic_fetch_add(&gq_result.id_generate, 1) + 1;
-    if (t->run_code == CORO_RUN_NORMAL && coro_sys_set && gq_result.queue) {
-        t->tid = gq_result.queue->local
-            ? atomic_fetch_add(&gq_result.queue->cpu_id_count, 1) % gq_result.thread_count
-            : gq_result.cpu_count;
+    t->tid = gq_result.cpu_count;
+    if (coro_sys_set && gq_result.queue) {
+        if (gq_result.queue->local)
+            t->tid = atomic_fetch_add(&gq_result.queue->cpu_id_count, 1) % gq_result.thread_count;
+
         atomic_fetch_add(&gq_result.active_count, 1);
-    } else {
+    }
+
+    if (t->run_code != CORO_RUN_NORMAL) {
         t->taken = true;
         coro()->used_count++;
     }
@@ -1729,6 +1731,7 @@ static RAII_INLINE void coro_info(routine_t *t, int pos) {
 static void_t coro_wait_system(void_t v) {
     routine_t *t;
     size_t now;
+    (void)v;
 
     coro_system();
     if (coro_is_main())
@@ -1840,11 +1843,18 @@ static void coro_unwind_setup(ex_context_t *ctx, const char *ex, const char *mes
 }
 
 static void coro_take(raii_deque_t *queue) {
-    if (atomic_load(&queue->available) > 0) {
-        routine_t *t = deque_steal(queue);
-        if (t != RAII_ABORT_T || t != RAII_EMPTY_T) {
+    size_t i, available;
+    if ((available = atomic_load_explicit(&queue->available, memory_order_relaxed)) > 0) {
+        for (i = 0; i < available; i++) {
+            routine_t *t = deque_steal(queue);
+            if (t == RAII_ABORT_T) {
+                --i;
+                continue;
+            } else if (t == RAII_EMPTY_T)
+                break;
+
             atomic_fetch_sub(&queue->available, 1);
-            if (!t->taken && t->run_code == CORO_RUN_NORMAL) {
+            if (!t->taken) {
                 t->taken = true;
                 coro()->used_count++;
             }
@@ -1930,6 +1940,13 @@ static int scheduler(void) {
     size_t i, count = 0;
 
     for (;;) {
+        if (coro_sys_set && gq_result.queue) {
+            if (coro_is_main())
+                coro_take(gq_result.queue);
+            else if (gq_result.queue->local)
+                coro_take(gq_result.queue->local[coro()->thrd_id]);
+        }
+
         if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T) {
             if (!coro_global_is_empty() && coro_sys_set && gq_result.queue && gq_result.queue->local) {
                 for (i = 0; i < gq_result.cpu_count; i++) {
@@ -1968,13 +1985,6 @@ static int scheduler(void) {
             }
         }
 
-        if (coro_sys_set && gq_result.queue) {
-            if (coro_is_main())
-                coro_take(gq_result.queue);
-            else if (gq_result.queue->local)
-                coro_take(gq_result.queue->local[coro()->thrd_id]);
-        }
-
         t = coro_dequeue(coro()->run_queue);
         if (t == nullptr || t == RAII_EMPTY_T)
             continue;
@@ -1989,8 +1999,11 @@ static int scheduler(void) {
 
         coro()->running = nullptr;
         if (t->halt || t->exiting) {
-            if (!t->system)
+            if (!t->system) {
                 --coro()->used_count;
+                if (coro_sys_set && gq_result.queue)
+                    atomic_fetch_sub(&gq_result.active_count, 1);
+            }
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
@@ -2063,9 +2076,7 @@ int raii_main(int argc, char **argv) {
     ex_signal_setup();
     coro_initialize();
     coro_sched_init(true, gq_result.cpu_count);
-    /* Currently example `go_waitgroup.c` not working as expected if uncommented,
-    feature required for multi threading coroutines */
-    //thrd_init(0);
+    thrd_init(0);
     create_coro(main_main, nullptr, gq_result.stacksize * 8, CORO_RUN_MAIN);
     scheduler();
     unreachable;
@@ -2142,9 +2153,6 @@ waitresult_t waitfor(waitgroup_t wg) {
                         coro_info(c, 1);
                         coro_yielding_active();
                     } else {
-                        if (gq_result.queue)
-                            atomic_fetch_sub(&gq_result.active_count, 1);
-
                         if (!is_empty(co->results) && !co->is_event_err)
                             $append(wgr, co->results);
 
@@ -2173,7 +2181,7 @@ waitresult_t waitfor(waitgroup_t wg) {
     return nullptr;
 }
 
-u32 go_for(callable_t fn, u64 num_of_args, ...) {
+u32 go(callable_t fn, u64 num_of_args, ...) {
     va_list ap;
 
     va_start(ap, num_of_args);
@@ -2185,7 +2193,7 @@ u32 go_for(callable_t fn, u64 num_of_args, ...) {
 
 void launching(func_t fn, u64 num_of_args, ...) {
     va_list ap;
-    go_for((callable_t)fn, num_of_args, ap);
+    go((callable_t)fn, num_of_args, ap);
     yielding();
 }
 

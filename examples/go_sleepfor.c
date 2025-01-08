@@ -14,8 +14,8 @@ void *greetings(params_t args) {
 
 int main(int argc, char **argv) {
     puts("Start of main Goroutine");
-    go_for(greetings, 1, "John");
-    go_for(greetings, 1, "Mary");
+    go(greetings, 1, "John");
+    go(greetings, 1, "Mary");
     sleepfor(1000);
     puts("\nEnd of main Goroutine");
     return 0;

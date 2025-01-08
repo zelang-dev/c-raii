@@ -4,8 +4,7 @@
 void_t fib(args_t args) {
     int n = args[0].integer;
     if (n < 2) {
-        RAII_HERE;
-        return thrd_value(n);
+        return $(n);
     } else {
         result_t x, y;
         future_t f = thrd_scope();
@@ -13,11 +12,9 @@ void_t fib(args_t args) {
         x = thrd_spawn(fib, 1, (n - 1));
         y = thrd_spawn(fib, 1, (n - 2));
 
-        RAII_HERE;
         thrd_sync(f);
 
-        RAII_HERE;
-        return thrd_value(thrd_result(x).integer + thrd_result(y).integer);
+        return $(thrd_result(x).integer + thrd_result(y).integer);
     }
 }
 
@@ -33,7 +30,6 @@ int main(int argc, char **argv) {
     result_t results = thrd_spawn(fib, 1, (n));
 
     thrd_sync(fut);
-    RAII_HERE;
     printf("Result: %d\n", thrd_result(results).integer);
 
     return 0;

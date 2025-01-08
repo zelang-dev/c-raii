@@ -44,8 +44,8 @@ The C++ version from <https://cplusplus.com/reference/future/future/wait/>
 // a non-optimized way of checking for prime numbers:
 void *is_prime(args_t arg) {
     int i, x = arg[0].integer;
-    for (i = 2; i < x; ++i) if (x % i == 0) return thrd_value(false);
-    return thrd_value(true);
+    for (i = 2; i < x; ++i) if (x % i == 0) return $(false);
+    return $(true);
 }
 
 int main(int argc, char **argv) {
@@ -322,10 +322,14 @@ C_API void thrd_delete(future);
 C_API uintptr_t thrd_self(void);
 C_API size_t thrd_cpu_count(void);
 
-/* Return any arbitrary set of `values` only available within `thread/future`, DO NOT FREE! */
-C_API vectors_t thrd_val(size_t, ...);
-C_API vectors_t thrd_data(void_t value);
-C_API vectors_t thrd_value(uintptr_t value);
+/* Return/create an arbitrary `vector/array` set of `values`, only available within `thread/future` */
+C_API vectors_t thrd_data(size_t, ...);
+
+/* Return/create an single `vector/array` ~value~, only available within `thread/future` */
+#define $(val) thrd_data(1, (val))
+
+/* Return/create an pair `vector/array` ~values~, only available within `thread/future` */
+#define $$(val1, val2) thrd_data(2, (val1), (val2))
 
 C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);

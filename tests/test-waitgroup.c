@@ -21,7 +21,7 @@ TEST(waitfor) {
     waitgroup_t wg = waitgroup();
     ASSERT_TRUE(is_array(wg));
     for (i = 0; i < 5; i++) {
-        cid[i] = go_for(worker, 1, i);
+        cid[i] = go(worker, 1, i);
         ASSERT_EQ(cid[i], i + 1);
     }
     ASSERT_TRUE(($size(wg) == 5));

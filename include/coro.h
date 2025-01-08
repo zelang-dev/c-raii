@@ -199,7 +199,7 @@ extern "C" {
 #endif
     /* Creates an coroutine of given function with arguments,
     and add to schedular, same behavior as Go. */
-    C_API u32 go_for(callable_t, u64, ...);
+    C_API u32 go(callable_t, u64, ...);
 
     /* Returns results of an completed coroutine, by result id, will panic,
     if called before `waitfor` returns. */

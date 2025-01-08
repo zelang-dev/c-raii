@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 
     waitgroup_t wg = waitgroup();
     for (i = 0; i < 50; i++) {
-        cid[i] = go_for(worker, 1, i);
+        cid[i] = go(worker, 1, i);
     }
     waitresult_t wgr = waitfor(wg);
 

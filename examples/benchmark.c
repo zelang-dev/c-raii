@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 
     waitgroup_t wg = waitgroup();
     for (i = 0; i < numRoutines; i++) {
-        go_for(func, 0);
+        go(func, 0);
     }
     waitfor(wg);
 

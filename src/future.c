@@ -174,7 +174,7 @@ RAII_INLINE void thrd_wait(future f, wait_func yield) {
         yield();
 }
 
-vectors_t thrd_val(size_t numof, ...) {
+vectors_t thrd_data(size_t numof, ...) {
     va_list ap;
     vectors_t args = nullptr;
     size_t i;
@@ -193,20 +193,6 @@ vectors_t thrd_val(size_t numof, ...) {
     }
 
     return args;
-}
-
-RAII_INLINE vectors_t thrd_data(void_t value) {
-    if (is_empty(value))
-        return (vectors_t)raii_values_empty->value.object;
-
-    return thrd_val(1, value);
-}
-
-RAII_INLINE vectors_t thrd_value(uintptr_t value) {
-    if (is_zero(value))
-        return (vectors_t)raii_values_empty->value.object;
-
-    return thrd_val(1, value);
 }
 
 RAII_INLINE values_type thrd_result(result_t value) {
