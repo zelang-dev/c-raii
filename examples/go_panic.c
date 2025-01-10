@@ -20,7 +20,7 @@ void divByZero(void *arg) {
 }
 
 int main(int argc, char **argv) {
-    launching(divByZero, 0);
+    launch(divByZero, 0);
     printf("Although panicked. We recovered. We call mul() func\n");
     printf("mul func result: %d\n", mul(5, 10));
     return 1;

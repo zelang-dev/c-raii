@@ -114,6 +114,7 @@ struct raii_results_s {
     size_t thread_count;
 
     size_t queue_size;
+    arrays_t gc;
     memory_t *scope;
     cacheline_pad_t _pad;
 

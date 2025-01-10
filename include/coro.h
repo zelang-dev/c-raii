@@ -211,7 +211,7 @@ extern "C" {
 
     /* Creates an coroutine of given function with argument,
     and immediately execute. */
-    C_API void launching(func_t, u64, ...);
+    C_API void launch(func_t, u64, ...);
 
     /* Yield execution to another coroutine and reschedule current. */
     C_API void yielding(void);
@@ -247,13 +247,27 @@ extern "C" {
     also accessible by coroutine `result id`, with `get_result` function. */
     C_API waitresult_t waitfor(waitgroup_t);
 
+    C_API awaitable_t async(callable_t, u64, ...);
+    C_API value_t await(awaitable_t);
+
+
     /* Collect coroutines with references preventing immediate cleanup. */
     C_API void coro_collector(routine_t *);
+    C_API routine_t *coro_ref_current(void);
+    C_API void coro_ref(routine_t *);
+    C_API void coro_unref(routine_t *);
+
+    C_API memory_t *coro_scope(void);
+
+    /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
+    C_API void coro_stack_check(int);
+
+    /* Suspends the execution of current coroutine, switch to scheduler. */
+    C_API void coro_suspend(void);
 
     /* Return handle to current coroutine. */
     C_API routine_t *coro_active(void);
 
-    C_API memory_t *coro_scope(void);
     C_API value_t coro_await(callable_t, size_t, ...);
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);
@@ -261,6 +275,9 @@ extern "C" {
     C_API void coro_interrupt_switch(routine_t *);
     C_API void coro_interrupt_complete(routine_t *, void_t);
     C_API void coro_interrupt_setup(raii_callable_t);
+    C_API void coro_interrupt_event(func_t, void_t, func_t);
+    C_API void coro_interrupt_process(func_t, void_t);
+    C_API signed int coro_err_code(void);
 
     /* Print `current` coroutine internal data state, only active in `debug` builds. */
     C_API void coro_info_active(void);
@@ -272,9 +289,6 @@ extern "C" {
 
     /* Return the unique `result id` for the current coroutine. */
     C_API u32 coro_id(void);
-
-    C_API awaitable_t async(callable_t, u64, ...);
-    C_API value_t await(awaitable_t);
 
     /* This library provides its own ~main~,
     which call this function as an coroutine! */
