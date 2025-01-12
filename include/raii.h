@@ -116,10 +116,16 @@ struct raii_results_s {
     size_t queue_size;
     arrays_t gc;
     memory_t *scope;
+
+    /* Array of thread `coroutine` results in waitgroup. */
+    waitresult_t group_result;
     cacheline_pad_t _pad;
 
     raii_deque_t *queue;
     cacheline_pad_t pad;
+
+    /* Lock to collect thread `coroutine` results in waitgroup. */
+    atomic_spinlock group_lock;
 
     /* Exception/error indicator, only private `co_awaitable()`
     will clear to break any possible infinite wait/loop condition,
@@ -129,10 +135,13 @@ struct raii_results_s {
     atomic_flag is_finish;
     atomic_flag is_started;
 
+    /* Used as flag and counter for an thread waitgroup results collected. */
+    atomic_size_t group_count;
+
     /* track the number of global coroutines active/available */
     atomic_size_t active_count;
 
-    /* coroutine unique id and*/
+    /* coroutine unique id */
     atomic_size_t id_generate;
 
     /* result generator also used to determent which thread's `run queue`
