@@ -9,7 +9,7 @@ result_t raii_result_create(void) {
     size_t id = atomic_fetch_add(&gq_result.result_id_generate, 1);
     result = (result_t)malloc_full(gq_result.scope, sizeof(struct result_data), RAII_FREE);
     results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
-    if (id % gq_result.queue_size == 0)
+    if (id % gq_result.queue_size == 0 || is_empty(results))
         results = try_realloc(results, (id + gq_result.queue_size) * sizeof(results[0]));
 
     result->is_ready = false;
