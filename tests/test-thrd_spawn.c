@@ -26,10 +26,14 @@ TEST(thrd_spawn) {
     future_t fut = thrd_scope();
     ASSERT_TRUE(is_type(fut, RAII_SPAWN));
 
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
-    ASSERT_TRUE(is_type(thrd_spawn(is_prime, 1, prime), RAII_VALUE));
+    ASSERT_TRUE(is_type(raii_result_get(thrd_spawn(is_prime, 1, prime)),
+                        RAII_VALUE));
+    ASSERT_TRUE(is_type(raii_result_get(thrd_spawn(is_prime, 1, prime)),
+                        RAII_VALUE));
+    ASSERT_TRUE(is_type(raii_result_get(thrd_spawn(is_prime, 1, prime)),
+                        RAII_VALUE));
+    ASSERT_TRUE(is_type(raii_result_get(thrd_spawn(is_prime, 1, prime)),
+                        RAII_VALUE));
 
     ASSERT_FALSE(thrd_is_finish(fut));
 

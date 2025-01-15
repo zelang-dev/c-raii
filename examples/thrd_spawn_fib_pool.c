@@ -6,7 +6,7 @@ void_t fib(args_t args) {
     if (n < 2) {
         return $(n);
     } else {
-        result_t x, y;
+        rid_t x, y;
         future_t f = thrd_scope();
 
         x = thrd_spawn(fib, 1, (n - 1));
@@ -25,9 +25,9 @@ int main(int argc, char **argv) {
     }
 
     int n = atoi(argv[1]);
-    thrd_init(25);
+    coro_thread_init(25);
     future_t fut = thrd_scope();
-    result_t results = thrd_spawn(fib, 1, (n));
+    rid_t results = thrd_spawn(fib, 1, (n));
 
     thrd_sync(fut);
     printf("Result: %d\n", thrd_result(results).integer);

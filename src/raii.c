@@ -4,6 +4,14 @@ thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
 future_results_t gq_result = {0};
 
+RAII_INLINE result_t raii_result_get(rid_t id) {
+    return (result_t)atomic_load_explicit(&gq_result.results[id], memory_order_relaxed);
+}
+
+RAII_INLINE bool result_is_ready(rid_t id) {
+    return raii_result_get(id)->is_ready;
+}
+
 result_t raii_result_create(void) {
     result_t result, *results;
     size_t id = atomic_fetch_add(&gq_result.result_id_generate, 1);

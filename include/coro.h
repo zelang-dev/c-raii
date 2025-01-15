@@ -11,7 +11,7 @@
 
 /* Coroutine states. */
 typedef enum {
-    CORO_EVENT_DEAD = -1, /* The coroutine has ended it's Event Loop routine, is uninitialized or deleted. */
+    CORO_EVENT_DEAD = RAII_ERR, /* The coroutine has ended it's Event Loop routine, is uninitialized or deleted. */
     CORO_DEAD, /* The coroutine is uninitialized or deleted. */
     CORO_NORMAL,   /* The coroutine is active but not running (that is, it has switch to another coroutine, suspended). */
     CORO_RUNNING,  /* The coroutine is active and running. */
@@ -34,7 +34,7 @@ typedef struct raii_deque_s raii_deque_t;
 typedef int (*coro_sys_func)(int, char **);
 typedef struct awaitable_s {
     raii_type type;
-    u32 cid;
+    rid_t cid;
     waitgroup_t wg;
 } *awaitable_t;
 
@@ -199,11 +199,11 @@ extern "C" {
 #endif
     /* Creates an coroutine of given function with arguments,
     and add to schedular, same behavior as Go. */
-    C_API u32 go(callable_t, u64, ...);
+    C_API rid_t go(callable_t, u64, ...);
 
-    /* Returns results of an completed coroutine, by result id, will panic,
+    /* Returns results of an completed coroutine, by `result id`, will panic,
     if called before `waitfor` returns. */
-    C_API value_t get_result(u32);
+    C_API value_t result_for(rid_t);
 
     /* Explicitly give up the CPU for at least ms milliseconds.
     Other tasks continue to run during this time. */
@@ -244,7 +244,7 @@ extern "C" {
     /* Pauses current coroutine, and begin execution of coroutines in `wait group` object,
     will wait for all to finish. Returns `vector/array` of results,
     directly accessible by index by order created,
-    also accessible by coroutine `result id`, with `get_result` function. */
+    also accessible by coroutine `result id`, with `result_for` function. */
     C_API waitresult_t waitfor(waitgroup_t);
 
     C_API awaitable_t async(callable_t, u64, ...);
@@ -288,18 +288,22 @@ extern "C" {
     C_API bool coro_is_valid(void);
 
     /* Return the unique `result id` for the current coroutine. */
-    C_API u32 coro_id(void);
+    C_API rid_t coro_id(void);
+    C_API void coro_thread_init(size_t queue_size);
 
     /* This library provides its own ~main~,
     which call this function as an coroutine! */
     C_API int coro_main(int, char **);
     C_API int raii_main(int, char **);
 
+    C_API void preempt_init(u32 usecs);
+    C_API void preempt_disable(void);
+    C_API void preempt_enable(void);
+    C_API void preempt_stop(void);
+
     C_API coro_sys_func coro_main_func;
     C_API bool coro_sys_set;
 #ifdef __cplusplus
 }
 #endif
-
-
 #endif /* _CORO_H */

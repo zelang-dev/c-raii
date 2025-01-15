@@ -81,6 +81,9 @@ typedef const unsigned char *u_string_t;
 /* Const unsigned char types. */
 typedef const unsigned char u_char_t;
 
+/* Unsigned int, raii ~result id~ type. */
+typedef u32 rid_t;
+
 typedef void (*func_t)(void_t);
 typedef void_t(*raii_func_t)(void_t);
 typedef void (*func_args_t)(void_t, ...);

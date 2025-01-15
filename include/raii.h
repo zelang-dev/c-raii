@@ -97,7 +97,7 @@ make_atomic(future_array_t *, atomic_future_t)
 typedef struct result_data {
     raii_type type;
     bool is_ready;
-    size_t id;
+    rid_t id;
     raii_values_t *result;
 } *result_t;
 make_atomic(result_t, atomic_result_t)
@@ -134,6 +134,7 @@ struct raii_results_s {
     atomic_flag is_interruptable;
     atomic_flag is_finish;
     atomic_flag is_started;
+    atomic_flag is_waitable;
 
     /* Used as flag and counter for an thread waitgroup results collected. */
     atomic_size_t group_count;
@@ -184,11 +185,10 @@ C_API vectors_t thrd_data(size_t, ...);
 /* Return/create an pair `vector/array` ~values~, only available within `thread/future` */
 #define $$(val1, val2) thrd_data(2, (val1), (val2))
 
-C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
-C_API result_t thrd_spawn(thrd_func_t fn, size_t, ...);
-C_API values_type thrd_result(result_t value);
+C_API rid_t thrd_spawn(thrd_func_t fn, size_t, ...);
+C_API values_type thrd_result(rid_t id);
 C_API void thrd_set_result(raii_values_t *, int);
 
 C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
@@ -210,6 +210,10 @@ C_API int raii_deferred_init(defer_t *array);
 C_API size_t raii_mid(void);
 C_API size_t raii_last_mid(memory_t *scope);
 C_API result_t raii_result_create(void);
+C_API result_t raii_result_get(rid_t);
+
+/* Check status of an `result id` */
+C_API bool result_is_ready(rid_t);
 
 /* Defer execution `LIFO` of given function with argument,
 to current `thread` scope lifetime/destruction. */

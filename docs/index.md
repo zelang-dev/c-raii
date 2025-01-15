@@ -326,11 +326,10 @@ C_API vectors_t thrd_data(size_t, ...);
 /* Return/create an pair `vector/array` ~values~, only available within `thread/future` */
 #define $$(val1, val2) thrd_data(2, (val1), (val2))
 
-C_API void thrd_init(size_t queue_size);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
-C_API result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...);
-C_API values_type thrd_result(result_t value);
+C_API rid_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...);
+C_API values_type thrd_result(rid_t id);
 
 // C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
 

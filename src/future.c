@@ -195,7 +195,8 @@ vectors_t thrd_data(size_t numof, ...) {
     return args;
 }
 
-RAII_INLINE values_type thrd_result(result_t value) {
+RAII_INLINE values_type thrd_result(rid_t id) {
+    result_t value = raii_result_get(id);
     if (value->is_ready)
         return value->result->value;
 
@@ -253,7 +254,7 @@ future_t thrd_scope(void) {
         if (raii_local()->threading)
             throw(logic_error);
 
-        thrd_init(0);
+        coro_thread_init(0);
         queue = raii_local()->queued;
     }
 
@@ -270,7 +271,7 @@ future_t thrd_scope(void) {
     return pool;
 }
 
-result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
+rid_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
     va_list ap;
     if (is_raii_empty() || !is_type(raii_local()->threaded, RAII_SPAWN))
         raii_panic("No initialization, No `thrd_scope`!");
@@ -282,7 +283,7 @@ result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
     unique_t *scope = raii_local();
     future_t pool = scope->threaded;
     result_t result = raii_result_create();
-    size_t result_id = result->id;
+    rid_t result_id = result->id;
 
     if (result_id % gq_result.queue_size == 0 || is_empty(pool->futures))
         pool->futures = try_realloc(pool->futures, (result_id + gq_result.queue_size) * sizeof(pool->futures[0]));
@@ -300,7 +301,7 @@ result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
     f_work->queue = scope->queued;
     f_work->type = RAII_FUTURE_ARG;
 
-    $append(pool->jobs, result_id);
+    $append(pool->jobs, (uintptr_t)result_id);
     pool->futures[result_id] = f;
    // if (!is_empty(queue->local))
        // thrd_add(f, queue, f_work, nil, nil);
@@ -308,7 +309,7 @@ result_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
     if (thrd_create(&f->thread, thrd_raii_wrapper, f_work) != thrd_success)
         throw(future_error);
 
-    return result;
+    return result_id;
 }
 
 future_t thrd_sync(future_t pool) {

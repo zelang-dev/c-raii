@@ -143,11 +143,16 @@ typedef struct {
     int used_count;
     /* indicator for thread termination. */
     u32 exiting;
-    /* thread id assigned by `thrd_init` */
+    /* thread id assigned by `coro_thread_init` */
     u32 thrd_id;
     /* number of other coroutine that ran while the current coroutine was waiting.*/
     u32 num_others_ran;
+    /* record thread integration code */
+    i32 interrupt_code;
+    void_t interrput_data;
+    /* record which coroutines participating in ~thread~ `waitfor` execution */
     waitgroup_t grouped;
+    /* record each thread `sleep/wait system` coroutine sleep handle */
     routine_t *sleep_handle;
     /* record which coroutine is executing for scheduler */
     routine_t *running;
@@ -165,6 +170,10 @@ typedef struct {
     /* Store/hold the registers of the default coroutine thread state,
     allows the ability to switch from any function, non coroutine context. */
     routine_t active_buffer[1];
+    /* record thread integration handler */
+    void_t interrput_handle;
+    /* array for thread integration `misc` data */
+    arrays_t interrput_args;
 } coro_thread_t;
 thrd_static(coro_thread_t, coro, nullptr)
 
@@ -342,15 +351,17 @@ static void deque_free(raii_deque_t *q) {
 
 static void deque_destroy(void) {
     if (is_type(gq_result.queue, RAII_POOL)) {
-        can_cleanup = false;
-        int i;
         raii_deque_t *queue = gq_result.queue;
         memory_t *scope = queue->scope;
+        int i;
         queue->type = RAII_ERR;
         if (!is_empty(queue->local)) {
             for (i = 1; i < gq_result.thread_count; i++) {
                 atomic_flag_test_and_set(&queue->local[i]->shutdown);
-                thrd_join(queue->local[i]->thread, nullptr);
+                if (atomic_flag_load(&gq_result.is_errorless) && atomic_load(&gq_result.group_count) == 0)
+                    thrd_join(queue->local[i]->thread, nullptr);
+                else
+                    pthread_cancel(queue->local[i]->thread);
             }
         }
 
@@ -394,6 +405,12 @@ static routine_t *deque_peek(raii_deque_t *q, u32 index) {
 static void coro_transfer(raii_deque_t *queue);
 static RAII_INLINE void coro_collector_free(void);
 static RAII_INLINE void coro_scheduler(void);
+
+/* Utility for aligning addresses. */
+static RAII_INLINE size_t _coro_align_forward(size_t addr, size_t align) {
+    return (addr + (align - 1)) & ~(align - 1);
+}
+
 static RAII_INLINE bool is_status_invalid(routine_t *t) {
     return (t->status > CORO_EVENT || t->status < 0);
 }
@@ -411,7 +428,7 @@ static RAII_INLINE bool coro_sched_is_assignable(size_t active) {
 }
 
 static RAII_INLINE void coro_result_set(routine_t *co, void_t data) {
-    if (!is_empty(data)) {
+    if (!is_empty(data) && co->rid != RAII_ERR) {
         u32 id = co->rid;
         raii_values_t *result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), RAII_FREE);
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
@@ -508,9 +525,11 @@ static RAII_INLINE void coro_enqueue(routine_t *t) {
     t->ready = true;
     raii_deque_t *queue;
     if (coro_is_running()) {
+        atomic_thread_fence(memory_order_acquire);
         raii_deque_t *queue = (t->tid == 0)
             ? gq_result.queue : gq_result.queue->local[t->tid];
         deque_push(queue, t);
+        atomic_thread_fence(memory_order_release);
         atomic_fetch_add(&queue->available, 1);
     } else {
         if (t->run_code == CORO_RUN_NORMAL)
@@ -1547,11 +1566,6 @@ static RAII_INLINE bool coro_terminated(routine_t *co) {
     return co->halt;
 }
 
-/* Utility for aligning addresses. */
-static RAII_INLINE size_t _coro_align_forward(size_t addr, size_t align) {
-    return (addr + (align - 1)) & ~(align - 1);
-}
-
 /* Create new coroutine. */
 static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     /* Stack size should be at least `CORO_STACK_SIZE`. */
@@ -1615,7 +1629,11 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     else
         t->run_code = code;
 
-    t->rid = (u32)raii_result_create()->id;
+    if (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_SYSTEM)
+        t->rid = RAII_ERR;
+    else
+        t->rid = (u32)raii_result_create()->id;
+
     t->cid = (u32)atomic_fetch_add(&gq_result.id_generate, 1) + 1;
     t->tid = 0;
     is_group = c->wait_active && !is_empty(c->wait_group) && !c->is_group_finish;
@@ -1753,6 +1771,9 @@ static void_t coro_wait_system(void_t v) {
         coro_name("coro_wait_system #%d", (int)coro()->thrd_id);
 
     for (;;) {
+        if (!atomic_flag_load(&gq_result.is_errorless) || atomic_flag_load(&gq_result.is_finish))
+            return 0;
+
         /* let everyone else run */
         while (coro_yielding_active() > 0)
             ;
@@ -1828,6 +1849,10 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->active_handle = nullptr;
     coro()->main_handle = nullptr;
     coro()->current_handle = nullptr;
+    coro()->interrupt_code = 0;
+    coro()->interrput_handle = nullptr;
+    coro()->interrput_args = nullptr;
+    coro()->interrput_data = nullptr;
 }
 
 /* Check `thread` local coroutine use count for zero. */
@@ -1849,17 +1874,9 @@ static RAII_INLINE bool coro_sched_is_sleeping(void) {
     return (coro()->sleeping_counted > 0 && coro_sched_active());
 }
 
-RAII_INLINE u32 coro_sched_id(void) {
-    return coro()->thrd_id;
-}
-
-static RAII_INLINE void coro_sched_dec(void) {
-    --coro()->used_count;
-}
-
-/* Check `global` active count for zero. */
+/* Check `global` coroutine active count status is `zero` or less. */
 static RAII_INLINE bool coro_global_is_empty(void) {
-    return atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) == 0;
+    return (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) <= 0;
 }
 
 static void coro_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
@@ -1870,11 +1887,14 @@ static void coro_unwind_setup(ex_context_t *ctx, const char *ex, const char *mes
     ex_unwind_set(ctx, co->scope->is_protected);
 }
 
-static void coro_take(raii_deque_t *queue, bool take_all) {
+static bool coro_take(raii_deque_t *queue, bool take_all) {
     size_t i, available, active;
+    bool work_taken = false;
     if ((available = atomic_load_explicit(&queue->available, memory_order_relaxed)) > 0) {
-        active = available > (int)(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) - 1) || take_all ? available : 1;
-        for (i = 0; i < active ; i++) {
+        work_taken = true;
+        active = take_all || (available > (int)(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) - 1))
+            ? available : 1;
+        for (i = 0; i < active; i++) {
             routine_t *t = deque_steal(queue);
             if (t == RAII_ABORT_T) {
                 --i;
@@ -1896,6 +1916,8 @@ static void coro_take(raii_deque_t *queue, bool take_all) {
             coro_add(coro()->run_queue, t);
         }
     }
+
+    return work_taken;
 }
 
 static void coro_transfer(raii_deque_t *queue) {
@@ -1942,6 +1964,7 @@ static void coro_thread_waitfor(waitgroup_t wg) {
     routine_t *co, *c = coro_active();
     u32 id = 0;
 
+    yielding();
     while ($size(wg) != 0) {
         foreach(task in wg) {
             co = (routine_t *)task.object;
@@ -1954,7 +1977,7 @@ static void coro_thread_waitfor(waitgroup_t wg) {
                     coro_info(c, 1);
                     coro_yielding_active();
                 } else {
-                    if (!is_empty(co->results) && !co->is_event_err)
+                    if (!is_empty(co->results) && !co->is_event_err && co->rid != RAII_ERR)
                         coro_thread_result_set(co);
 
                     if (co->is_event_err) {
@@ -1970,12 +1993,14 @@ static void coro_thread_waitfor(waitgroup_t wg) {
             }
         }
     }
-    coro_sched_dec();
+    array_delete(wg);
+    coro()->grouped = nullptr;
+    --coro()->used_count;
 }
 
 static void_t coro_thread_main(void_t args) {
     raii_deque_t *queue = (raii_deque_t *)args;
-    waitgroup_t grouped;
+    bool already = false;
 
     coro_name("coro_thread_main #%d", (int)coro()->thrd_id);
     coro_info(coro_active(), -1);
@@ -1984,23 +2009,22 @@ static void_t coro_thread_main(void_t args) {
     while (!atomic_flag_load_explicit(&gq_result.is_started, memory_order_relaxed))
         thrd_yield();
 
-    coro_take(queue, false);
+    already = atomic_flag_load(&gq_result.is_waitable);
+    coro_take(queue, already);
     while (!coro_sched_empty() && atomic_flag_load(&gq_result.is_errorless) && !atomic_flag_load(&gq_result.is_finish)) {
         if (!is_empty(coro()->grouped) && $size(coro()->grouped) > 0) {
+            if (!already)
+                coro_take(queue, true);
+
             atomic_fetch_add(&gq_result.group_count, 1);
-            coro_take(queue, true);
-            grouped = coro()->grouped;
-            coro()->grouped = nullptr;
-            coro_thread_waitfor(grouped);
-            array_delete(grouped);
+            coro_thread_waitfor(coro()->grouped);
             atomic_fetch_sub(&gq_result.group_count, 1);
-            if (coro()->used_count == 1)
-                break;
         } else if (coro()->used_count > 1) {
             yielding();
         } else {
             break;
         }
+        already = false;
     }
 
     return 0;
@@ -2019,73 +2043,73 @@ static void coro_cleanup(void) {
 
         atomic_thread_fence(memory_order_seq_cst);
         can_cleanup = false;
-        memory_t *scope = gq_result.scope;
-        result_t *r = atomic_get(result_t *, &gq_result.results);
-        if (!is_empty(coro()->sleep_handle))
-            RAII_FREE(coro()->sleep_handle);
+        while (!coro_global_is_empty() && atomic_flag_load(&gq_result.is_errorless))
+            thrd_yield();
 
-        raii_delete(scope);
-        if (!is_empty(r)) {
-            atomic_store(&gq_result.results, nullptr);
-            RAII_FREE((void_t)r);
+        if (!is_empty(coro()->sleep_handle) && coro()->sleep_handle->magic_number == CORO_MAGIC_NUMBER) {
+            RAII_FREE(coro()->sleep_handle);
+            coro()->sleep_handle = nullptr;
         }
 
+        coro_interrupt_cleanup(nullptr);
         coro_collector_free();
+        deque_destroy();
     }
 }
 
 static int scheduler(void) {
-    routine_t *t = nullptr;
+    routine_t *local = nullptr, *t = nullptr;
     size_t i;
-    bool stole;
+    bool stole, have_work = false;
 
     for (;;) {
         stole = false;
         if (coro_is_running()) {
             if (coro()->is_main)
-                coro_take(gq_result.queue, false);
+                have_work = coro_take(gq_result.queue, false);
             else if (gq_result.queue->local)
-                coro_take(gq_result.queue->local[coro()->thrd_id], false);
+                have_work = coro_take(gq_result.queue->local[coro()->thrd_id], false);
+
+            if (have_work)
+                t = nullptr;
         }
 
-        if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T) {
-            if (!coro()->is_main && coro_sched_is_stealable() && !atomic_flag_load(&gq_result.is_finish)
-                && !atomic_flag_load(&gq_result.is_errorless)) {
+        if (coro_sched_empty() || !coro_sched_active() || local == RAII_ABORT_T) {
+            if (!coro()->is_main && is_empty(coro()->grouped) && (t != RAII_EMPTY_T
+                || local != RAII_ABORT_T) && !atomic_flag_load(&gq_result.is_finish)) {
                 t = RAII_EMPTY_T;
-                for (i = 1; i < gq_result.thread_count; i++) {
-                    if (i == coro()->thrd_id)
-                        continue;
-
-                    raii_deque_t *queue = gq_result.queue->local[i];
-                    if (atomic_load(&queue->available) > 1) {
-                        t = deque_steal(queue);
-                        if (t == RAII_ABORT_T) {
-                            --i;
-                            continue;
-                        } else if (t == RAII_EMPTY_T)
+                if (coro_sched_is_stealable()) {
+                    for (i = 1; i < gq_result.thread_count; i++) {
+                        if (i == coro()->thrd_id)
                             continue;
 
-                        if (t->system || t->is_group || t->run_code == CORO_RUN_THRD) {
-                            deque_push(queue, t);
-                            t = RAII_EMPTY_T;
-                            continue;
+                        raii_deque_t *queue = gq_result.queue->local[i];
+                        if (atomic_load(&queue->available) > 1) {
+                            t = deque_take(queue);
+                            if (t == RAII_EMPTY_T)
+                                continue;
+
+                            atomic_fetch_sub(&queue->available, 1);
+                            if (t->system || t->run_code == CORO_RUN_THRD) {
+                                coro_enqueue(t);
+                                t = RAII_EMPTY_T;
+                                continue;
+                            }
+
+                            t->taken = true;
+                            t->tid = coro()->thrd_id;
+                            coro()->used_count++;
+                            stole = true;
+                            break;
                         }
-
-                        atomic_fetch_sub(&queue->available, 1);
-                        t->taken = true;
-                        t->tid = coro()->thrd_id;
-                        coro()->used_count++;
-                        stole = true;
-                        break;
                     }
                 }
 
                 if (t == RAII_EMPTY_T)
                     continue;
-            } else if (coro()->is_main && (t == RAII_EMPTY_T
-                                           || atomic_flag_load(&gq_result.is_finish)
+            } else if (coro()->is_main && (local == RAII_ABORT_T || atomic_flag_load(&gq_result.is_finish)
                                            || !atomic_flag_load(&gq_result.is_errorless)
-                                           || coro_global_is_empty())) {
+                                           || (coro_global_is_empty() && coro_sched_empty()))) {
                 coro_cleanup();
                 if (coro()->used_count > 0) {
                     RAII_INFO("\nNo runnable coroutines! %d stalled\n", coro()->used_count);
@@ -2094,13 +2118,13 @@ static int scheduler(void) {
                     RAII_LOG("\nCoro scheduler exited");
                     exit(0);
                 }
-            } else if (!coro()->is_main && (coro_sched_empty() || t == RAII_EMPTY_T
-                                            || atomic_flag_load(&gq_result.is_finish)
+            } else if (!coro()->is_main && (local == RAII_ABORT_T || atomic_flag_load(&gq_result.is_finish)
                                             || !atomic_flag_load(&gq_result.is_errorless))) {
                 RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
                 /* Wait for global exit signal */
                 while (!atomic_flag_load(&gq_result.is_finish)
-                       && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown))
+                       && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown)
+                       && atomic_flag_load(&gq_result.is_errorless))
                     thrd_yield();
 
                 RAII_INFO("Thrd #%zx exiting, %d runnable coroutines.\033[0K\n", thrd_self(), coro()->used_count);
@@ -2110,7 +2134,7 @@ static int scheduler(void) {
 
         if (!stole) {
             t = coro_dequeue(coro()->run_queue);
-            if (t == nullptr || t == RAII_EMPTY_T)
+            if (t == nullptr)
                 continue;
         }
 
@@ -2126,8 +2150,15 @@ static int scheduler(void) {
         if (t->halt || t->exiting) {
             if (!t->system) {
                 --coro()->used_count;
-                if (coro_is_running())
+                if (coro_is_running() && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
+            }
+
+            if ((t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN)) {
+                if (coro()->used_count < 0)
+                    coro()->used_count++;
+
+                local = RAII_ABORT_T;
             }
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
@@ -2152,8 +2183,11 @@ static int thrd_coro_wrapper(void_t arg) {
     create_coro(coro_thread_main, queue, gq_result.stacksize * 6, CORO_RUN_THRD);
     res = scheduler();
 
-    if (!is_empty(coro()->sleep_handle))
+    if (!is_empty(coro()->sleep_handle) && coro()->sleep_handle->magic_number == CORO_MAGIC_NUMBER)
         RAII_FREE(coro()->sleep_handle);
+
+    if (coro_interrupt_set)
+        coro_interrupt_cleanup(nullptr);
 
     rpmalloc_thread_finalize(1);
     thrd_exit(res);
@@ -2164,7 +2198,6 @@ static void_t main_main(void_t v) {
     coro_name("coro_main");
     coro()->exiting = coro_sys_set && coro_main_func
         ? coro_main_func(coro_argc, coro_argv) : coro_main(coro_argc, coro_argv);
-    atomic_flag_test_and_set(&gq_result.is_finish);
 
     return 0;
 }
@@ -2188,6 +2221,7 @@ static void coro_initialize(void) {
     atomic_flag_clear(&gq_result.group_lock);
     atomic_flag_clear(&gq_result.is_finish);
     atomic_flag_clear(&gq_result.is_started);
+    atomic_flag_clear(&gq_result.is_waitable);
     atomic_flag_test_and_set(&gq_result.is_errorless);
     atomic_flag_test_and_set(&gq_result.is_interruptable);
 }
@@ -2205,7 +2239,7 @@ int raii_main(int argc, char **argv) {
     ex_signal_setup();
     coro_initialize();
     coro_sched_init(true, 0);
-    thrd_init(256);
+    coro_thread_init(256);
     create_coro(main_main, nullptr, gq_result.stacksize * 8, CORO_RUN_MAIN);
     scheduler();
     unreachable;
@@ -2241,12 +2275,8 @@ RAII_INLINE string_t catch_message(void) {
     return raii_message_by(coro_scope());
 }
 
-static RAII_INLINE result_t coro_get_result(u32 id) {
-    return (result_t)atomic_load_explicit(&gq_result.results[id], memory_order_relaxed);
-}
-
-RAII_INLINE value_t get_result(u32 id) {
-    result_t value = coro_get_result(id);
+RAII_INLINE value_t result_for(rid_t id) {
+    result_t value = raii_result_get(id);
     if (value->is_ready)
         return value->result->valued;
 
@@ -2268,10 +2298,13 @@ waitresult_t waitfor(waitgroup_t wg) {
     waitresult_t wgr = nullptr;
     waitgroup_t wg_set = nullptr, group = nullptr;
     u32 id = 0;
-    bool has_erred = false, has_completed = false;
+    bool has_erred = false;
 
     if (c->wait_active && (memcmp(c->wait_group, wg, sizeof(wg)) == 0)) {
         c->is_group_finish = true;
+        if (coro_sched_is_assignable(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed)))
+            atomic_flag_test_and_set(&gq_result.is_waitable);
+
         wgr = array_of(c->scope, 0);
         array_deferred_set(wgr, c->scope);
 
@@ -2303,7 +2336,7 @@ waitresult_t waitfor(waitgroup_t wg) {
                         coro_info(c, 1);
                         coro_yielding_active();
                     } else {
-                        if (!is_empty(co->results) && !co->is_event_err)
+                        if (!is_empty(co->results) && !co->is_event_err && co->rid != RAII_ERR)
                             coro_thread_result_set(co);
 
                         if (co->is_event_err) {
@@ -2321,14 +2354,14 @@ waitresult_t waitfor(waitgroup_t wg) {
             }
         }
         if (!is_empty(group))
-            array_delete(group);
+            array_delete(wg_set);
 
         while (atomic_load_explicit(&gq_result.group_count, memory_order_relaxed) != 0)
             yielding();
 
         c->wait_active = false;
         c->wait_group = nullptr;
-        coro_sched_dec();
+        --coro()->used_count;
         array_delete(wg);
         wgr = gq_result.group_result;
         atomic_lock(&gq_result.group_lock);
@@ -2340,7 +2373,7 @@ waitresult_t waitfor(waitgroup_t wg) {
     return nullptr;
 }
 
-u32 go(callable_t fn, u64 num_of_args, ...) {
+rid_t go(callable_t fn, u64 num_of_args, ...) {
     va_list ap;
 
     va_start(ap, num_of_args);
@@ -2369,7 +2402,7 @@ awaitable_t async(callable_t fn, u64 num_of_args, ...) {
     c->wait_active = true;
     c->wait_group = wg;
     c->is_group_finish = false;
-    u32 rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_ASYNC);
+    rid_t rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_ASYNC);
     c->wait_group = nullptr;
     awaitable->wg = wg;
     awaitable->cid = rid;
@@ -2381,13 +2414,13 @@ awaitable_t async(callable_t fn, u64 num_of_args, ...) {
 value_t await(awaitable_t task) {
     if (!is_empty(task) && is_type(task, RAII_CORO)) {
         task->type = RAII_ERR;
-        u32 rid = task->cid;
+        rid_t rid = task->cid;
         waitgroup_t wg = task->wg;
         RAII_FREE(task);
         coro_active()->wait_group = wg;
         waitresult_t wgr = waitfor(wg);
         if (!is_empty(wgr))
-            return get_result(rid);
+            return result_for(rid);
     }
 
     return raii_values_empty->valued;
@@ -2401,10 +2434,10 @@ value_t coro_await(callable_t fn, size_t num_of_args, ...) {
     params_t params = array_ex(coro_scope(), num_of_args, ap);
     va_end(ap);
 
-    u32 rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
+    rid_t rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
     waitresult_t wgr = waitfor(wg);
     if (!is_empty(wgr))
-        return get_result(rid);
+        return result_for(rid);
 
     return raii_values_empty->valued;
 }
@@ -2526,8 +2559,9 @@ RAII_INLINE void coro_stacksize_set(u32 size) {
     gq_result.stacksize = size;
 }
 
-void thrd_init(size_t queue_size) {
+void coro_thread_init(size_t queue_size) {
     if (!thrd_queue_set) {
+        atomic_thread_fence(memory_order_seq_cst);
         thrd_queue_set = true;
         if (!coro_init_set)
             coro_initialize();

@@ -29,8 +29,8 @@ TEST(waitfor) {
     ASSERT_TRUE(is_array(wgr));
     ASSERT_TRUE(($size(wgr) == 2));
 
-    ASSERT_TRUE((wgr[1].integer == get_result(cid[3]).integer));
-    ASSERT_STR(wgr[0].char_ptr, get_result(cid[2]).char_ptr);
+    ASSERT_TRUE((wgr[1].integer == result_for(cid[3]).integer));
+    ASSERT_STR(wgr[0].char_ptr, result_for(cid[2]).char_ptr);
 
     return 0;
 }
