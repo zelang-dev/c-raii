@@ -1964,7 +1964,6 @@ static void coro_thread_waitfor(waitgroup_t wg) {
     routine_t *co, *c = coro_active();
     u32 id = 0;
 
-    yielding();
     while ($size(wg) != 0) {
         foreach(task in wg) {
             co = (routine_t *)task.object;
@@ -2000,22 +1999,11 @@ static void coro_thread_waitfor(waitgroup_t wg) {
 
 static void_t coro_thread_main(void_t args) {
     raii_deque_t *queue = (raii_deque_t *)args;
-    bool already = false;
 
     coro_name("coro_thread_main #%d", (int)coro()->thrd_id);
     coro_info(coro_active(), -1);
-
-    atomic_flag_clear(&queue->shutdown);
-    while (!atomic_flag_load_explicit(&gq_result.is_started, memory_order_relaxed))
-        thrd_yield();
-
-    already = atomic_flag_load(&gq_result.is_waitable);
-    coro_take(queue, already);
     while (!coro_sched_empty() && atomic_flag_load(&gq_result.is_errorless) && !atomic_flag_load(&gq_result.is_finish)) {
         if (!is_empty(coro()->grouped) && $size(coro()->grouped) > 0) {
-            if (!already)
-                coro_take(queue, true);
-
             atomic_fetch_add(&gq_result.group_count, 1);
             coro_thread_waitfor(coro()->grouped);
             atomic_fetch_sub(&gq_result.group_count, 1);
@@ -2024,7 +2012,6 @@ static void_t coro_thread_main(void_t args) {
         } else {
             break;
         }
-        already = false;
     }
 
     return 0;
@@ -2060,15 +2047,16 @@ static void coro_cleanup(void) {
 static int scheduler(void) {
     routine_t *local = nullptr, *t = nullptr;
     size_t i;
-    bool stole, have_work = false;
+    bool take_all, stole, have_work = false;
 
     for (;;) {
         stole = false;
         if (coro_is_running()) {
+            take_all = atomic_flag_load_explicit(&gq_result.is_waitable, memory_order_relaxed) && !is_empty(coro()->grouped);
             if (coro()->is_main)
-                have_work = coro_take(gq_result.queue, false);
+                have_work = coro_take(gq_result.queue, take_all);
             else if (gq_result.queue->local)
-                have_work = coro_take(gq_result.queue->local[coro()->thrd_id], false);
+                have_work = coro_take(gq_result.queue->local[coro()->thrd_id], take_all);
 
             if (have_work)
                 t = nullptr;
@@ -2086,8 +2074,8 @@ static int scheduler(void) {
                     RAII_LOG("\nCoro scheduler exited");
                     exit(0);
                 }
-            } else if (!coro()->is_main && coro_sched_empty() && t != RAII_EMPTY_T && local != RAII_ABORT_T
-                       && !atomic_flag_load(&gq_result.is_finish) && !coro_sched_is_sleeping()
+            } else if (!coro()->is_main && !coro_sched_active() && t != RAII_EMPTY_T && local != RAII_ABORT_T
+                       && !atomic_flag_load(&gq_result.is_finish)
                        && coro_sched_is_stealable()) {
                 t = RAII_EMPTY_T;
                 for (i = 1; i < gq_result.thread_count; i++) {
@@ -2114,7 +2102,7 @@ static int scheduler(void) {
 
                 if (t == RAII_EMPTY_T)
                     continue;
-            } else if (!coro()->is_main && !coro_sched_active() && (coro_sched_empty() || local == RAII_ABORT_T
+            } else if (!coro()->is_main && (coro_sched_empty() || local == RAII_ABORT_T
                                             || atomic_flag_load(&gq_result.is_finish)
                                             || !atomic_flag_load(&gq_result.is_errorless))) {
                 RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
@@ -2176,7 +2164,16 @@ static int thrd_coro_wrapper(void_t arg) {
     RAII_FREE(arg);
     rpmalloc_init();
 
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
     coro_sched_init(false, tid);
+    atomic_flag_clear(&queue->shutdown);
+
+    /* Wait for global start signal */
+    while (!atomic_flag_load_explicit(&gq_result.is_started, memory_order_relaxed))
+        ;
+
     create_coro(coro_thread_main, queue, gq_result.stacksize * 6, CORO_RUN_THRD);
     res = scheduler();
 
@@ -2311,7 +2308,6 @@ waitresult_t waitfor(waitgroup_t wg) {
         yielding();
 
         if (!is_empty(coro()->grouped) && $size(coro()->grouped) > 0) {
-            coro_take(gq_result.queue, true);
             group = coro()->grouped;
             coro()->grouped = nullptr;
         }
