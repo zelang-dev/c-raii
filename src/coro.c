@@ -1861,8 +1861,8 @@ static RAII_INLINE bool coro_sched_empty(void) {
 }
 
 static RAII_INLINE bool coro_sched_is_stealable(void) {
-    size_t active_count = atomic_load_explicit(&gq_result.active_count, memory_order_relaxed);
-    return active_count != 0 && coro_sched_is_assignable(active_count);
+    int active_count = (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed);
+    return active_count > 1 && coro_sched_is_assignable(active_count);
 }
 
 /* Check `local` run queue `head` for not `nullptr`. */
@@ -2075,41 +2075,9 @@ static int scheduler(void) {
         }
 
         if (coro_sched_empty() || !coro_sched_active() || local == RAII_ABORT_T) {
-            if (!coro()->is_main && is_empty(coro()->grouped) && (t != RAII_EMPTY_T
-                || local != RAII_ABORT_T) && !atomic_flag_load(&gq_result.is_finish)) {
-                t = RAII_EMPTY_T;
-                if (coro_sched_is_stealable()) {
-                    for (i = 1; i < gq_result.thread_count; i++) {
-                        if (i == coro()->thrd_id)
-                            continue;
-
-                        raii_deque_t *queue = gq_result.queue->local[i];
-                        if (atomic_load(&queue->available) > 1) {
-                            t = deque_take(queue);
-                            if (t == RAII_EMPTY_T)
-                                continue;
-
-                            atomic_fetch_sub(&queue->available, 1);
-                            if (t->system || t->run_code == CORO_RUN_THRD) {
-                                coro_enqueue(t);
-                                t = RAII_EMPTY_T;
-                                continue;
-                            }
-
-                            t->taken = true;
-                            t->tid = coro()->thrd_id;
-                            coro()->used_count++;
-                            stole = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (t == RAII_EMPTY_T)
-                    continue;
-            } else if (coro()->is_main && (local == RAII_ABORT_T || atomic_flag_load(&gq_result.is_finish)
-                                           || !atomic_flag_load(&gq_result.is_errorless)
-                                           || (coro_global_is_empty() && coro_sched_empty()))) {
+            if (coro()->is_main && (local == RAII_ABORT_T || atomic_flag_load(&gq_result.is_finish)
+                                    || !atomic_flag_load(&gq_result.is_errorless)
+                                    || (coro_global_is_empty() && coro_sched_empty()))) {
                 coro_cleanup();
                 if (coro()->used_count > 0) {
                     RAII_INFO("\nNo runnable coroutines! %d stalled\n", coro()->used_count);
@@ -2118,7 +2086,36 @@ static int scheduler(void) {
                     RAII_LOG("\nCoro scheduler exited");
                     exit(0);
                 }
-            } else if (!coro()->is_main && (local == RAII_ABORT_T || atomic_flag_load(&gq_result.is_finish)
+            } else if (!coro()->is_main && coro_sched_empty() && t != RAII_EMPTY_T && local != RAII_ABORT_T
+                       && !atomic_flag_load(&gq_result.is_finish) && !coro_sched_is_sleeping()
+                       && coro_sched_is_stealable()) {
+                t = RAII_EMPTY_T;
+                for (i = 1; i < gq_result.thread_count; i++) {
+                    if (i == coro()->thrd_id)
+                        continue;
+
+                    raii_deque_t *queue = gq_result.queue->local[i];
+                    if (atomic_load(&queue->available) > 1) {
+                        t = deque_take(queue);
+                        if (t == RAII_EMPTY_T)
+                            continue;
+
+                        atomic_fetch_sub(&queue->available, 1);
+                        if (t->system || t->is_group || t->run_code == CORO_RUN_THRD) {
+                            coro_enqueue(t);
+                            t = RAII_EMPTY_T;
+                            continue;
+                        }
+
+                        stole = true;
+                        break;
+                    }
+                }
+
+                if (t == RAII_EMPTY_T)
+                    continue;
+            } else if (!coro()->is_main && !coro_sched_active() && (coro_sched_empty() || local == RAII_ABORT_T
+                                            || atomic_flag_load(&gq_result.is_finish)
                                             || !atomic_flag_load(&gq_result.is_errorless))) {
                 RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
                 /* Wait for global exit signal */
@@ -2150,16 +2147,16 @@ static int scheduler(void) {
         if (t->halt || t->exiting) {
             if (!t->system) {
                 --coro()->used_count;
-                if (coro_is_running() && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
+                if (coro_is_running()
+                    && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
             }
 
-            if ((t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN)) {
-                if (coro()->used_count < 0)
-                    coro()->used_count++;
+            if (coro()->used_count < 0)
+                coro()->used_count++;
 
+            if (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN)
                 local = RAII_ABORT_T;
-            }
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
