@@ -1861,8 +1861,8 @@ static RAII_INLINE bool coro_sched_empty(void) {
 }
 
 static RAII_INLINE bool coro_sched_is_stealable(void) {
-    int active_count = (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed);
-    return active_count != 0 && active_count > 1 && coro_sched_is_assignable(active_count);
+    size_t active_count = atomic_load_explicit(&gq_result.active_count, memory_order_relaxed);
+    return active_count != 0 && coro_sched_is_assignable(active_count);
 }
 
 /* Check `local` run queue `head` for not `nullptr`. */
@@ -1964,6 +1964,7 @@ static void coro_thread_waitfor(waitgroup_t wg) {
     routine_t *co, *c = coro_active();
     u32 id = 0;
 
+    yielding();
     while ($size(wg) != 0) {
         foreach(task in wg) {
             co = (routine_t *)task.object;
@@ -1999,13 +2000,13 @@ static void coro_thread_waitfor(waitgroup_t wg) {
 
 static void_t coro_thread_main(void_t args) {
     raii_deque_t *queue = (raii_deque_t *)args;
-    volatile bool already = false;
+    bool already = false;
 
     coro_name("coro_thread_main #%d", (int)coro()->thrd_id);
     coro_info(coro_active(), -1);
 
     atomic_flag_clear(&queue->shutdown);
-    while (!atomic_flag_load(&gq_result.is_started))
+    while (!atomic_flag_load_explicit(&gq_result.is_started, memory_order_relaxed))
         thrd_yield();
 
     already = atomic_flag_load(&gq_result.is_waitable);
@@ -2074,9 +2075,8 @@ static int scheduler(void) {
         }
 
         if (coro_sched_empty() || !coro_sched_active() || local == RAII_ABORT_T) {
-            if (!coro()->is_main && (atomic_load(&gq_result.group_count) == 0)
-                && t != RAII_EMPTY_T && local != RAII_ABORT_T
-                && !atomic_flag_load(&gq_result.is_finish) && !coro_sched_is_sleeping()) {
+            if (!coro()->is_main && is_empty(coro()->grouped) && (t != RAII_EMPTY_T
+                || local != RAII_ABORT_T) && !atomic_flag_load(&gq_result.is_finish)) {
                 t = RAII_EMPTY_T;
                 if (coro_sched_is_stealable()) {
                     for (i = 1; i < gq_result.thread_count; i++) {
@@ -2090,13 +2090,15 @@ static int scheduler(void) {
                                 continue;
 
                             atomic_fetch_sub(&queue->available, 1);
-                            if (t->system || t->run_code == CORO_RUN_THRD
-                                || t->run_code == CORO_RUN_SYSTEM) {
+                            if (t->system || t->run_code == CORO_RUN_THRD) {
                                 coro_enqueue(t);
                                 t = RAII_EMPTY_T;
                                 continue;
                             }
 
+                            t->taken = true;
+                            t->tid = coro()->thrd_id;
+                            coro()->used_count++;
                             stole = true;
                             break;
                         }
@@ -2148,15 +2150,16 @@ static int scheduler(void) {
         if (t->halt || t->exiting) {
             if (!t->system) {
                 --coro()->used_count;
-                if (coro_is_running() && (int)atomic_load(&gq_result.active_count) > 0)
+                if (coro_is_running() && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
             }
 
-            if (coro()->used_count < 0)
-                coro()->used_count++;
+            if ((t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN)) {
+                if (coro()->used_count < 0)
+                    coro()->used_count++;
 
-            if ((t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN))
                 local = RAII_ABORT_T;
+            }
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
@@ -2321,7 +2324,6 @@ waitresult_t waitfor(waitgroup_t wg) {
         else
             wg_set = group;
 
-        atomic_fetch_add(&gq_result.group_count, 1);
         while ($size(wg_set) != 0) {
             foreach(task in wg_set) {
                 co = (routine_t *)task.object;
@@ -2351,7 +2353,6 @@ waitresult_t waitfor(waitgroup_t wg) {
                 }
             }
         }
-        atomic_fetch_sub(&gq_result.group_count, 1);
         if (!is_empty(group))
             array_delete(wg_set);
 
