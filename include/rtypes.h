@@ -316,4 +316,16 @@ s\
 #define Mb(count) (u64) (count * 1024 * 1024)
 #define Kb(count) (u64) (count * 1024)
 
+#if defined(__arm__) || defined(_M_ARM) || defined(_M_ARM64) || defined(__mips) || defined(__mips__) || defined(__mips64) || defined(__mips32) || defined(__MIPSEL__) || defined(__MIPSEB__) || defined(__sparc__) || defined(__sparc64__) || defined(__sparc_v9__) || defined(__sparcv9) || defined(__riscv) || defined(__ARM64__)
+#   define _CACHE_LINE 32
+#elif defined(__m68k__)
+#   define _CACHE_LINE 16
+#elif defined(__ppc__) || defined(__ppc) || defined(__powerpc__) || defined(_M_MPPC) || defined(_M_PPC) ||  defined(__aarch64__)  || defined(__ppc64__) || defined(__powerpc64__) || defined(__arc__)
+#   define _CACHE_LINE 128
+#elif defined(__s390__) || defined(__s390x__)
+#   define _CACHE_LINE 256
+#else
+#   define _CACHE_LINE 64
+#endif
+
 #endif /* RAII_DEFINE_TYPES_H */

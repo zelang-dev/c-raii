@@ -21,7 +21,7 @@
  https://github.com/golang/go/search?q=CacheLinePadSize
  https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
 */
-#   define CACHELINE_SIZE __ATOMIC_CACHE_LINE
+#   define CACHELINE_SIZE _CACHE_LINE
 #endif
 
 typedef char cacheline_pad_t[CACHELINE_SIZE];
@@ -122,33 +122,49 @@ struct raii_results_s {
     cacheline_pad_t _pad;
 
     raii_deque_t *queue;
-    cacheline_pad_t pad;
+    cacheline_pad_t _pad1;
 
     /* Lock to collect thread `coroutine` results in waitgroup. */
     atomic_spinlock group_lock;
+    cacheline_pad_t _pad2;
 
     /* Exception/error indicator, only private `co_awaitable()`
     will clear to break any possible infinite wait/loop condition,
     normal cleanup code will not be executed. */
     atomic_flag is_errorless;
+    cacheline_pad_t _pad3;
+
     atomic_flag is_interruptable;
+    cacheline_pad_t _pad4;
+
     atomic_flag is_finish;
+    cacheline_pad_t _pad5;
+
     atomic_flag is_started;
+    cacheline_pad_t _pad6;
+
     atomic_flag is_waitable;
+    cacheline_pad_t _pad7;
 
     /* Used as flag and counter for an thread waitgroup results collected. */
     atomic_size_t group_count;
+    cacheline_pad_t _pad8;
 
     /* track the number of global coroutines active/available */
     atomic_size_t active_count;
+    cacheline_pad_t _pad9;
 
     /* coroutine unique id */
     atomic_size_t id_generate;
+    cacheline_pad_t _pad10;
 
     /* result generator also used to determent which thread's `run queue`
     receive next `coroutine` task, `counter % cpu cores` */
     atomic_size_t result_id_generate;
+    cacheline_pad_t _pad11;
+
     atomic_result_t *results;
+    cacheline_pad_t _pad12;
 };
 C_API future_results_t gq_result;
 
@@ -562,12 +578,12 @@ C_API values_type get_arg(void_t);
 
 #define in ,
 #define foreach_xp(X, A) X A
-#define foreach_in(X, S) values_type X; int i_##X;  \
-    for (i_##X = 0; i_##X < $size(S); i_##X++)      \
-        if ((X.object = S[i_##X].object) || X.object == nullptr)
-#define foreach_in_back(X, S) values_type X; int i_##X; \
-    for (i_##X = $size(S) - 1; i_##X >= 0; i_##X--)     \
-        if ((X.object = S[i_##X].object) || X.object == nullptr)
+#define foreach_in(X, S) values_type X; int i##X;  \
+    for (i##X = 0; i##X < $size(S); i##X++)      \
+        if ((X.object = S[i##X].object) || X.object == nullptr)
+#define foreach_in_back(X, S) values_type X; int i##X; \
+    for (i##X = $size(S) - 1; i##X >= 0; i##X--)     \
+        if ((X.object = S[i##X].object) || X.object == nullptr)
 
 /* The `foreach(`item `in` vector/array`)` macro, similar to `C#`,
 executes a statement or a block of statements for each element in
