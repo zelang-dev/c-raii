@@ -555,8 +555,7 @@ static RAII_INLINE void coro_enqueue(routine_t *t) {
             || (!coro()->is_main
                 && t->run_code == CORO_RUN_THRD && !coro()->started))) {
         coro_add(coro()->run_queue, t);
-    } else if (coro_is_threading()
-               && (t->run_code == CORO_RUN_NORMAL || t->run_code == CORO_RUN_SYSTEM || t->flagged)) {
+    } else if (coro_is_threading()) {
         coro_atomic_enqueue(t);
     } else {
         coro_add(coro()->run_queue, t);

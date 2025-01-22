@@ -50,6 +50,11 @@ typedef struct vector_metadata_s {
         vector_set_capacity((vec), (count));        \
     } while (0)
 
+static RAII_INLINE size_t vec_num(void) {
+    size_t count = thrd_cpu_count();
+    return 1 << ((count > 5 ) ? 6 : count * 2);
+}
+
 static RAII_INLINE void vector_delete(vectors_t vec) {
     if (vec) {
         void_t p1__ = vector_address(vec);
@@ -154,9 +159,9 @@ vectors_t vector_for(vectors_t v, size_t item_count, ...) {
 
 RAII_INLINE vectors_t vector_variant(void) {
     vectors_t vec = nullptr;
-    size_t cores = 1 << (thrd_cpu_count() * 2);
+    size_t n = vec_num();
     memory_t *scope = unique_init();
-    vector_grow(vec, cores, scope);
+    vector_grow(vec, n, scope);
     raii_deferred(scope, (func_t)vector_delete, vec);
     _defer(raii_delete, scope);
 
@@ -217,6 +222,42 @@ arrays_t array_ex(memory_t *scope, size_t num_of, va_list ap_copy) {
     return params;
 }
 
+arrays_t rangeing(int start, int stop, int steps) {
+    arrays_t array = arrays();
+    memory_t *scope = vector_context(array);
+    int i, n = stop - start;
+    size_t cv_sz___;
+    for (i = start; i < stop; i = i + steps)
+        $append(array, (intptr_t)i);
+
+    cv_sz___ = vector_length(array);
+    vector_grow((array), (cv_sz___), scope);
+    return array;
+}
+
+arrays_t range(int start, int stop) {
+    arrays_t array = arrays();
+    memory_t *scope = vector_context(array);
+    int i, n = stop - start;
+    vector_grow((array), (n + 1), scope);
+    for (i = start; i < stop; i++)
+        $append(array, (intptr_t)i);
+
+    return array;
+}
+
+arrays_t range_char(string_t text) {
+    arrays_t array = arrays();
+    memory_t *scope = vector_context(array);
+    size_t len = simd_strlen(text);
+    int i;
+    vector_grow((array), (len + 1), scope);
+    for (i = 0; i < len; i++)
+        $append(array, (uintptr_t)*text++);
+
+    return array;
+}
+
 RAII_INLINE void array_remove(arrays_t arr, int i) {
     if (arr) {
         const size_t cv_sz__ = vector_length(arr);
@@ -263,7 +304,7 @@ arrays_t array_of(memory_t *scope, size_t count, ...) {
     va_list ap;
     size_t i;
     arrays_t params = nullptr;
-    size_t size = count ? count + 1 : 1 << (thrd_cpu_count() * 2);
+    size_t size = count ? count + 1 : vec_num();
     vector_grow(params, size, scope);
 
     if (count > 0) {
@@ -277,6 +318,21 @@ arrays_t array_of(memory_t *scope, size_t count, ...) {
     return params;
 }
 
+RAII_INLINE arrays_t arrays(void) {
+    memory_t *scope;
+    if (!coro_sys_set)
+        scope = unique_init();
+    else
+        scope = get_scope();
+
+    arrays_t array = array_of(scope, 0);
+    array_deferred_set(array, scope);
+    if (!coro_sys_set)
+        _defer(raii_delete, scope);
+
+    return array;
+}
+
 RAII_INLINE void array_deferred_set(arrays_t params, memory_t *scope) {
     if (vector_type(params) == RAII_ARRAY && !vector_deferred(params)) {
         vector_defer_set(params);
@@ -288,7 +344,7 @@ args_t args_for(size_t count, ...) {
     va_list ap;
     size_t i;
     args_t params = nullptr;
-    size_t size = count ? count : 1 << (thrd_cpu_count() * 2);
+    size_t size = count ? count : vec_num();
     memory_t *scope = unique_init();
     vector_grow(params, size, scope);
 

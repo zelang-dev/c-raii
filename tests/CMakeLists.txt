@@ -4,6 +4,7 @@ set(TARGET_LIST
  test-args_for
  test-array_of
  test-vector
+ test-range
  test-base64
  test-swar
  test-defer

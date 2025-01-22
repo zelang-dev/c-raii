@@ -561,6 +561,21 @@ C_API void array_append(arrays_t, void_t);
 C_API void array_delete(arrays_t);
 C_API void array_remove(arrays_t, int);
 C_API bool is_array(void_t);
+
+/* Returns a sequence of numbers, in a given range, this is same as `arrays_of`,
+but `scoped` to either ~current~ call scope, `coroutine` or `thread` termination. */
+C_API arrays_t range(int start, int stop);
+
+/* Same as `range`, but increasing by given ~steps~. */
+C_API arrays_t rangeing(int start, int stop, int steps);
+
+/* Same as `range`, but return given ~string/text~, split as array of `char`. */
+C_API arrays_t range_char(string_t text);
+
+/* Returns `empty` array `scoped` to either ~current~ call scope,
+`coroutine` or `thread` termination. */
+C_API arrays_t arrays(void);
+
 #define $append(arr, value) array_append((arrays_t)arr, (void_t)value)
 #define $remove(arr, index) array_remove((arrays_t)arr, index)
 
