@@ -132,6 +132,7 @@ typedef enum {
     RAII_INTEGER,
     RAII_UINT,
     RAII_SLONG,
+    RAII_LONG,
     RAII_ULONG,
     RAII_LLONG,
     RAII_MAXSIZE,

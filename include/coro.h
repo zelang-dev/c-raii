@@ -36,7 +36,7 @@ typedef struct awaitable_s {
     raii_type type;
     rid_t cid;
     waitgroup_t wg;
-} *awaitable_t;
+} _awaitable_t, *awaitable_t;
 
 #define USE_UCONTEXT
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
@@ -250,6 +250,12 @@ extern "C" {
     C_API awaitable_t async(callable_t, u64, ...);
     C_API value_t await(awaitable_t);
 
+    C_API string_t _itoa(int64_t number);
+    C_API string str_dup(string_t str);
+    C_API string str_replace(string_t haystack, string_t needle, string_t replace);
+    C_API string str_concat(int num_args, ...);
+    C_API string str_trim(string_t str, size_t length);
+    C_API string *str_split(string_t s, string_t delim, int *count);
 
     /* Collect coroutines with references preventing immediate cleanup. */
     C_API void coro_collector(routine_t *);

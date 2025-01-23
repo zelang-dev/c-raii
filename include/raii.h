@@ -99,7 +99,7 @@ typedef struct result_data {
     bool is_ready;
     rid_t id;
     raii_values_t *result;
-} *result_t;
+} _result_t, *result_t;
 make_atomic(result_t, atomic_result_t)
 
 struct raii_results_s {

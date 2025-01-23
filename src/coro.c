@@ -2678,3 +2678,34 @@ void coro_thread_init(size_t queue_size) {
         throw(logic_error);
     }
 }
+
+RAII_INLINE string_t _itoa(int64_t number) {
+    simd_itoa(number, coro_active()->scrape);
+    return coro_active()->scrape;
+}
+
+RAII_INLINE string str_trim(string_t str, size_t length) {
+    return str_memdup_ex(get_scope(), str, length);
+}
+
+RAII_INLINE string str_dup(string_t str) {
+    return str_trim(str, simd_strlen(str));
+}
+
+RAII_INLINE string *str_split(string_t s, string_t delim, int *count) {
+    return str_split_ex(get_scope(), s, delim, count);
+}
+
+string str_concat(int num_args, ...) {
+    va_list args;
+
+    va_start(args, num_args);
+    string s = str_concat_ex(get_scope(), num_args, args);
+    va_end(args);
+
+    return s;
+}
+
+RAII_INLINE string str_replace(string_t haystack, string_t needle, string_t replace) {
+    return str_replace_ex(get_scope(), haystack, needle, replace);
+}
