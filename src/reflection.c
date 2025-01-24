@@ -128,12 +128,14 @@ RAII_INLINE bool is_reflection(void_t self) {
 
 void println(int n_of_args, ...) {
     va_list argp;
-    void_t list;
+    void_t arguments;
+    ranges_t lists;
+    reflect_type_t *kind;
     int i, type;
 
     va_start(argp, n_of_args);
     for (i = 0; i < n_of_args; i++) {
-        list = va_arg(argp, void_t);
+        arguments = va_arg(argp, void_t);
         /*
         if (is_type(((map_t *)list), RAII_MAP_STRUCT)) {
             type = ((map_t *)list)->item_type;
@@ -152,8 +154,8 @@ void println(int n_of_args, ...) {
                     printf(has(item).boolean ? "true " : "false ");
             }
         } else*/
-        if (is_reflection(list)) {
-            reflect_type_t *kind = (reflect_type_t *)list;
+        if (is_reflection(arguments)) {
+            reflect_type_t *kind = (reflect_type_t *)arguments;
             printf("[ %d, %s, %zu, %zu, %zu ]\n",
                    reflect_type_enum(kind),
                    reflect_type_of(kind),
@@ -172,32 +174,40 @@ void println(int n_of_args, ...) {
                        reflect_field_array_size(kind, i)
                 );
             }
-        } else if (is_valid(list)) {
-            match(list) {
+        } else if (is_valid(arguments)) {
+            match(arguments) {
                 and (RAII_STRING)
                 and (RAII_CHAR_P)
                 and (RAII_CONST_CHAR)
-                    printf("%s ", c_char_ptr(((var_t *)list)->value));
+                    printf("%s ", c_char_ptr(((var_t *)arguments)->value));
                 or (RAII_CHAR)
                 and (RAII_BOOL)
-                    printf("%c ", c_char(((var_t *)list)->value));
+                    printf(c_bool(((var_t *)arguments)->value) ? "true " : "false ");
                 or (RAII_INT)
                 and (RAII_INTEGER)
-                    printf("%d ", c_int(((var_t *)list)->value));
+                    printf("%d ", c_int(((var_t *)arguments)->value));
                 or (RAII_LONG)
-                    printf("%ls ", c_long(((var_t *)list)->value));
+                    printf("%ls ", c_long(((var_t *)arguments)->value));
                 or (RAII_MAXSIZE)
                 and (RAII_ULONG)
-                    printf("%zu ", c_size_t(((var_t *)list)->value));
+                    printf("%zu ", c_size_t(((var_t *)arguments)->value));
+                or (RAII_RANGE)
+                    lists = (ranges_t)((var_t *)arguments)->value;
+                    foreach(l in lists)
+                        printf("%lld, ", l.long_long);
+                or (RAII_RANGE_CHAR)
+                    lists = (ranges_t)((var_t *)arguments)->value;
+                    foreach(c in lists)
+                        printf("%c", c.schar);
                 or (RAII_DOUBLE)
-                    printf("%.6f ", c_double(((var_t *)list)->value));
+                    printf("%.6f ", c_double(((var_t *)arguments)->value));
                 or (RAII_FLOAT)
-                    printf("%f ", c_float(((var_t *)list)->value));
+                    printf("%f ", c_float(((var_t *)arguments)->value));
                 otherwise
-                    printf("%p ", c_ptr(((var_t *)list)->value));
+                    printf("%p ", c_ptr(((var_t *)arguments)->value));
             }
         } else {
-            printf("%s ", c_char_ptr(list));
+            printf("%s ", c_char_ptr(arguments));
         }
     }
     va_end(argp);

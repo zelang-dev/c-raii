@@ -222,8 +222,24 @@ arrays_t array_ex(memory_t *scope, size_t num_of, va_list ap_copy) {
     return params;
 }
 
-arrays_t rangeing(int start, int stop, int steps) {
-    arrays_t array = arrays();
+RAII_INLINE arrays_t array_copy(arrays_t des, arrays_t src) {
+    memory_t *scope;
+    size_t cv_sz___;
+    if (src) {
+        des = arrays();
+        scope = vector_context(des);
+        foreach(x in src)
+            $append(des, x.object);
+        cv_sz___ = vector_length(des);
+        vector_grow((des), (cv_sz___), scope);
+        vector_set_type(des, vector_type(src));
+    }
+
+    return des;
+}
+
+ranges_t rangeing(int start, int stop, int steps) {
+    ranges_t array = arrays();
     memory_t *scope = vector_context(array);
     int i, n = stop - start;
     size_t cv_sz___;
@@ -232,22 +248,24 @@ arrays_t rangeing(int start, int stop, int steps) {
 
     cv_sz___ = vector_length(array);
     vector_grow((array), (cv_sz___), scope);
+    vector_set_type(array, RAII_RANGE);
     return array;
 }
 
-arrays_t range(int start, int stop) {
-    arrays_t array = arrays();
+ranges_t range(int start, int stop) {
+    ranges_t array = arrays();
     memory_t *scope = vector_context(array);
     int i, n = stop - start;
     vector_grow((array), (n + 1), scope);
     for (i = start; i < stop; i++)
         $append(array, (intptr_t)i);
 
+    vector_set_type(array, RAII_RANGE);
     return array;
 }
 
-arrays_t range_char(string_t text) {
-    arrays_t array = arrays();
+ranges_t range_char(string_t text) {
+    ranges_t array = arrays();
     memory_t *scope = vector_context(array);
     size_t len = simd_strlen(text);
     int i;
@@ -255,6 +273,7 @@ arrays_t range_char(string_t text) {
     for (i = 0; i < len; i++)
         $append(array, (uintptr_t)*text++);
 
+    vector_set_type(array, RAII_RANGE_CHAR);
     return array;
 }
 
@@ -364,7 +383,11 @@ RAII_INLINE bool is_vector(void_t params) {
 }
 
 RAII_INLINE bool is_array(void_t params) {
-    return vector_type((arrays_t)params) == RAII_ARRAY;
+    if (is_valid(params))
+        return false;
+
+    int param = vector_type((arrays_t)params);
+    return param == RAII_ARRAY || param == RAII_RANGE || param == RAII_RANGE_CHAR;
 }
 
 RAII_INLINE bool is_args(void_t params) {
