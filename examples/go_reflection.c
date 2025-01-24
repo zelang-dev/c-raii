@@ -15,7 +15,7 @@ reflect_struct(details,
 
 typedef string myType;
 
-void showDetails(reflect_type_t *i, void_t j) {
+void showDetails(reflect_type_t *i, interface j) {
     char value[20] = {0};
     int index;
     reflect_field_t *val = reflect_value_of(i);
@@ -57,7 +57,7 @@ void showDetails(reflect_type_t *i, void_t j) {
 }
 
 int main(int argc, char **argv) {
-    as_ref(iD, myType, "12345678", RAII_STRING);
+    as_string_ref(iD, myType, "12345678");
 
     as_instance_ref(person, details);
     person->fname = "Go";

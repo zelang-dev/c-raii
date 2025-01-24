@@ -14,7 +14,9 @@
 extern "C" {
 #endif
 
+#undef interface
 typedef raii_type reflect_types;
+typedef void_t interface;
 typedef struct reflect_value_s {
     reflect_types type;
     string_t value_type;
@@ -340,9 +342,8 @@ C_API void shuttingdown(void);
     variable->value = (variable_type *)calloc_local(1, sizeof(variable_type) + sizeof(data)); \
     memcpy(variable->value, &data, sizeof(data))
 
-#define as_char(variable, data) as_var(variable, char, data, RAII_CHAR_P)
 #define as_string(variable, data) as_var(variable, char, data, RAII_STRING)
-#define as_long(variable, data) as_var(variable, long, data, RAII_LONG)
+#define as_size(variable, data) as_var(variable, size_t, data, RAII_MAXSIZE)
 #define as_int(variable, data) as_var(variable, int, data, RAII_INTEGER)
 #define as_uchar(variable, data) as_var(variable, unsigned char, data, RAII_UCHAR)
 
@@ -352,7 +353,26 @@ C_API void shuttingdown(void);
 #define as_ref(variable, type, data, enum_type) as_var(variable, type, data, enum_type); \
     as_reflect(variable##_r, var_t, variable)
 
-#define as_instance(variable, variable_type) variable_type *variable = (variable_type *)calloc_local(1, sizeof(variable_type)); \
+#define as_string_ref(variable, type, data) as_var(variable, type, data, RAII_STRING); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_size_ref(variable, type, data) as_var(variable, type, data, RAII_MAXSIZE); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_int_ref(variable, type, data) as_var(variable, type, data, RAII_INT); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_uchar_ref(variable, type, data) as_var(variable, type, data, RAII_UCHAR); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_float_ref(variable, type, data) as_var(variable, type, data, RAII_FLOAT); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_double_ref(variable, type, data) as_var(variable, type, data, RAII_DOUBLE); \
+    as_reflect(variable##_r, var_t, variable)
+
+#define as_instance(variable, variable_type)    \
+    variable_type *variable = (variable_type *)calloc_local(1, sizeof(variable_type));  \
     variable->type = RAII_STRUCT;
 
 #define as_instance_ref(variable, type) as_instance(variable, type) \

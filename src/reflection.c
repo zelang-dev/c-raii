@@ -172,8 +172,32 @@ void println(int n_of_args, ...) {
                        reflect_field_array_size(kind, i)
                 );
             }
+        } else if (is_valid(list)) {
+            match(list) {
+                and (RAII_STRING)
+                and (RAII_CHAR_P)
+                and (RAII_CONST_CHAR)
+                    printf("%s ", c_char_ptr(((var_t *)list)->value));
+                or (RAII_CHAR)
+                and (RAII_BOOL)
+                    printf("%c ", c_char(((var_t *)list)->value));
+                or (RAII_INT)
+                and (RAII_INTEGER)
+                    printf("%d ", c_int(((var_t *)list)->value));
+                or (RAII_LONG)
+                    printf("%ls ", c_long(((var_t *)list)->value));
+                or (RAII_MAXSIZE)
+                and (RAII_ULONG)
+                    printf("%zu ", c_size_t(((var_t *)list)->value));
+                or (RAII_DOUBLE)
+                    printf("%.6f ", c_double(((var_t *)list)->value));
+                or (RAII_FLOAT)
+                    printf("%f ", c_float(((var_t *)list)->value));
+                otherwise
+                    printf("%p ", c_ptr(((var_t *)list)->value));
+            }
         } else {
-            printf("%s ", raii_value(list).char_ptr);
+            printf("%s ", c_char_ptr(list));
         }
     }
     va_end(argp);
