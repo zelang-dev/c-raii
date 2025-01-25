@@ -269,6 +269,7 @@ C_API bool reflect_field_is_signed(reflect_type_t *, int);
 C_API int reflect_field_array_size(reflect_type_t *, int);
 C_API reflect_types reflect_field_enum(reflect_type_t *, int);
 C_API bool is_reflection(void_t self);
+C_API var_t *assign(interface src, raii_type type);
 C_API void println(int n_of_args, ...);
 C_API void shuttingdown(void);
 
@@ -337,41 +338,31 @@ C_API void shuttingdown(void);
 #define c_func(data) c_callable(data)
 #define c_cast(type, data) (type)raii_value((data)).object
 
-#define as_var(variable, variable_type, data, enum_type) var_t *variable = (var_t *)calloc_local(1, sizeof(var_t)); \
-    variable->type = enum_type; \
-    variable->value = (variable_type *)calloc_local(1, sizeof(variable_type) + sizeof(data)); \
-    memcpy(variable->value, &data, sizeof(data))
+#define as_var(variable, data, enum_type) var_t *variable = assign(data, enum_type)
 
-#define as_list(variable, variable_type, data, enum_type) var_t *variable = (var_t *)calloc_local(1, sizeof(var_t)); \
-    variable->type = enum_type; \
-    variable->value = (interface)array_copy((variable_type)variable->value, data);
-
-#define as_string(variable, data) as_var(variable, char, data, RAII_STRING)
-#define as_size(variable, data) as_var(variable, size_t, data, RAII_MAXSIZE)
-#define as_int(variable, data) as_var(variable, int, data, RAII_INTEGER)
-#define as_uchar(variable, data) as_var(variable, unsigned char, data, RAII_UCHAR)
-#define as_array(variable, data) as_list(variable, arrays_t, data, RAII_ARRAY)
-#define as_range(variable, data) as_list(variable, ranges_t, data, RAII_RANGE)
-#define as_range_char(variable, data) as_list(variable, ranges_t, data, RAII_RANGE_CHAR)
+#define as_string(variable, type, data) as_var(variable, (type)data, RAII_STRING)
+#define as_size(variable, type, data) as_var(variable, (type)data, RAII_MAXSIZE)
+#define as_int(variable, type, data) as_var(variable, (type)data, RAII_INTEGER)
+#define as_uchar(variable, type, data) as_var(variable, (type)data, RAII_UCHAR)
+#define as_array(variable, type, data) as_var(variable, (type)data, RAII_ARRAY)
+#define as_range(variable, type, data) as_var(variable, (type)data, RAII_RANGE)
+#define as_range_char(variable, type, data) as_var(variable, (type)data, RAII_RANGE_CHAR)
 
 #define as_reflect(variable, type, value)   reflect_type_t* variable = reflect_##type(); \
-    variable->instance = value;
+    reflect_with(variable, value)
 
-#define as_ref(variable, type, data, enum_type) as_var(variable, type, data, enum_type); \
+#define as_ref(variable, data, enum_type) as_var(variable, data, enum_type); \
     as_reflect(variable##_r, var_t, variable)
 
-#define as_list_ref(variable, type, data, enum_type) as_list(variable, type, data, enum_type); \
-    as_reflect(variable##_r, var_t, variable)
-
-#define as_string_ref(variable, type, data) as_ref(variable, type, data, RAII_STRING)
-#define as_size_ref(variable, type, data) as_ref(variable, type, data, RAII_MAXSIZE)
-#define as_int_ref(variable, type, data) as_ref(variable, type, data, RAII_INT)
-#define as_uchar_ref(variable, type, data) as_ref(variable, type, data, RAII_UCHAR)
-#define as_float_ref(variable, type, data) as_ref(variable, type, data, RAII_FLOAT)
-#define as_double_ref(variable, type, data) as_ref(variable, type, data, RAII_DOUBLE)
-#define as_array_ref(variable, type, data) as_list_ref(variable, type, data, RAII_ARRAY)
-#define as_range_ref(variable, type, data) as_list_ref(variable, type, data, RAII_RANGE)
-#define as_range_char_ref(variable, type, data) as_list_ref(variable, type, data, RAII_RANGE_CHAR)
+#define as_string_ref(variable, type, data) as_ref(variable, (type)data, RAII_STRING)
+#define as_size_ref(variable, type, data) as_ref(variable, (type)data, RAII_MAXSIZE)
+#define as_int_ref(variable, type, data) as_ref(variable, (type)data, RAII_INT)
+#define as_uchar_ref(variable, type, data) as_ref(variable, (type)data, RAII_UCHAR)
+#define as_float_ref(variable, type, data) as_ref(variable, (type)data, RAII_FLOAT)
+#define as_double_ref(variable, type, data) as_ref(variable, (type)data, RAII_DOUBLE)
+#define as_array_ref(variable, type, data) as_ref(variable, (type)data, RAII_ARRAY)
+#define as_range_ref(variable, type, data) as_ref(variable, (type)data, RAII_RANGE)
+#define as_range_char_ref(variable, type, data) as_ref(variable, (type)data, RAII_RANGE_CHAR)
 
 #define as_instance(variable, variable_type)    \
     variable_type *variable = (variable_type *)calloc_local(1, sizeof(variable_type));  \

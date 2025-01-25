@@ -53,6 +53,23 @@ string_t reflect_kind(void_t value) {
     return "Unknown error";
 }
 
+var_t *assign(interface src, raii_type type) {
+    var_t *as = (var_t *)calloc_local(1, sizeof(var_t));
+    as->type = type;
+    if (type == RAII_ARRAY || type == RAII_RANGE || type == RAII_RANGE_CHAR) {
+        as->value = (interface)array_copy((arrays_t)as->value, (arrays_t)src);
+    } else if (type == RAII_VECTOR || type == RAII_ARGS) {
+        as->value = (interface)vector_copy(get_scope(), (vectors_t)as->value, (vectors_t)src);
+    } else if (type == RAII_STRING || type == RAII_CHAR_P || type == RAII_CONST_CHAR) {
+        as->value = str_memdup_ex(get_scope(), src, simd_strlen((string_t)src));
+    } else {
+        as->value = calloc_local(1, sizeof(values_type) + sizeof(src));
+        memcpy(as->value, src, sizeof(src));
+    }
+
+    return as;
+}
+
 RAII_INLINE void reflect_with(reflect_type_t *type, void_t value) {
     type->instance = value;
 }
@@ -191,6 +208,12 @@ void println(int n_of_args, ...) {
                 or (RAII_MAXSIZE)
                 and (RAII_ULONG)
                     printf("%zu ", c_size_t(((var_t *)arguments)->value));
+                or (RAII_VECTOR)
+                and (RAII_ARGS)
+                and (RAII_ARRAY)
+                    lists = (vectors_t)((var_t *)arguments)->value;
+                    foreach(p in lists)
+                        printf("%p, ", p.object);
                 or (RAII_RANGE)
                     lists = (ranges_t)((var_t *)arguments)->value;
                     foreach(l in lists)

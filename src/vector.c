@@ -379,7 +379,9 @@ args_t args_for(size_t count, ...) {
 }
 
 RAII_INLINE bool is_vector(void_t params) {
-    return vector_type((vectors_t)params) == RAII_VECTOR;
+    return is_valid(params)
+        ? false
+        : vector_type((vectors_t)params) == RAII_VECTOR;
 }
 
 RAII_INLINE bool is_array(void_t params) {
@@ -391,7 +393,9 @@ RAII_INLINE bool is_array(void_t params) {
 }
 
 RAII_INLINE bool is_args(void_t params) {
-    return vector_type((args_t)params) == RAII_ARGS;
+    return is_valid(params)
+        ? false
+        : vector_type((args_t)params) == RAII_ARGS;
 }
 
 RAII_INLINE values_type get_arg(void_t params) {
