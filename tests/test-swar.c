@@ -25,6 +25,7 @@ TEST(memchr) {
     const char str[] = "tutor.ials.point";
     ASSERT_STR(simd_memchr(str, '.', simd_strlen(str)), ".ials.point");
     ASSERT_STR(simd_memrchr(str, '.', simd_strlen(str)), ".point");
+    return 0;
 }
 
 TEST(cast8) {
@@ -37,6 +38,7 @@ TEST(cast8) {
     ASSERT_UEQ(cast8("1234567890", 6), 0x363534333231ull);
     ASSERT_UEQ(cast8("1234567890", 7), 0x37363534333231ull);
     ASSERT_UEQ(cast8("1234567890", 8), 0x3837363534333231ull);
+    return 0;
 }
 
 TEST(atoi) {
@@ -136,6 +138,7 @@ TEST(atoi) {
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 18), -12345678901234567ll);
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 19), -123456789012345678ll);
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 20), -1234567890123456789ll);
+    return 0;
 }
 
 TEST(htou) {
@@ -190,6 +193,7 @@ TEST(htou) {
     ASSERT_LEQ(htou8("1234abef", 6), 0x1234ab);
     ASSERT_LEQ(htou8("1234abef", 7), 0x1234abe);
     ASSERT_LEQ(htou8("1234abef", 8), 0x1234abef);
+    return 0;
 }
 
 TEST(itoa) {
@@ -264,20 +268,24 @@ TEST(itoa) {
     itoa8(123456, itoa_returned); ASSERT_STR(itoa_returned, "123456");
     itoa8(1234567, itoa_returned); ASSERT_STR(itoa_returned, "1234567");
     itoa8(12345678, itoa_returned); ASSERT_STR(itoa_returned, "12345678");
+    return 0;
 }
 
 TEST(strlen) {
     const char *any = "Hello World!";
     ASSERT_TRUE((12 == simd_strlen(any)));
+    return 0;
 }
 
 TEST(raii_replace) {
     string_t text = "hello world";
     ASSERT_STR(raii_replace(text, "world", "hello"), "hello hello");
+    return 0;
 }
 
 TEST(raii_concat) {
     ASSERT_STR(raii_concat(3, "testing ", "this ", "thing"), "testing this thing");
+    return 0;
 }
 
 TEST(raii_split) {
