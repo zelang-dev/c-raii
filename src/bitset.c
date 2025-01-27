@@ -95,6 +95,18 @@ RAII_INLINE bits_t bitset_create(i32 length) {
     return set;
 }
 
+RAII_INLINE bits_t bitset(i32 length, u64 ul) {
+    bits_t bits = bitset_create(length);
+    if (!coro_sys_set)
+        _defer(bitset_free, bits);
+    else
+        raii_deferred(get_scope(), (func_t)bitset_free, bits);
+
+    *bits->words = ul;
+
+    return bits;
+}
+
 RAII_INLINE void bitset_free(bits_t set) {
     if (is_type(set, RAII_BITSET)) {
         set->type = RAII_ERR;

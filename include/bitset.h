@@ -6,6 +6,7 @@
 
 typedef struct bits_s *bits_t;
 C_API bits_t bitset_create(i32 length);
+C_API bits_t bitset(i32 length, u64 ul);
 C_API i32 bitset_size(bits_t set);
 C_API i32 bitset_count(bits_t set);
 C_API void bitset_free(bits_t set);
