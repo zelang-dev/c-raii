@@ -146,6 +146,7 @@ RAII_INLINE bool is_reflection(void_t self) {
 void println(int n_of_args, ...) {
     va_list argp;
     void_t arguments;
+    vectors_t variants;
     ranges_t lists;
     reflect_type_t *kind;
     int i, type;
@@ -210,8 +211,11 @@ void println(int n_of_args, ...) {
                     printf("%zu ", c_size_t(((var_t *)arguments)->value));
                 or (RAII_VECTOR)
                 and (RAII_ARGS)
-                and (RAII_ARRAY)
-                    lists = (vectors_t)((var_t *)arguments)->value;
+                    variants = (vectors_t)((var_t *)arguments)->value;
+                    foreach(v in variants)
+                        printf("%p, ", v.object);
+                or (RAII_ARRAY)
+                    lists = (arrays_t)((var_t *)arguments)->value;
                     foreach(p in lists)
                         printf("%p, ", p.object);
                 or (RAII_RANGE)
