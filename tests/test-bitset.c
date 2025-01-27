@@ -3,7 +3,7 @@
 #include "bitset.h"
 #include "test_assert.h"
 
-TEST(bitset_get) {
+TEST(bitset_test) {
     i32 i;
     bits_t x = bitset_create(5); // all 0's by default
     ASSERT_EQ(5, bitset_size(x));
@@ -12,7 +12,7 @@ TEST(bitset_get) {
     bitset_set(x, 1);
     bitset_set(x, 4);
     for (i = 0; i < bitset_size(x); ++i)
-        printf("%d", bitset_get(x, i));
+        printf("%d", bitset_test(x, i));
     puts("\n");
 
     ASSERT_STR("10011", bitset_to_string(x));
@@ -25,7 +25,7 @@ TEST(bitset_get) {
 TEST(list) {
     int result = 0;
 
-    EXEC_TEST(bitset_get);
+    EXEC_TEST(bitset_test);
     return result;
 }
 

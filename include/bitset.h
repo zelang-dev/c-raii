@@ -11,7 +11,7 @@ C_API i32 bitset_count(bits_t set);
 C_API void bitset_free(bits_t set);
 C_API u64 bitset_ullong(bits_t set);
 C_API string bitset_to_string(bits_t set);
-C_API i32 bitset_get(bits_t set, i32 n);
+C_API bool bitset_test(bits_t set, i32 n);
 C_API void bitset_set(bits_t set, i32 n);
 C_API void bitset_reset(bits_t set, i32 n);
 C_API void bitset_flip(bits_t set, i32 n);

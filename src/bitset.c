@@ -124,11 +124,11 @@ RAII_INLINE i32 bitset_count(bits_t set) {
     return length;
 }
 
-RAII_INLINE i32 bitset_get(bits_t set, i32 n) {
+RAII_INLINE bool bitset_test(bits_t set, i32 n) {
     RAII_ASSERT(set);
     RAII_ASSERT(0 <= n && n < set->length);
 
-    return ((set->bytes[n / 8] >> (n % 8)) & 1);
+    return (bool)((set->bytes[n / 8] >> (n % 8)) & 1);
 }
 
 RAII_INLINE u64 bitset_ullong(bits_t set) {
@@ -143,7 +143,7 @@ RAII_INLINE string bitset_to_string(bits_t set) {
 
     memset(set->to_string, '0', set->length);
     for (i = 0; i < set->length; i++) {
-        if (bitset_get(set, max))
+        if (bitset_test(set, max))
             set->to_string[i] = '1';
 
         max--;
