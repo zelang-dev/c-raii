@@ -7,6 +7,7 @@ set(TARGET_LIST
  test-range
  test-reflect
  test-base64
+ test-bitset
  test-swar
  test-defer
  test-exceptions

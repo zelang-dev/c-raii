@@ -177,6 +177,7 @@ typedef enum {
     RAII_INTERRUPT_ARG,
     RAII_PROCESS,
     RAII_SCHED,
+    RAII_BITSET,
     RAII_CHANNEL,
     RAII_STRUCT,
     RAII_UNION,
