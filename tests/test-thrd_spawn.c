@@ -13,8 +13,8 @@ void *is_prime(args_t arg) {
 void_t check_primes(void_t result, size_t id, vectors_t object) {
     bool y = object[0].boolean;
     int prime = object[1].integer;
-    ASSERT_TRUE((prime == 194232491));
-    ASSERT_EQ(y, true);
+    ASSERT_EQU(prime, 194232491);
+    ASSERT_EQU(y, true);
 
     *(int *)result = 0;
     return result;

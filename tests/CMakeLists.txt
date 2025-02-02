@@ -8,6 +8,7 @@ set(TARGET_LIST
  test-reflect
  test-base64
  test-bitset
+ test-hashmap
  test-swar
  test-defer
  test-exceptions

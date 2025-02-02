@@ -49,6 +49,17 @@ inline void assert_expected(long res, long expected, const char *file, unsigned 
     PRINT_OK(" %s == %s\033[0K\n", #expected, #actual); \
   } while (0)
 
+#define ASSERT_ERR_(expected, actual, cmp, print_op) do { \
+    if (!(cmp)) \
+      { \
+	PRINT_ERR(" %s %d:\n   * %s != %s\n   * Expected: " print_op	\
+          "\n   * Actual: " print_op "\n", __FILE__, __LINE__, \
+          #expected, #actual, expected, actual); \
+    return $$$(1); \
+      } \
+    PRINT_OK(" %s == %s\033[0K\n", #expected, #actual); \
+  } while (0)
+
 #define ASSERT_THREAD_EQ(expected, actual, cmp, print_op) do { \
     if (!(cmp)) \
       { \
@@ -75,6 +86,7 @@ inline void assert_expected(long res, long expected, const char *file, unsigned 
 #define ASSERT_PTR(expected, actual) ASSERT_EQ_(expected, actual, memcmp(expected, actual, sizeof(actual)) == 0, "%p")
 #define ASSERT_UEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%zu")
 #define ASSERT_EQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%d")
+#define ASSERT_EQU(expected, actual) ASSERT_ERR_(expected, actual, expected == actual, "%d")
 #define ASSERT_CHAR(expected, actual) ASSERT_EQ_((char)expected, (char)actual, expected == actual, "%c")
 #define ASSERT_LEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%i")
 #define ASSERT_XEQ(expected, actual) ASSERT_EQ_((long)(expected), (long)(actual), expected == actual, "%ld")

@@ -270,7 +270,7 @@ C_API int reflect_field_array_size(reflect_type_t *, int);
 C_API reflect_types reflect_field_enum(reflect_type_t *, int);
 C_API bool is_reflection(void_t self);
 C_API var_t *assign(interface src, raii_type type);
-C_API void println(int n_of_args, ...);
+C_API void println(u32, ...);
 C_API void shuttingdown(void);
 
 /**

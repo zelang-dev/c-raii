@@ -4,7 +4,7 @@
 
 void *worker(params_t args) {
     int id = coro_id();
-    ASSERT_EQ(coro_id(), args[0].integer + 1);
+    ASSERT_EQU(coro_id(), args[0].integer + 1);
 
     sleepfor(1000);
     if (id == 4)

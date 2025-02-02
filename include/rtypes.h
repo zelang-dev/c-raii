@@ -88,6 +88,9 @@ typedef void (*func_t)(void_t);
 typedef void_t(*raii_func_t)(void_t);
 typedef void (*func_args_t)(void_t, ...);
 typedef void_t(*raii_func_args_t)(void_t, ...);
+typedef intptr_t(*raii_callable_t)(intptr_t);
+typedef uintptr_t(*raii_callable_args_t)(uintptr_t, ...);
+typedef uintptr_t *(*raii_callable_const_t)(const char *, ...);
 
 /* Generic simple union storage types. */
 typedef union {
@@ -147,21 +150,21 @@ typedef enum {
     RAII_CHAR_P,
     RAII_CONST_CHAR,
     RAII_STRING,
+    RAII_OBJ,
+    RAII_PTR,
+    RAII_FUNC,
+    RAII_NAN,
     RAII_ARRAY,
     RAII_RANGE,
     RAII_RANGE_CHAR,
     RAII_VECTOR,
     RAII_ARGS,
     RAII_HASH,
-    RAII_OBJ,
-    RAII_PTR,
-    RAII_FUNC,
-    RAII_NAN,
+    RAII_MAP,
     RAII_DEF_ARR,
     RAII_DEF_FUNC,
     RAII_ROUTINE,
     RAII_CORO,
-    RAII_OA_HASH,
     RAII_REFLECT_TYPE,
     RAII_REFLECT_INFO,
     RAII_REFLECT_VALUE,
@@ -201,9 +204,6 @@ typedef struct future_pool *future_t;
 typedef struct raii_deque_s raii_deque_t;
 typedef struct raii_results_s future_results_t;
 typedef memory_t unique_t;
-typedef intptr_t(*raii_callable_t)(intptr_t);
-typedef uintptr_t(*raii_callable_args_t)(uintptr_t, ...);
-typedef uintptr_t *(*raii_callable_const_t)(const char *, ...);
 
 /* Generic simple union storage types. */
 typedef union {

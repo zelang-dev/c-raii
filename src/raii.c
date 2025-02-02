@@ -4,6 +4,65 @@ thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
 future_results_t gq_result = {0};
 
+values_type *value_create(const_t data, raii_type op) {
+    values_type *value = try_calloc(1, sizeof(values_type));
+    size_t slen;
+    string text;
+
+    switch (op) {
+        case RAII_UINT:
+        case RAII_ULONG:
+        case RAII_MAXSIZE:
+            value->max_size = *(size_t *)data;
+            break;
+        case RAII_FLOAT:
+        case RAII_DOUBLE:
+            value->precision = *(double *)data;
+            break;
+        case RAII_BOOL:
+            value->boolean = *(bool *)data;
+            break;
+        case RAII_UCHAR:
+        case RAII_CHAR:
+            value->schar = *(char *)data;
+            break;
+        case RAII_USHORT:
+        case RAII_SHORT:
+            value->s_short = *(short *)data;
+            break;
+        case RAII_INT:
+        case RAII_LONG:
+        case RAII_SLONG:
+        case RAII_INTEGER:
+        case RAII_LLONG:
+            value->long_long = *(int64_t *)data;
+            break;
+        case RAII_FUNC:
+            value->func = (raii_func_t)data;
+            break;
+        case RAII_CHAR_P:
+        case RAII_CONST_CHAR:
+        case RAII_STRING:
+            slen = simd_strlen((string)data);
+            if (slen > sizeof(values_type) - 1) {
+                text = try_calloc(1, slen + sizeof(char) + 1);
+                str_copy(text, (string)data, slen);
+                value->char_ptr = text;
+            } else {
+                value->char_ptr = (string)data;
+            }
+            break;
+        case RAII_UCHAR_P:
+        case RAII_OBJ:
+        case RAII_PTR:
+        default:
+            value->object = (void_t)data;
+            break;
+    }
+
+    return value;
+}
+
 RAII_INLINE result_t raii_result_get(rid_t id) {
     return (result_t)atomic_load_explicit(&gq_result.results[id], memory_order_relaxed);
 }

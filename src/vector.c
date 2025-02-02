@@ -319,6 +319,18 @@ RAII_INLINE void array_append(arrays_t arr, void_t value) {
     vector_set_size(arr, vector_length(arr) + 1);
 }
 
+RAII_INLINE void array_append_double(arrays_t arr, double value) {
+    size_t size, cv_cap__ = vector_cap(arr);
+    memory_t *scope = vector_context(arr);
+    if (cv_cap__ <= vector_length(arr)) {
+        size = cv_cap__ << 1;
+        vector_grow(arr, size, scope);
+    }
+
+    arr[vector_length(arr)].precision = value;
+    vector_set_size(arr, vector_length(arr) + 1);
+}
+
 arrays_t array_of(memory_t *scope, size_t count, ...) {
     va_list ap;
     size_t i;

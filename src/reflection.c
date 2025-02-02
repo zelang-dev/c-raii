@@ -1,4 +1,5 @@
 #include "reflection.h"
+#include "map.h"
 
 string_t reflect_kind(void_t value) {
     reflect_types res = (reflect_types)type_of(value);
@@ -143,36 +144,41 @@ RAII_INLINE bool is_reflection(void_t self) {
         && ((reflect_kind_t *)self)->packed_size;
 }
 
-void println(int n_of_args, ...) {
+void println(u32 num_of_args, ...) {
     va_list argp;
     void_t arguments;
     vectors_t variants;
     ranges_t lists;
+    map_t *list;
     reflect_type_t *kind;
     int i, type;
 
-    va_start(argp, n_of_args);
-    for (i = 0; i < n_of_args; i++) {
+    va_start(argp, num_of_args);
+    for (i = 0; i < num_of_args; i++) {
         arguments = va_arg(argp, void_t);
-        /*
-        if (is_type(((map_t *)list), RAII_MAP_STRUCT)) {
-            type = ((map_t *)list)->item_type;
-            foreach(item in list) {
-                if (type == RAII_LLONG)
+        if (is_type(((map_t *)arguments), RAII_MAP_STRUCT)) {
+            list = (map_t *)arguments;
+            foreach_map(item in list) {
+                if (iter_type(item) == RAII_LLONG)
 #ifdef _WIN32
                     printf("%ld ", (long)has(item).long_long);
 #else
                     printf("%lld ", has(item).long_long);
 #endif
-                else if (type == RAII_STRING)
-                    printf("%s ", has(item).str);
-                else if (type == RAII_OBJ)
+                else if (iter_type(item) == RAII_MAXSIZE)
+                    printf("%zu ", has(item).max_size);
+                else if (iter_type(item) == RAII_STRING)
+                    printf("%s ", has(item).char_ptr);
+                else if (iter_type(item) == RAII_CHAR)
+                    printf("%c ", has(item).schar);
+                else if (iter_type(item) == RAII_OBJ)
                     printf("%p ", has(item).object);
-                else if (type == RAII_BOOL)
+                else if (iter_type(item) == RAII_BOOL)
                     printf(has(item).boolean ? "true " : "false ");
+                else if (iter_type(item) == RAII_INVALID)
+                    printf("invalid: %p ", has(item).object);
             }
-        } else*/
-        if (is_reflection(arguments)) {
+        } else if (is_reflection(arguments)) {
             reflect_type_t *kind = (reflect_type_t *)arguments;
             printf("[ %d, %s, %zu, %zu, %zu ]\n",
                    reflect_type_enum(kind),

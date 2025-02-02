@@ -20,6 +20,7 @@ set(TARGET_LIST defer_thread
  thrd_spawn_fib
  thrd_spawn_fib_pool
  benchmark
+ map_insert
  go_reflection
  go_multi_args
  go_panic

@@ -113,6 +113,7 @@ struct raii_results_s {
     size_t cpu_count;
     size_t thread_count;
 
+    size_t capacity;
     size_t queue_size;
     arrays_t gc;
     memory_t *scope;
@@ -322,6 +323,7 @@ This uses current `thread` smart pointer, unless called
 between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
 C_API void_t calloc_local(int count, size_t size);
 
+C_API values_type *value_create(const_t, raii_type);
 C_API values_type raii_value(void_t);
 C_API raii_type type_of(void_t);
 C_API bool is_type(void_t, raii_type);
@@ -559,6 +561,7 @@ C_API arrays_t array_ex(memory_t *, size_t, va_list);
 C_API arrays_t array_copy(arrays_t des, arrays_t src);
 C_API void array_deferred_set(arrays_t, memory_t *);
 C_API void array_append(arrays_t, void_t);
+C_API void array_append_double(arrays_t, double);
 C_API void array_delete(arrays_t);
 C_API void array_remove(arrays_t, int);
 C_API bool is_array(void_t);
@@ -578,6 +581,7 @@ C_API ranges_t range_char(string_t text);
 C_API arrays_t arrays(void);
 
 #define $append(arr, value) array_append((arrays_t)arr, (void_t)value)
+#define $append_double(arr, value) array_append_number((arrays_t)arr, (double)value)
 #define $remove(arr, index) array_remove((arrays_t)arr, index)
 
 C_API values_type get_arg(void_t);
@@ -611,6 +615,15 @@ an instance of `vectors_t/args_t/arrays_t` */
 #define and(ENUM) case ENUM:
 #define or(ENUM) break; case ENUM:
 #define otherwise break; default:
+#define casting(X) (void_t)((ptrdiff_t)(X))
+
+#ifndef va_copy
+# ifdef __va_copy
+#  define va_copy(a,b) __va_copy(a,b)
+# else /* !__va_copy */
+#  define va_copy(a,b) (*(a) = *(b))
+# endif /* __va_copy */
+#endif /* va_copy */
 
 #ifdef __cplusplus
     }
