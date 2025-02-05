@@ -110,7 +110,7 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
 map_t map_create(void) {
     map_t hash = (map_t)try_malloc(sizeof(struct map_s));
     hash->started = false;
-    hash->dict = hash_init_ex(256);
+    hash->dict = hash_create_ex(256);
     hash->type = RAII_MAP_STRUCT;
     return hash;
 }

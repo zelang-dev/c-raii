@@ -675,7 +675,7 @@ RAII_INLINE bool is_str_in(const char *text, char *pattern) {
 }
 
 RAII_INLINE bool is_str_eq(const char *str, const char *str2) {
-    return (str != NULL && str2 != NULL) && (simd_strcmp(str, str2) == 0);
+    return (str != nullptr && str2 != nullptr) && (strcmp(str, str2) == 0);
 }
 
 RAII_INLINE bool is_str_empty(const char *str) {

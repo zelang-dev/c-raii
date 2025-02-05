@@ -62,7 +62,7 @@ var_t *assign(interface src, raii_type type) {
     } else if (type == RAII_VECTOR || type == RAII_ARGS) {
         as->value = (interface)vector_copy(get_scope(), (vectors_t)as->value, (vectors_t)src);
     } else if (type == RAII_STRING || type == RAII_CHAR_P || type == RAII_CONST_CHAR) {
-        as->value = str_memdup_ex(get_scope(), src, simd_strlen((string_t)src));
+        as->value = str_trim(src, simd_strlen((string_t)src));
     } else {
         as->value = calloc_local(1, sizeof(values_type) + sizeof(src));
         memcpy(as->value, src, sizeof(src));

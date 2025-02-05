@@ -8,21 +8,6 @@ Modified from https://github.com/nomemory/open-adressing-hash-table-c
 */
 #include "hashtable.h"
 
-typedef struct key_ops_s {
-    void_t arg;
-    bool (*eq)(const_t data1, const_t data2, void_t arg);
-    uint32_t(*hash)(const_t data);
-    void *(*cp)(const_t data, void_t arg);
-    void (*free)(void_t data);
-} key_ops_t;
-
-typedef struct val_ops_s {
-    void_t arg;
-    bool (*eq)(const_t data1, const_t data2, void_t arg);
-    void *(*cp)(const_t data, void_t arg);
-    void (*free)(void_t data);
-} val_ops_t;
-
 make_atomic(kv_pair_t, atomic_kv_pair_t)
 struct hash_s {
     raii_type type;
@@ -37,27 +22,16 @@ struct hash_s {
     atomic_kv_pair_t **buckets;
 };
 
-static kv_pair_t *hash_operation(hash_t *, const_t key, const_t value, raii_type op);
-static hash_t *hash_new_ex(key_ops_t key_ops, val_ops_t val_ops, probe_func probing, u32 cap);
 // Pair related
 static kv_pair_t *pair_create(uint32_t hash, const_t key, const_t value, raii_type op);
+static kv_pair_t *hash_operation(hash_t *, const_t key, const_t value, raii_type op);
 static void pair_free(kv_pair_t *pair);
-
-// String operations
-static uint32_t string_hash(const_t data);
-static void_t string_cp(const_t data, void_t arg);
-static bool string_eq(const_t data1, const_t data2, void_t arg);
-
-/* Probing functions */
-static RAII_INLINE void hash_lp_idx(hash_t *htable, size_t *idx);
 
 enum ret_ops {
     DEL,
     PUT,
     GET
 };
-static u32 hash_initial_capacity = HASH_INIT_CAPACITY;
-static bool hash_initial_override = false;
 
 static size_t hash_getidx(hash_t *htable, size_t idx, uint32_t hash_val, const_t key, enum ret_ops op);
 static RAII_INLINE void hash_grow(hash_t *htable);
@@ -65,7 +39,12 @@ static RAII_INLINE bool hash_should_grow(hash_t *htable);
 static RAII_INLINE bool hash_is_tombstone(hash_t *htable, size_t idx);
 static RAII_INLINE void hash_put_tombstone(hash_t *htable, size_t idx);
 
-static hash_t *hash_new_ex(key_ops_t key_ops, val_ops_t val_ops, probe_func probing, u32 cap) {
+static u32 hash_initial_capacity = HASH_INIT_CAPACITY;
+static bool hash_initial_override = false;
+key_ops_t key_ops_string = {djb2_hash, hash_string_eq, hash_string_cp, RAII_FREE, nullptr};
+val_ops_t val_ops_string = {hash_string_eq, hash_string_cp, RAII_FREE, nullptr};
+
+hash_t *hashtable_init(key_ops_t key_ops, val_ops_t val_ops, probe_func probing, u32 cap) {
     int i;
     hash_t *htable = try_calloc(1, sizeof(*htable));
     u32 capacity = is_zero(cap) ? hash_initial_capacity : cap;
@@ -84,7 +63,7 @@ static hash_t *hash_new_ex(key_ops_t key_ops, val_ops_t val_ops, probe_func prob
 
 void pair_free(kv_pair_t *pair) {
     if (!is_empty(pair) && is_valid(pair)) {
-        if (pair->type == RAII_STRING && simd_strlen(pair->extended->char_ptr) > sizeof(values_type)) {
+        if (pair->type == RAII_CONST_CHAR) {
             void_t data = pair->extended->char_ptr;
             RAII_FREE(data);
         }
@@ -103,7 +82,13 @@ void hash_free(hash_t *htable) {
         kv_pair_t **buckets = (kv_pair_t **)atomic_load_explicit(&htable->buckets, memory_order_consume);
         for (i = 0; i < capacity; i++) {
             if (buckets[i] && buckets[i]->key)
-                htable->key_ops.free(buckets[i]->key);
+                if (buckets[i]) {
+                    if (buckets[i]->key)
+                        htable->key_ops.free(buckets[i]->key);
+
+                    if (!is_empty(buckets[i]->value))
+                        htable->val_ops.free(buckets[i]->value);
+                }
 
             pair_free(buckets[i]);
         }
@@ -134,7 +119,8 @@ static RAII_INLINE void hash_grow(hash_t *htable) {
     for (i = 0; i < old_capacity; i++) {
         crt_pair = old_buckets[i];
         if (!is_empty(crt_pair) && !hash_is_tombstone(htable, i)) {
-            hash_put(htable, crt_pair->key, crt_pair->value);
+            hash_operation(htable, crt_pair->key, crt_pair->value, crt_pair->type);
+            htable->val_ops.free(crt_pair->value);
             htable->key_ops.free(crt_pair->key);
             pair_free(crt_pair);
         }
@@ -178,12 +164,19 @@ kv_pair_t *hash_operation(hash_t *hash, const_t key, const_t value, raii_type op
             // Update the existing value
             // Free the old values
             RAII_FREE(buckets[idx]->extended);
-            hash->key_ops.free(buckets[idx]->key);
+            if (buckets[idx]->type == RAII_PTR)
+                hash->key_ops.free(buckets[idx]->value);
+
             // Update the new values
-            buckets[idx]->extended = value_create(hash->val_ops.cp(value, hash->val_ops.arg), op);
             buckets[idx]->type = op;
+            if (op == RAII_STRING && simd_strlen((string)value) > (sizeof(values_type) - 1))
+                buckets[idx]->type = RAII_CONST_CHAR;
+
+            buckets[idx]->extended = value_create(hash->val_ops.cp(value, hash->val_ops.arg), op);
             buckets[idx]->value = buckets[idx]->extended;
-            buckets[idx]->key = hash->val_ops.cp(key, hash->key_ops.arg);
+            if (op == RAII_PTR)
+                buckets[idx]->value = buckets[idx]->extended->object;
+
             buckets[idx]->hash = hash_val;
             atomic_fetch_sub(&hash->size, 1);
         }
@@ -196,6 +189,14 @@ kv_pair_t *hash_operation(hash_t *hash, const_t key, const_t value, raii_type op
 
 RAII_INLINE void_t hash_put(hash_t *htable, const_t key, const_t value) {
     return (void_t)hash_operation(htable, key, value, RAII_OBJ);
+}
+
+RAII_INLINE void_t hash_put_str(hash_t *htable, const_t key, string value) {
+    return hash_operation(htable, key, value, RAII_PTR);
+}
+
+RAII_INLINE void_t hash_put_obj(hash_t *htable, const_t key, const_t value) {
+    return hash_operation(htable, key, value, RAII_PTR);
 }
 
 RAII_INLINE kv_pair_t *hash_func(hash_t *htable, const_t key, raii_func_args_t value) {
@@ -243,12 +244,14 @@ void_t hash_replace(hash_t *htable, const_t key, const_t value) {
     kv_pair_t **buckets = (kv_pair_t **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
     // Update the new values
-    if (buckets[idx]->type == RAII_STRING
-        && simd_strlen(buckets[idx]->extended->char_ptr) > sizeof(values_type)) {
+    if (buckets[idx]->type == RAII_CONST_CHAR) {
         buckets[idx]->type = RAII_OBJ;
         void_t data = buckets[idx]->extended->char_ptr;
         RAII_FREE(data);
     }
+
+    if (buckets[idx]->type == RAII_PTR)
+        htable->key_ops.free(buckets[idx]->value);
 
     buckets[idx]->extended->object = (void_t)value;
     buckets[idx]->value = buckets[idx]->extended;
@@ -320,6 +323,9 @@ void hash_delete(hash_t *htable, const_t key) {
     atomic_thread_fence(memory_order_seq_cst);
     RAII_FREE(buckets[idx]->extended);
     htable->key_ops.free(buckets[idx]->key);
+    if (buckets[idx]->type == RAII_PTR)
+        htable->key_ops.free(buckets[idx]->value);
+
     atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
     atomic_fetch_sub(&htable->size, 1);
 
@@ -383,27 +389,40 @@ static size_t hash_getidx(hash_t *htable, size_t idx, uint32_t hash_val,
 
 kv_pair_t *pair_create(uint32_t hash, const_t key, const_t value, raii_type op) {
     kv_pair_t *p = try_calloc(1, sizeof(kv_pair_t));
-    p->extended = value_create(value, op);
-
     p->type = op;
+    if (op == RAII_STRING && simd_strlen((string)value) > (sizeof(values_type) - 1))
+        p->type = RAII_CONST_CHAR;
+
+    p->extended = value_create(value, op);
     p->hash = hash;
     p->value = p->extended;
+    if (op == RAII_PTR)
+        p->value = p->extended->object;
+
     p->key = (void_t)key;
 
     return p;
 }
 
-// Probing functions
-static RAII_INLINE void hash_lp_idx(hash_t *htable, size_t *idx) {
+RAII_INLINE void hash_lp_idx(hash_t *htable, size_t *idx) {
     (*idx)++;
     if ((*idx) == (size_t)atomic_load(&htable->capacity))
         (*idx) = 0;
 }
 
-static RAII_INLINE bool string_eq(const_t data1, const_t data2, void_t arg) {
+RAII_INLINE bool hash_string_eq(const_t data1, const_t data2, void_t arg) {
     string_t str1 = (string_t)data1;
     string_t str2 = (string_t)data2;
     return !(strcmp(str1, str2)) ? true : false;
+}
+
+RAII_INLINE void_t hash_string_cp(const_t data, void_t arg) {
+    string_t input = (string_t)data;
+    size_t input_length = simd_strlen(input);
+    char *result = try_calloc(1, sizeof(*result) + input_length + 1);
+
+    str_copy(result, input, input_length);
+    return result;
 }
 
 // String operations
@@ -414,7 +433,7 @@ static RAII_INLINE uint32_t hash_fmix32(uint32_t h) {
     return h;
 }
 
-static RAII_INLINE uint32_t string_hash(const_t data) {
+RAII_INLINE uint32_t djb2_hash(const_t data) {
     // djb2
     uint32_t hash = (const uint32_t)5381;
     string_t str = (string_t)data;
@@ -423,19 +442,6 @@ static RAII_INLINE uint32_t string_hash(const_t data) {
         hash = ((hash << 5) + hash) + c;
     }
     return hash_fmix32(hash);
-}
-
-static RAII_INLINE void_t string_cp(const_t data, void_t arg) {
-    string_t input = (string_t)data;
-    size_t input_length = simd_strlen(input);
-    char *result = try_calloc(1, sizeof(char) + input_length + 1);
-
-    str_copy(result, input, input_length);
-    return result;
-}
-
-RAII_INLINE void string_free(void_t data, void_t arg) {
-    RAII_FREE(data);
 }
 
 RAII_INLINE void string_print(const_t data) {
@@ -453,15 +459,14 @@ static RAII_INLINE bool plain_eq(const_t data1, const_t data2, void_t arg) {
 static RAII_INLINE void plain_free(void_t data) {
 }
 
-key_ops_t key_ops_string = {nullptr, string_eq, string_hash, string_cp, RAII_FREE};
-val_ops_t val_ops_value = {nullptr, plain_eq, plain_cp, plain_free};
+val_ops_t val_ops_value = {plain_eq, plain_cp, plain_free, nullptr};
 
-RAII_INLINE hash_t *hash_init(void) {
-    return (hash_t *)hash_new_ex(key_ops_string, val_ops_value, hash_lp_idx, 0);
+RAII_INLINE hash_t *hash_create(void) {
+    return (hash_t *)hashtable_init(key_ops_string, val_ops_value, hash_lp_idx, 0);
 }
 
-RAII_INLINE hash_t *hash_init_ex(u32 size) {
-    return (hash_t *)hash_new_ex(key_ops_string, val_ops_value, hash_lp_idx, size);
+RAII_INLINE hash_t *hash_create_ex(u32 size) {
+    return (hash_t *)hashtable_init(key_ops_string, val_ops_value, hash_lp_idx, size);
 }
 
 RAII_INLINE void hash_capacity(u32 buckets) {

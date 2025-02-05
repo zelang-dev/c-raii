@@ -501,16 +501,6 @@ thrd_local_extern(memory_t, raii)
 thrd_local_extern(ex_context_t, except)
 C_API const raii_values_t raii_values_empty[1];
 
-C_API string str_memdup_ex(memory_t *defer, const_t src, size_t len);
-C_API string str_copy(string dest, string_t src, size_t len);
-C_API string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count);
-C_API string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy);
-C_API string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, string_t replace);
-C_API u_string str_encode64_ex(memory_t *defer, u_string_t src);
-C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
-C_API bool is_base64(u_string_t src);
-C_API int strpos(const char *text, char *pattern);
-
 C_API vectors_t vector_variant(void);
 C_API vectors_t vector_for(vectors_t, size_t, ...);
 C_API void vector_insert(vectors_t, int, void_t);

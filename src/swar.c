@@ -6,22 +6,19 @@
 #define CODE_SECTION
 #endif
 
-// Copy the sign from src to dst that is unsigned.
-// *** dst is up to 63 bit
 static RAII_INLINE int64_t _copySign(int64_t src, uint64_t dst) {
     // This is better than `src > 0 ? dst : -dst` that is using cmov
     uint64_t m = ~(src >> 63); // all 1s if >= 0 (opposite of abs)
     return (dst + m) ^ m; // flip if src negative
 }
 
-RAII_INLINE uintptr_t cast(const char *src) {
+RAII_INLINE uintptr_t cast(string_t src) {
     uintptr_t ret;
     memcpy(&ret, src, sizeof(uintptr_t));
     return ret;
 }
 
-// Get the uint _cast_ of a string of up to 8 chars
-RAII_INLINE uintptr_t cast8(const char *s, uint32_t len) {
+RAII_INLINE uintptr_t cast8(string_t s, uint32_t len) {
     RAII_ASSERT(len <= 8);
 
     // int 64 of s
@@ -39,8 +36,6 @@ RAII_INLINE uintptr_t extend(char c) {
     return ret;
 }
 
-/* Returns the number of trailing 0-bits in x,
-starting at the least significant bit position.*/
 RAII_INLINE int countr_zero(uintptr_t mask) {
 #ifdef _WIN32
     unsigned long result;
@@ -51,8 +46,6 @@ RAII_INLINE int countr_zero(uintptr_t mask) {
 #endif
 }
 
-/* Returns the number of leading 0-bits in x,
-starting at the most significant bit position. */
 RAII_INLINE int countl_zero(uintptr_t mask) {
 #ifdef _WIN32
     unsigned long result;
@@ -63,26 +56,21 @@ RAII_INLINE int countl_zero(uintptr_t mask) {
 #endif
 }
 
-/* Returns the index of the least significant 1-bit in x,
-or the value zero if x is zero. */
 RAII_INLINE int countr_index(uintptr_t mask) {
     return (mask == 0) ? 0 : countr_zero(mask) + 1;
 }
 
-/* Check if word has zero byte */
 RAII_INLINE bool haszero(uint64_t x) {
     uint64_t a = 0x7f7f7f7f7f7f7f7full;
     uint64_t l = 0x0101010101010101ull;
     return (x - l) & ~x & ~a;
 }
 
-/* Check if word has some byte */
 RAII_INLINE bool hasbyte(uint64_t x, uint8_t c) {
     return haszero(x ^ extend(c));
 }
 
-// Find char in string. Support all options.
-RAII_INLINE uint32_t _memchr8(bool Printable, bool Exists, bool Reverse, const char *s, uint8_t c) {
+RAII_INLINE uint32_t _memchr8(bool Printable, bool Exists, bool Reverse, string_t s, uint8_t c) {
     // int 64 of all c's
     uint64_t m = extend(c);
 
@@ -129,20 +117,16 @@ RAII_INLINE uint32_t _memchr8(bool Printable, bool Exists, bool Reverse, const c
     }
 }
 
-// Find char in binary string of 8 chars
-RAII_INLINE uint32_t memchr8(const char *s, uint8_t c) {
+RAII_INLINE uint32_t memchr8(string_t s, uint8_t c) {
     return _memchr8(false, false, false, s, c);
 }
 
-// Find char in binary string of 8 chars
-// * The string is known to contain the char
-RAII_INLINE uint32_t memchr8k(const char *s, uint8_t c) {
+RAII_INLINE uint32_t memchr8k(string_t s, uint8_t c) {
     return _memchr8(false, true, false, s, c);
 }
 
-// Find char, in reverse, in const binary string
-static RAII_INLINE uint32_t _memrchr(bool Printable, bool Known, const char *s, uint32_t len, uint8_t c) {
-    const char *p = s + len;
+static RAII_INLINE uint32_t _memrchr(bool Printable, bool Known, string_t s, uint32_t len, uint8_t c) {
+    string_t p = s + len;
 
     // If shorter than 8 bytes, we have to mask away c bytes past len
     uint32_t partLen = (len & 7) ? (len & 7) : 8;
@@ -154,7 +138,7 @@ static RAII_INLINE uint32_t _memrchr(bool Printable, bool Known, const char *s, 
 
     // Check first 8 bytes
     if (hasbyte(first, c)) {
-        return (p - s) + _memchr8(Printable, true, true, (char *)&first, c);
+        return (p - s) + _memchr8(Printable, true, true, (string)&first, c);
     }
 
     // Check words for that byte
@@ -170,10 +154,9 @@ static RAII_INLINE uint32_t _memrchr(bool Printable, bool Known, const char *s, 
     }
 }
 
-// Find char in const binary string
-static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, const char *s, uint32_t len, uint8_t c) {
-    const char *p = s;
-    const char *end = s + len;
+static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, string_t s, uint32_t len, uint8_t c) {
+    string_t p = s;
+    string_t end = s + len;
 
     // If shorter than 8 bytes, we have to mask away c bytes past len
     uint32_t partLen = (len & 7) ? (len & 7) : 8;
@@ -182,7 +165,7 @@ static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, const char *s, u
 
     // Check first 8 bytes
     if (hasbyte(first, c))
-        return _memchr8(Printable, true, false, (char *)&first, c);
+        return _memchr8(Printable, true, false, (string)&first, c);
 
     // Advance to leave multiple of 8 bytes
     p += partLen;
@@ -200,7 +183,6 @@ static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, const char *s, u
     }
 }
 
-// Convert uint, of less than 100, to %02u, as int 16
 RAII_INLINE uint16_t utoa2p(uint64_t x) {
     static const section(text) uint8_t pairs[50] = { // 0..49, little endian
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90,
@@ -218,14 +200,12 @@ RAII_INLINE uint16_t utoa2p(uint64_t x) {
     return ((t | (t << 4)) & 0x0f0f) | 0x3030;
 }
 
-// Convert uint, of less than 100, to %02u
-RAII_INLINE void utoa2p_ex(uint64_t x, char *s) {
+RAII_INLINE void utoa2p_ex(uint64_t x, string s) {
     uint16_t t = utoa2p(x);
     memcpy(s, &t, sizeof(uint16_t));
 }
 
-// Convert signed int 32 to string of up to 8 bytes.
-RAII_INLINE uint32_t itoa8(int32_t x, char *buf) {
+RAII_INLINE uint32_t itoa8(int32_t x, string buf) {
     // Handle negatives
     bool neg = x < 0;
     *buf = '-'; // Always write
@@ -259,10 +239,7 @@ RAII_INLINE uint32_t itoa8(int32_t x, char *buf) {
     return n + neg;
 }
 
-// Convert signed int 64 to string. String buffer is at least 22 bytes.
-// Returns length
-// *** this feels inefficient :( ***
-RAII_INLINE uint32_t simd_itoa(int64_t x, char *buf) {
+RAII_INLINE string simd_itoa(int64_t x, string buf) {
     // Handle negatives
     bool neg = x < 0;
     *buf = '-'; // Always write
@@ -270,7 +247,7 @@ RAII_INLINE uint32_t simd_itoa(int64_t x, char *buf) {
     x = abs(x);
 
     char tmp[20];
-    char *p = tmp + 20;
+    string p = tmp + 20;
 
     while (x >= 100) {
         p -= 2;
@@ -288,11 +265,10 @@ RAII_INLINE uint32_t simd_itoa(int64_t x, char *buf) {
     memcpy(buf, p, 20);
     buf[len] = '\0';
 
-    return len + neg;
+    return buf;
 }
 
-// Parse uint from string of up to 8 chars
-RAII_INLINE uint32_t atou8(const char *s, uint32_t len) {
+RAII_INLINE uint32_t atou8(string_t s, uint32_t len) {
     RAII_ASSERT(len <= 8);
 
     // int 64 of s. "12345678" --> 0x3837363534333231
@@ -314,9 +290,7 @@ RAII_INLINE uint32_t atou8(const char *s, uint32_t len) {
     return x;
 }
 
-// Parse uint64_t from string of up to 20 chars
-// *** More than 20 char returns junk.
-RAII_INLINE uint64_t simd_atou(const char *s, uint32_t len) {
+RAII_INLINE uint64_t simd_atou(string_t s, uint32_t len) {
     RAII_ASSERT(len <= 20);
     uint64_t x = 0;
     if (len > 8) {
@@ -335,8 +309,7 @@ RAII_INLINE uint64_t simd_atou(const char *s, uint32_t len) {
     return x + atou8(s, len);
 }
 
-// Parse _signed_ int from string of up to 20 chars. No spaces
-RAII_INLINE int64_t simd_atoi(const char *s, uint32_t len) {
+RAII_INLINE int64_t simd_atoi(string_t s, uint32_t len) {
     bool neg = !!len & (*s == '-');
     bool ls = !!len & (*s == '-' || *s == '+');
     s += ls;
@@ -346,8 +319,7 @@ RAII_INLINE int64_t simd_atoi(const char *s, uint32_t len) {
     return neg ? -x : x;
 }
 
-// Parse hex int from string of up to 8 chars
-RAII_INLINE uint32_t htou8(const char *s, uint32_t len) {
+RAII_INLINE uint32_t htou8(string_t s, uint32_t len) {
     RAII_ASSERT(len <= 8);
 
     // int 64 of s. "12345678" --> 0x3837363534333231
@@ -374,8 +346,7 @@ RAII_INLINE uint32_t htou8(const char *s, uint32_t len) {
     return x;
 }
 
-// Parse hex int from string of up to 16 chars
-RAII_INLINE uint64_t simd_htou(const char *s, uint32_t len) {
+RAII_INLINE uint64_t simd_htou(string_t s, uint32_t len) {
     RAII_ASSERT(len <= 16);
     uint64_t x = 0;
     if (len > 8) {
@@ -388,42 +359,8 @@ RAII_INLINE uint64_t simd_htou(const char *s, uint32_t len) {
     return x + htou8(s, len);
 }
 
-RAII_INLINE int simd_strcmp(const char *str0, const char *str1) {
-    int len = simd_strlen(str0);
-    int fast = len / sizeof(size_t) + 1;
-    int offset = (fast - 1) * sizeof(size_t);
-    int current_block = 0;
-
-    if (len <= sizeof(size_t)) { fast = 0; }
-
-    size_t *lstr0 = (size_t *)str0;
-    size_t *lstr1 = (size_t *)str1;
-
-    while (current_block < fast) {
-        if ((lstr0[current_block] ^ lstr1[current_block])) {
-            int pos;
-            for (pos = current_block * sizeof(size_t); pos < len; ++pos) {
-                if ((str0[pos] ^ str1[pos]) || (str0[pos] == 0) || (str1[pos] == 0)) {
-                    return  (int)((unsigned char)str0[pos] - (unsigned char)str1[pos]);
-                }
-            }
-        }
-
-        ++current_block;
-    }
-
-    while (len > offset) {
-        if ((str0[offset] ^ str1[offset])) {
-            return (int)((unsigned char)str0[offset] - (unsigned char)str1[offset]);
-        }
-        ++offset;
-    }
-
-    return 0;
-}
-
-RAII_INLINE size_t simd_strlen(const char *str) {
-    const char *char_ptr;
+RAII_INLINE size_t simd_strlen(string_t str) {
+    string_t char_ptr;
     const uintptr_t *longword_ptr;
     uintptr_t longword, himagic, lomagic;
 
@@ -468,7 +405,7 @@ RAII_INLINE size_t simd_strlen(const char *str) {
             /* Which of the bytes was the zero?  If none of them were, it was
                a misfire; continue the search.  */
 
-            const char *cp = (const char *)(longword_ptr - 1);
+            string_t cp = (string_t )(longword_ptr - 1);
 
             if (cp[0] == 0)
                 return cp - str;
@@ -492,49 +429,39 @@ RAII_INLINE size_t simd_strlen(const char *str) {
     }
 }
 
-RAII_INLINE string simd_memchr(const char *s, uint8_t c, uint32_t len) {
-    return (char *)s + _memchr(false, false, s, len, c);
+RAII_INLINE string simd_memchr(string_t s, uint8_t c, uint32_t len) {
+    return (string)s + _memchr(false, false, s, len, c);
 }
 
-RAII_INLINE string simd_memrchr(const char *s, uint8_t c, uint32_t len) {
-    return (char *)s + _memrchr(false, false, s, len, c);
+RAII_INLINE string simd_memrchr(string_t s, uint8_t c, uint32_t len) {
+    return (string)s + _memrchr(false, false, s, len, c);
 }
 
-// Find char in binary string. Char c is known to be in s + len
-RAII_INLINE uint32_t memchrk(const char *s, uint32_t len, uint8_t c) {
+RAII_INLINE uint32_t memchrk(string_t s, uint32_t len, uint8_t c) {
     return _memchr(false, true, s, len, c);
 }
 
-// Find char in printable string
-RAII_INLINE uint32_t pmemchr(const char *s, uint32_t len, uint8_t c) {
+RAII_INLINE uint32_t pmemchr(string_t s, uint32_t len, uint8_t c) {
     return _memchr(true, false, s, len, c);
 }
 
-// Find char in printable string. Char c is known to be in s + len
-RAII_INLINE uint32_t pmemchrk(const char *s, uint32_t len, uint8_t c) {
+RAII_INLINE uint32_t pmemchrk(string_t s, uint32_t len, uint8_t c) {
     return _memchr(true, true, s, len, c);
 }
 
-
-// Find char in binary string. Char c is known to be in s + len
-RAII_INLINE uint32_t memrchrk(const char *s, uint32_t len, uint8_t c) {
+RAII_INLINE uint32_t memrchrk(string_t s, uint32_t len, uint8_t c) {
     return _memrchr(false, true, s, len, c);
 }
 
-// Find char in printable string
-RAII_INLINE uint32_t pmemrchr(const char *s, uint32_t len, uint8_t c) {
+RAII_INLINE uint32_t pmemrchr(string_t s, uint32_t len, uint8_t c) {
     return _memrchr(true, false, s, len, c);
 }
 
-// Find char in printable string. Char c is known to be in s + len
-RAII_INLINE uint32_t pmemrchrk(const char *s, uint32_t len, uint8_t c) {
+RAII_INLINE uint32_t pmemrchrk(string_t s, uint32_t len, uint8_t c) {
     return _memrchr(true, true, s, len, c);
 }
 
-// Parse double from string
-// *** More than 20 char integer part returns junk.
-// *** Too much decimal char will get lost to precision
-RAII_INLINE double simd_atod(const char *s, uint32_t len) {
+RAII_INLINE double simd_atod(string_t s, uint32_t len) {
     // Get int part
     int ilen = pmemchr(s, len, '.');
 
@@ -562,8 +489,7 @@ RAII_INLINE double simd_atod(const char *s, uint32_t len) {
     return ipart + dpart * scales[len];
 }
 
-// Convert uint to %0<N>u, N <= 8
-RAII_INLINE uint64_t _utoap(int N, uint64_t x, char *s) {
+RAII_INLINE uint64_t _utoap(int N, uint64_t x, string s) {
     int i;
     RAII_ASSERT(N <= 8);
 
@@ -581,8 +507,7 @@ RAII_INLINE uint64_t _utoap(int N, uint64_t x, char *s) {
     return x;
 }
 
-// Convert uint to %0<N>u, N <= 20
-RAII_INLINE char *utoap(int N, uint64_t x, char *s) {
+RAII_INLINE string utoap(int N, uint64_t x, string s) {
     if (N <= 8) {
         _utoap(N, x, s);
     } else if (N <= 16) {
@@ -600,7 +525,7 @@ RAII_INLINE char *utoap(int N, uint64_t x, char *s) {
     return s;
 }
 
-int strpos(const char *text, char *pattern) {
+int strpos(string_t text, string pattern) {
     size_t c, d, e, text_length, pattern_length, position = RAII_ERR;
 
     text_length = simd_strlen(text);
@@ -626,7 +551,7 @@ int strpos(const char *text, char *pattern) {
 
 string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count) {
     if (is_str_eq(s, ""))
-        return NULL;
+        return nullptr;
 
     if (is_empty((void_t)delim))
         delim = " ";
@@ -657,7 +582,7 @@ string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count) {
             }
         }
 
-        *++ptrs = NULL;
+        *++ptrs = nullptr;
         if (count)
             *count = (int)nbWords;
     }
@@ -693,7 +618,7 @@ string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy) {
 
 string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, string_t replace) {
     if (!haystack || !needle || !replace)
-        return NULL;
+        return nullptr;
 
     string result;
     size_t i, cnt = 0;
@@ -709,7 +634,7 @@ string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, strin
     }
 
     if (cnt == 0)
-        return NULL;
+        return nullptr;
 
     if (defer)
         result = (string)calloc_full(defer, 1, i + cnt * (newWlen - oldWlen) + 1, RAII_FREE);
@@ -738,7 +663,96 @@ RAII_INLINE string str_copy(string dest, string_t src, size_t len) {
 RAII_INLINE string str_memdup_ex(memory_t *defer, const_t src, size_t len) {
     string ptr = (string)calloc_full(defer, 1, len + 1, RAII_FREE);
 
-    return LIKELY(ptr) ? memcpy(ptr, src, len) : NULL;
+    return memcpy(ptr, src, len);
+}
+
+RAII_INLINE string str_trim(string_t str, size_t length) {
+    return str_memdup_ex(get_scope(), str, length);
+}
+
+RAII_INLINE string str_dup(string_t str) {
+    return str_trim(str, simd_strlen(str));
+}
+
+RAII_INLINE string *str_split(string_t s, string_t delim, int *count) {
+    return str_split_ex(get_scope(), s, delim, count);
+}
+
+string str_concat(int num_args, ...) {
+    va_list args;
+
+    va_start(args, num_args);
+    string s = str_concat_ex(get_scope(), num_args, args);
+    va_end(args);
+
+    return s;
+}
+
+RAII_INLINE string str_replace(string_t haystack, string_t needle, string_t replace) {
+    return str_replace_ex(get_scope(), haystack, needle, replace);
+}
+
+RAII_INLINE string str_toupper(string s, size_t len) {
+    u_string c;
+    u_string_t e;
+
+    c = (u_string)s;
+    e = (u_string)c + len;
+
+    while (c < e) {
+        *c = toupper(*c);
+        c++;
+    }
+
+    return s;
+}
+
+RAII_INLINE string str_tolower(string s, size_t len) {
+    u_string c;
+    u_string_t e;
+
+    c = (u_string)s;
+    e = c + len;
+
+    while (c < e) {
+        *c = tolower(*c);
+        c++;
+    }
+    return s;
+}
+
+RAII_INLINE string word_toupper(string str, char sep) {
+    size_t i, length = 0;
+
+    length = simd_strlen(str);
+    for (i = 0;i < length;i++) {// capitalize the first most letter
+        if (i == 0) {
+            str[i] = toupper(str[i]);
+        } else if (str[i] == sep) {//check if the charater is the separator
+            str[i + 1] = toupper(str[i + 1]);
+            i += 1;  // skip the next charater
+        } else {
+            str[i] = tolower(str[i]); // lowercase reset of the characters
+        }
+    }
+
+    return str;
+}
+
+RAII_INLINE string ltrim(string s) {
+    while (isspace(*s)) s++;
+    return s;
+}
+
+RAII_INLINE string rtrim(string s) {
+    string back = s + strlen(s);
+    while (isspace(*--back));
+    *(back + 1) = '\0';
+    return s;
+}
+
+RAII_INLINE string trim(string s) {
+    return rtrim(ltrim(s));
 }
 
 static u_char_t base64_table[65] =
@@ -773,7 +787,7 @@ static inline size_t str_base64_len(size_t decoded_len) {
     return ((4u * decoded_len / 3u) + 3u) & ~3u;
 }
 
-bool is_base64(u_string_t src) {
+RAII_INLINE bool is_base64(u_string_t src) {
     size_t i, len = simd_strlen(src);
     for (i = 0; i < len; i++) {
         if (base64_decode_table[src[i]] == 0x80)
@@ -791,7 +805,7 @@ u_string str_encode64_ex(memory_t *defer, u_string_t src) {
 
     olen = str_base64_len(len) + 1 /* for NUL termination */;
     if (olen < len)
-        return NULL; /* integer overflow */
+        return nullptr; /* integer overflow */
 
     out = calloc_full(defer, 1, olen, RAII_FREE);
     end = src + len;
@@ -836,7 +850,7 @@ u_string str_decode64_ex(memory_t *defer, u_string_t src) {
     }
 
     if (count == 0 || count % 4)
-        return NULL;
+        return nullptr;
 
     olen = (count / 4 * 3) + 1;
     pos = out = calloc_full(defer, 1, olen, RAII_FREE);
@@ -863,7 +877,7 @@ u_string str_decode64_ex(memory_t *defer, u_string_t src) {
                     pos -= 2;
                 else {
                     /* Invalid padding */
-                    return NULL;
+                    return nullptr;
                 }
                 break;
             }

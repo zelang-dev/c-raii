@@ -193,7 +193,13 @@ typedef enum {
     RAII_SYNC,
     RAII_NO_INSTANCE,
     RAII_GUARDED_STATUS,
-    RAII_COUNT
+    RAII_SCHEME_TLS,
+    RAII_SCHEME_TCP,
+    RAII_SCHEME_PIPE,
+    RAII_SCHEME_UDP,
+    RAII_URLINFO,
+    RAII_HTTPINFO,
+    RAII_COUNTER
 } raii_type;
 
 /* Smart memory pointer, the allocated memory requested in `arena` field,
