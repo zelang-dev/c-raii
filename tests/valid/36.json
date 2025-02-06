@@ -1,0 +1,102 @@
+[
+  {
+    "value": 123,
+    "bar": "asdf",
+    "bat": [],
+    "baz": [
+      1,
+      2,
+      {
+        "value": 123,
+        "bar": "asdf",
+        "bat": [ [1, 2, {}, { "fooo": "bar!\"" } ] ],
+        "baz": [
+          1,
+          2, 
+          {
+            "value": 123,
+            "bar": "asdf",
+            "bat": [        ],
+            "baz": [1, 2, "asdf"]
+          },
+          "asdf"
+        ]
+      }
+    ]
+  },
+  {
+    "value": 123,
+    "bar": "asdf",
+    "bat": [],
+    "baz": [
+      1,
+      2,
+      {
+        "value": 123,
+        "bar": "asdf",
+        "bat": [ [1, 2, {}, { "fooo": "bar!\"" } ] ],
+        "baz": [
+          1,
+          2, 
+          {
+            "value": 123,
+            "bar": "asdf",
+            "bat": [        ],
+            "baz": [1, 2, "asdf"]
+          },
+          "asdf"
+        ]
+      }
+    ]
+  },
+  {
+    "value": 123,
+    "bar": "asdf",
+    "bat": [],
+    "baz": [
+      1,
+      2,
+      {
+        "value": 123,
+        "bar": "asdf",
+        "bat": [ [1, 2, {}, { "fooo": "bar!\"" } ] ],
+        "baz": [
+          1,
+          2, 
+          {
+            "value": 123,
+            "bar": "asdf",
+            "bat": [        ],
+            "baz": [1, 2, "asdf"]
+          },
+          "asdf"
+        ]
+      }
+    ]
+  },
+  {
+    "value": 123,
+    "bar": "asdf",
+    "bat": [],
+    "baz": [
+      1,
+      2,
+      {
+        "value": 123,
+        "bar": "asdf",
+        "bat": [ [1, 2, {}, { "fooo": "bar!\"" } ] ],
+        "baz": [
+          1,
+          2, 
+          {
+            "value": 123,
+            "bar": "asdf",
+            "bat": [        ],
+            "baz": [1, 2, "asdf"]
+          },
+          "asdf"
+        ]
+      }
+    ]
+  }
+]

@@ -24,6 +24,8 @@ set(TARGET_LIST
  test-http_response
  test-parse_http
  test-parse_url
+ test-json
+ test-json_parser
 )
 
 foreach (TARGET ${TARGET_LIST})

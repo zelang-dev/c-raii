@@ -3,7 +3,6 @@
 
 #include "raii.h"
 
-#define kv(key, value) (key), (value)
 #define HASH_LOAD_FACTOR (0.75)
 #define HASH_GROWTH_FACTOR (1<<2)
 #ifndef HASH_INIT_CAPACITY

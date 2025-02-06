@@ -586,6 +586,7 @@ C_API values_type get_arg(void_t);
 #define $capacity(vec) vector_capacity((vectors_t)vec)
 #define $erase(vec, index) vector_erase((vectors_t)vec, index)
 
+#define kv(key, value) (key), (value)
 #define in ,
 #define foreach_xp(X, A) X A
 #define foreach_in(X, S) values_type X; int i##X;  \
