@@ -265,7 +265,6 @@ size_t          json_string_len(const JSON_Value *value); /* doesn't account for
 double          json_number(const JSON_Value *value);
 int             json_boolean(const JSON_Value *value);
 
-char *json_read_file(const char *filename);
 /* Parses first JSON value in a file, returns NULL in case of error */
 JSON_Value *json_parse_file(const char *filename);
 

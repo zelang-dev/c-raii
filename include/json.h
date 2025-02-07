@@ -90,6 +90,7 @@ C_API json_t *json_encode(string_t desc, ...);
 */
 C_API string json_for(string_t desc, ...);
 
+C_API string json_read_file(string_t filename);
 #ifdef __cplusplus
 }
 #endif

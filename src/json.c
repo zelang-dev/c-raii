@@ -111,7 +111,8 @@ static bool isString(string_t text, int *cursor, int length) {
 static bool isAtLeastOneInteger(string_t text, int *cursor, int length) {
     if (
         text[*cursor] < 48 ||
-        text[*cursor] > 57
+        text[*cursor] > 57 ||
+        text[*cursor] == 48
         ) return false;
     do (*cursor)++;
     while (
@@ -427,4 +428,44 @@ string json_for(string_t desc, ...) {
     va_end(argp);
 
     return json_serialize(json_array_get_wrapping_value(value_array), false);
+}
+
+string json_read_file(string_t filename) {
+    FILE *fp = fopen(filename, "r");
+    size_t size_to_read = 0;
+    size_t size_read = 0;
+    long pos;
+    string file_contents;
+
+    if (!fp) {
+        return nullptr;
+    }
+
+    fseek(fp, 0L, SEEK_END);
+    pos = ftell(fp);
+    if (pos < 0) {
+        fclose(fp);
+        return nullptr;
+    }
+
+    size_to_read = pos;
+    rewind(fp);
+    file_contents = (string)malloc(sizeof(char) * (size_to_read + 1));
+    if (!file_contents) {
+        fclose(fp);
+        return nullptr;
+    }
+
+    size_read = fread(file_contents, 1, size_to_read, fp);
+    if (size_read == 0 || ferror(fp)) {
+        fclose(fp);
+        free(file_contents);
+        return nullptr;
+    }
+
+    fclose(fp);
+    file_contents[size_read] = '\0';
+    deferring(free, file_contents);
+
+    return file_contents;
 }

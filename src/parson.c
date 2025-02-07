@@ -74,7 +74,6 @@
 #define SIZEOF_TOKEN(a)       (sizeof(a) - 1)
 #define SKIP_CHAR(str)        ((*str)++)
 #define SKIP_WHITESPACES(str) while (isspace((unsigned char)(**str))) { SKIP_CHAR(str); }
-//#define MAX(a, b)             ((a) > (b) ? (a) : (b))
 
 #if defined(isnan) && defined(isinf)
 #define IS_NUMBER_INVALID(x) (isnan((x)) || isinf((x)))
@@ -200,40 +199,6 @@ static int json_serialize_to_buffer_r(const JSON_Value *value, char *buf, int le
 static int json_serialize_string(const char *string, size_t len, int quotes, char *buf);
 
 /* Various */
-char *json_read_file(const char *filename) {
-    FILE *fp = fopen(filename, "r");
-    size_t size_to_read = 0;
-    size_t size_read = 0;
-    long pos;
-    char *file_contents;
-    if (!fp) {
-        return NULL;
-    }
-    fseek(fp, 0L, SEEK_END);
-    pos = ftell(fp);
-    if (pos < 0) {
-        fclose(fp);
-        return NULL;
-    }
-    size_to_read = pos;
-    rewind(fp);
-    file_contents = (char *)parson_malloc(sizeof(char) * (size_to_read + 1));
-    if (!file_contents) {
-        fclose(fp);
-        return NULL;
-    }
-    size_read = fread(file_contents, 1, size_to_read, fp);
-    if (size_read == 0 || ferror(fp)) {
-        fclose(fp);
-        parson_free(file_contents);
-        return NULL;
-    }
-    fclose(fp);
-    file_contents[size_read] = '\0';
-    deferring((func_t)free, file_contents);
-    return file_contents;
-}
-
 static void remove_comments(char *string, const char *start_token, const char *end_token) {
     parson_bool_t in_string = PARSON_FALSE, escaped = PARSON_FALSE;
     size_t i;
