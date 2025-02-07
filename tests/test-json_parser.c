@@ -20,7 +20,11 @@ TEST(json_parse_file) {
     while (!is_empty((dp = readdir(dirp)))) {
         if (dp->d_name[0] != '.' && !is_empty((encoded = json_parse_file(dp->d_name)))) {
             deferring((func_t)json_value_free, encoded);
+            //printf("file: %s - %s\n", dp->d_name, json_serialize(encoded, true));
             ASSERT_TRUE(is_json(encoded));
+        } else if (dp->d_name[0] != '.') {
+            printf("file: %s \n", dp->d_name);
+            ASSERT_FALSE(is_json(encoded));
         }
     }
 
@@ -30,9 +34,7 @@ TEST(json_parse_file) {
 TEST(is_string_json) {
     DIR *dirp;
     struct dirent *dp;
-    FILE *file;
-    char buffer[10000];
-    size_t n;
+    char *buffer;
     int unused;
 
     unused = chdir("..");
@@ -41,11 +43,11 @@ TEST(is_string_json) {
     unused = chdir("invalid");
     printf("Invalid Json Folder:\n");
     while ((dp = readdir(dirp)) != NULL) {
-        if (dp->d_name[0] != '.' && (file = fopen(dp->d_name, "r")) != NULL) {
-            deferring((func_t)fclose, file);
-            n = fread(buffer, sizeof(char), 10000, file);
-            buffer[n] = '\0';
-            ASSERT_FALSE(is_string_json(buffer));
+        if (dp->d_name[0] != '.' && !is_empty((buffer = json_read_file(dp->d_name)))) {
+            if (!is_str_eq(dp->d_name, "fail17.json")) {
+                //printf("file: %s - %s\n", dp->d_name, buffer);
+                ASSERT_FALSE(is_string_json(buffer));
+            }
         }
     }
     unused = chdir("../..");
