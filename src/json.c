@@ -200,7 +200,7 @@ RAII_INLINE bool is_json(json_t *schema) {
 }
 
 RAII_INLINE string json_serialize(json_t *json, bool is_pretty) {
-    string json_string = nullptr;
+    string json_string = "";
     if (!is_empty(json)) {
         if (is_pretty)
             json_string = json_serialize_to_string_pretty((const json_t *)json);

@@ -23,7 +23,7 @@ TEST(json_parse_file) {
             //printf("file: %s - %s\n", dp->d_name, json_serialize(encoded, true));
             ASSERT_TRUE(is_json(encoded));
         } else if (dp->d_name[0] != '.') {
-            printf("file: %s \n", dp->d_name);
+            printf("file: %s - %s\n", dp->d_name, json_read_file(dp->d_name));
             ASSERT_FALSE(is_json(encoded));
         }
     }
@@ -44,10 +44,8 @@ TEST(is_string_json) {
     printf("Invalid Json Folder:\n");
     while ((dp = readdir(dirp)) != NULL) {
         if (dp->d_name[0] != '.' && !is_empty((buffer = json_read_file(dp->d_name)))) {
-            if (!is_str_eq(dp->d_name, "fail17.json")) {
-                //printf("file: %s - %s\n", dp->d_name, buffer);
-                ASSERT_FALSE(is_string_json(buffer));
-            }
+            //printf("file: %s - %s\n", dp->d_name, buffer);
+            ASSERT_FALSE(is_string_json(buffer));
         }
     }
     unused = chdir("../..");
