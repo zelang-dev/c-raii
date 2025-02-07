@@ -11,10 +11,11 @@ TEST(json_parse_file) {
     DIR *dirp;
     struct dirent *dp;
     json_t *encoded;
+    int unused;
 
     dirp = opendir(TESTDIR);
     deferring((func_t)closedir, dirp);
-    chdir(TESTDIR);
+    unused = chdir(TESTDIR);
     printf("Valid Json Folder:\n");
     while (!is_empty((dp = readdir(dirp)))) {
         if (dp->d_name[0] != '.' && !is_empty((encoded = json_parse_file(dp->d_name)))) {
@@ -32,11 +33,12 @@ TEST(is_string_json) {
     FILE *file;
     char buffer[10000];
     size_t n;
+    int unused;
 
-    chdir("..");
+    unused = chdir("..");
     dirp = opendir("invalid");
     deferring((func_t)closedir, dirp);
-    chdir("invalid");
+    unused = chdir("invalid");
     printf("Invalid Json Folder:\n");
     while ((dp = readdir(dirp)) != NULL) {
         if (dp->d_name[0] != '.' && (file = fopen(dp->d_name, "r")) != NULL) {
@@ -46,7 +48,7 @@ TEST(is_string_json) {
             ASSERT_FALSE(is_string_json(buffer));
         }
     }
-    chdir("../..");
+    unused = chdir("../..");
 
     return 0;
 }

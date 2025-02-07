@@ -146,7 +146,6 @@ struct json_array_t {
 };
 
 /* Various */
-static char *read_file(const char *filename);
 static void   remove_comments(char *string, const char *start_token, const char *end_token);
 static char *parson_strndup(const char *string, size_t n);
 static char *parson_strdup(const char *string);
@@ -201,7 +200,7 @@ static int json_serialize_to_buffer_r(const JSON_Value *value, char *buf, int le
 static int json_serialize_string(const char *string, size_t len, int quotes, char *buf);
 
 /* Various */
-static char *read_file(const char *filename) {
+char *json_read_file(const char *filename) {
     FILE *fp = fopen(filename, "r");
     size_t size_to_read = 0;
     size_t size_read = 0;
@@ -231,6 +230,7 @@ static char *read_file(const char *filename) {
     }
     fclose(fp);
     file_contents[size_read] = '\0';
+    deferring((func_t)free, file_contents);
     return file_contents;
 }
 
@@ -2514,24 +2514,22 @@ void json_set_number_serialization_function(JSON_Number_Serialization_Function f
 
 /* Parser API */
 JSON_Value *json_parse_file(const char *filename) {
-    char *file_contents = read_file(filename);
+    char *file_contents = json_read_file(filename);
     JSON_Value *output_value = NULL;
     if (file_contents == NULL) {
         return NULL;
     }
     output_value = json_parse_string(file_contents);
-    parson_free(file_contents);
     return output_value;
 }
 
 JSON_Value *json_parse_file_with_comments(const char *filename) {
-    char *file_contents = read_file(filename);
+    char *file_contents = json_read_file(filename);
     JSON_Value *output_value = NULL;
     if (file_contents == NULL) {
         return NULL;
     }
     output_value = json_parse_string_with_comments(file_contents);
-    parson_free(file_contents);
     return output_value;
 }
 
