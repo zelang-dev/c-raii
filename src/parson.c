@@ -365,6 +365,9 @@ static int is_valid_utf8(const char *string, size_t string_len) {
 }
 
 static parson_bool_t is_decimal(const char *string, size_t length) {
+    if (length > 1 && string[0] == '0' && string[1] == 'e') {
+        return PARSON_TRUE;
+    }
     if (length > 1 && string[0] == '0' && string[1] != '.') {
         return PARSON_FALSE;
     }

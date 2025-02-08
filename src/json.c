@@ -88,8 +88,13 @@ static bool isString(string_t text, int *cursor, int length) {
         *cursor < length &&
         text[*cursor] != '"'
         ) {
+        if (text[*cursor] == '\t' || text[*cursor] == '\n' || text[*cursor] == '\0') return false;
         if (text[*cursor] == '\\') {
             (*cursor)++;
+            if (text[*cursor] == 'x' || text[*cursor] == 'a' ||
+                text[*cursor] == '0' || text[*cursor] == ' ' ||
+                text[*cursor] == '\n' || text[*cursor] == '\t' ||
+                text[*cursor] == '\0') return false;
             if (text[*cursor] == 'u') {
                 if ((*cursor) + 4 > length) return false;
                 // From https://github.com/zserge/jsmn/blob/25647e692c7906b96ffd2b05ca54c097948e879c/jsmn.h#L241-L251
