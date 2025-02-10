@@ -562,10 +562,6 @@ static JSON_Status json_object_add(JSON_Object *object, char *name, JSON_Value *
     hash = hash_string(name, simd_strlen(name));
     found = PARSON_FALSE;
     cell_ix = json_object_get_cell_ix(object, name, simd_strlen(name), hash, &found);
-    if (found) {
-        return JSONFailure;
-    }
-
     if (object->count >= object->item_capacity) {
         res = json_object_grow_and_rehash(object);
         if (res != JSONSuccess) {
@@ -855,8 +851,8 @@ static char *process_string(const char *input, size_t input_len, size_t *output_
                 case 'r':  *output_ptr = '\r'; break;
                 case 't':  *output_ptr = '\t'; break;
                 case 'u':
-                    if (parse_utf16(&input_ptr, &output_ptr) != JSONSuccess) {
-                        goto error;
+                        if (parse_utf16(&input_ptr, &output_ptr) != JSONSuccess) {
+                            goto error;
                     }
                     break;
                 default:

@@ -40,53 +40,32 @@ C_API json_t *json_decode(string_t, bool is_commented);
 * Creates json value `object` using a format like `printf` for each value to key.
 *
 * @param desc format string:
-*
-* - '`.`' indicate next format character will use dot function to record value for key name with dot,
-*
-* - '`a`' begin array encoding, every item `value` will be appended, until '`e`' is place in format desc,
-*
-* - '`e`' end array encoding,
-*
-* - '`n`' record `null` value for key, *DO NOT PLACE `NULL` IN ARGUMENTS*,
-*
-* - '`f`' record `float/double` number for key,
-*
-* - '`d`' record `signed` number for key,
-*
-* - '`i`' record `unsigned` number for key,
-*
-* - '`b`' record `boolean` value for key,
-*
-* - '`s`' record `string` value for key,
-*
-* - '`v`' record `JSON_Value` for key,
-*
-* @param arguments use `kv(key,value)` for pairs,
-*
-* - DO NOT PROVIDE FOR `NULL`, ONLY KEY
+* * @param `.` indicate next format character will use dot function to record value for key name with dot,
+* * @param `a` begin array encoding, every item `value` will be appended, until '`e`' is place in format desc,
+* * @param `e` end array encoding,
+* * @param `n` record `null` value for key, *DO NOT PLACE `NULL` IN ARGUMENTS*,
+* * @param `f` record `float/double` number for key,
+* * @param `d` record `signed` number for key,
+* * @param `i` record `unsigned` number for key,
+* * @param `b` record `boolean` value for key,
+* * @param `s` record `string` value for key,
+* * @param `v` record `JSON_Value` for key,
+* @param arguments use ~macro~ `kv(key,value)` for pairs, *DO NOT PROVIDE FOR NULL, ONLY KEY*
 */
 C_API json_t *json_encode(string_t desc, ...);
 
 /**
-* Creates json value string `array` using a format like `printf` for each value to index.
+* Creates json string `array`, using a format like `printf` for each value to index.
 *
 * @param desc format string:
-*
-* - '`n`' record `null` value for index, ~DO NOT PLACE `NULL` IN ARGUMENTS~,
-*
-* - '`f`' record `float/double` number for index,,
-*
-* - '`d`' record `signed` number for index,
-*
-* - '`i`' record `unsigned` number for index,
-*
-* - '`b`' record `boolean` value for index,,
-*
-* - '`s`' record `string` value for index,,
-*
-* - '`v`' record `JSON_Value` for index,
-*
-* @param arguments indexed by `desc` format order, ~DO NOT PROVIDE FOR NULL~
+* * @param `n` record `null` value for index, *DO NOT PLACE `NULL` IN ARGUMENTS*,
+* * @param `f` record `float/double` number for index,
+* * @param `d` record `signed` number for index,
+* * @param `i` record `unsigned` number for index,
+* * @param `b` record `boolean` value for index,
+* * @param `s` record `string` value for index,
+* * @param `v` record `JSON_Value` for index,
+* @param arguments indexed by `desc` format order, *DO NOT PROVIDE FOR NULL*
 */
 C_API string json_for(string_t desc, ...);
 
