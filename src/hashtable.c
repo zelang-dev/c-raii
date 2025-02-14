@@ -199,35 +199,35 @@ RAII_INLINE void_t hash_put_obj(hash_t *htable, const_t key, const_t value) {
     return hash_operation(htable, key, value, RAII_PTR);
 }
 
-RAII_INLINE kv_pair_t *hash_func(hash_t *htable, const_t key, raii_func_args_t value) {
+RAII_INLINE kv_pair_t *insert_func(hash_t *htable, const_t key, raii_func_args_t value) {
     return hash_operation(htable, key, value, RAII_FUNC);
 }
 
-RAII_INLINE kv_pair_t *hash_unsigned(hash_t *htable, const_t key, size_t value) {
+RAII_INLINE kv_pair_t *insert_unsigned(hash_t *htable, const_t key, size_t value) {
     return hash_operation(htable, key, &value, RAII_MAXSIZE);
 }
 
-RAII_INLINE kv_pair_t *hash_signed(hash_t *htable, const_t key, int64_t value) {
+RAII_INLINE kv_pair_t *insert_signed(hash_t *htable, const_t key, int64_t value) {
     return hash_operation(htable, key, &value, RAII_LLONG);
 }
 
-RAII_INLINE kv_pair_t *hash_double(hash_t *htable, const_t key, double value) {
+RAII_INLINE kv_pair_t *insert_double(hash_t *htable, const_t key, double value) {
     return hash_operation(htable, key, &value, RAII_DOUBLE);
 }
 
-RAII_INLINE kv_pair_t *hash_string(hash_t *htable, const_t key, string value) {
+RAII_INLINE kv_pair_t *insert_string(hash_t *htable, const_t key, string value) {
     return hash_operation(htable, key, value, RAII_STRING);
 }
 
-RAII_INLINE kv_pair_t *hash_bool(hash_t *htable, const_t key, bool value) {
+RAII_INLINE kv_pair_t *insert_bool(hash_t *htable, const_t key, bool value) {
     return hash_operation(htable, key, &value, RAII_BOOL);
 }
 
-RAII_INLINE kv_pair_t *hash_char(hash_t *htable, const_t key, char value) {
+RAII_INLINE kv_pair_t *insert_char(hash_t *htable, const_t key, char value) {
     return hash_operation(htable, key, &value, RAII_CHAR);
 }
 
-RAII_INLINE kv_pair_t *hash_short(hash_t *htable, const_t key, short value) {
+RAII_INLINE kv_pair_t *insert_short(hash_t *htable, const_t key, short value) {
     return hash_operation(htable, key, &value, RAII_SHORT);
 }
 
@@ -469,14 +469,22 @@ RAII_INLINE hash_t *hash_create_ex(u32 size) {
     return (hash_t *)hashtable_init(key_ops_string, val_ops_value, hash_lp_idx, size);
 }
 
-RAII_INLINE void hash_capacity(u32 buckets) {
+RAII_INLINE void hash_set_capacity(u32 buckets) {
     atomic_thread_fence(memory_order_seq_cst);
     gq_result.capacity = hash_initial_capacity = buckets;
     hash_initial_override = true;
 }
 
 RAII_INLINE size_t hash_count(hash_t *htable) {
-    return htable->size;
+    return (size_t)atomic_load_explicit(&htable->size, memory_order_relaxed);
+}
+
+RAII_INLINE size_t hash_capacity(hash_t *htable) {
+    return (size_t)atomic_load_explicit(&htable->capacity, memory_order_relaxed);
+}
+
+RAII_INLINE kv_pair_t *hash_buckets(hash_t *htable, u32 index) {
+    return (kv_pair_t *)atomic_load_explicit(&htable->buckets[index], memory_order_relaxed);
 }
 
 RAII_INLINE void hash_print(hash_t *htable) {

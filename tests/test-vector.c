@@ -5,6 +5,7 @@ TEST(vector_for) {
     vector(vec, 4, "Bonjour", "tout", "le", "monde");
 
     ASSERT_TRUE(($size(vec) == 4));
+    ASSERT_TRUE(is_vector(vec));
     ASSERT_STR("Bonjour", vec[0].char_ptr);
 
     foreach(item in vec)

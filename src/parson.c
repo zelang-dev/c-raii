@@ -156,7 +156,7 @@ static int         num_bytes_in_utf8_sequence(unsigned char c);
 static JSON_Status   verify_utf8_sequence(const unsigned char *string, int *len);
 static parson_bool_t is_valid_utf8(const char *string, size_t string_len);
 static parson_bool_t is_decimal(const char *string, size_t length);
-static unsigned long hash_string(const char *string, size_t n);
+static unsigned long hash_str(const char *string, size_t n);
 
 /* JSON Object */
 static JSON_Object *json_object_make(JSON_Value *wrapping_value);
@@ -382,7 +382,7 @@ static parson_bool_t is_decimal(const char *string, size_t length) {
     return PARSON_TRUE;
 }
 
-static unsigned long hash_string(const char *string, size_t n) {
+static unsigned long hash_str(const char *string, size_t n) {
 #ifdef PARSON_FORCE_HASH_COLLISIONS
     (void)string;
     (void)n;
@@ -559,7 +559,7 @@ static JSON_Status json_object_add(JSON_Object *object, char *name, JSON_Value *
         return JSONFailure;
     }
 
-    hash = hash_string(name, simd_strlen(name));
+    hash = hash_str(name, simd_strlen(name));
     found = PARSON_FALSE;
     cell_ix = json_object_get_cell_ix(object, name, simd_strlen(name), hash, &found);
     if (object->count >= object->item_capacity) {
@@ -589,7 +589,7 @@ static JSON_Value *json_object_getn_value(const JSON_Object *object, const char 
     if (!object || !name) {
         return NULL;
     }
-    hash = hash_string(name, name_len);
+    hash = hash_str(name, name_len);
     found = PARSON_FALSE;
     cell_ix = json_object_get_cell_ix(object, name, name_len, hash, &found);
     if (!found) {
@@ -615,7 +615,7 @@ static JSON_Status json_object_remove_internal(JSON_Object *object, const char *
         return JSONFailure;
     }
 
-    hash = hash_string(name, simd_strlen(name));
+    hash = hash_str(name, simd_strlen(name));
     found = PARSON_FALSE;
     cell = json_object_get_cell_ix(object, name, simd_strlen(name), hash, &found);
     if (!found) {
@@ -2083,7 +2083,7 @@ JSON_Status json_object_set_value(JSON_Object *object, const char *name, JSON_Va
     if (!object || !name || !value || value->parent) {
         return JSONFailure;
     }
-    hash = hash_string(name, simd_strlen(name));
+    hash = hash_str(name, simd_strlen(name));
     found = PARSON_FALSE;
     cell_ix = json_object_get_cell_ix(object, name, simd_strlen(name), hash, &found);
     if (found) {

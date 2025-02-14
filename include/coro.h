@@ -8,6 +8,7 @@
 #endif
 
 #include "rtypes.h"
+#include "hashtable.h"
 
 /* Coroutine states. */
 typedef enum {
@@ -31,6 +32,7 @@ typedef enum {
 
 typedef struct routine_s routine_t;
 typedef struct raii_deque_s raii_deque_t;
+typedef struct hash_s *waitgroup_t;
 typedef int (*coro_sys_func)(int, char **);
 typedef struct awaitable_s {
     raii_type type;
@@ -240,11 +242,12 @@ extern "C" {
     The initialization ends when `waitfor` is called, as such current coroutine will pause,
     and execution will begin and wait for the group of coroutines to finished. */
     C_API waitgroup_t waitgroup(void);
+    C_API waitgroup_t waitgroup_ex(u32 capacity);
 
     /* Pauses current coroutine, and begin execution of coroutines in `wait group` object,
-    will wait for all to finish. Returns `vector/array` of results,
-    directly accessible by index by order created,
-    also accessible by coroutine `result id`, with `result_for` function. */
+    will wait for all to finish.
+
+    Returns `vector/array` of `results id`, accessible using `result_for` function. */
     C_API waitresult_t waitfor(waitgroup_t);
 
     C_API awaitable_t async(callable_t, u64, ...);

@@ -319,7 +319,9 @@ RAII_INLINE void array_append(arrays_t arr, void_t value) {
     vector_set_size(arr, vector_length(arr) + 1);
 }
 
-RAII_INLINE void array_append_double(arrays_t arr, double value) {
+void array_append_item(arrays_t arr, ...) {
+    va_list ap;
+    raii_type n = RAII_ERR;
     size_t size, cv_cap__ = vector_cap(arr);
     memory_t *scope = vector_context(arr);
     if (cv_cap__ <= vector_length(arr)) {
@@ -327,7 +329,28 @@ RAII_INLINE void array_append_double(arrays_t arr, double value) {
         vector_grow(arr, size, scope);
     }
 
-    arr[vector_length(arr)].precision = value;
+    va_start(ap, arr);
+    n = va_arg(ap, raii_type);
+    if (n == RAII_DOUBLE) {
+        arr[vector_length(arr)].precision = va_arg(ap, double);
+    } else if (n == RAII_LLONG) {
+        arr[vector_length(arr)].long_long = va_arg(ap, int64_t);
+    } else if (n == RAII_MAXSIZE) {
+        arr[vector_length(arr)].max_size = va_arg(ap, size_t);
+    } else if (n == RAII_FUNC) {
+        arr[vector_length(arr)].func = (raii_func_t)va_arg(ap, raii_func_args_t);
+    } else if (n == RAII_SHORT) {
+        arr[vector_length(arr)].s_short = (short)va_arg(ap, int);
+    } else if (n == RAII_BOOL) {
+        arr[vector_length(arr)].boolean = (bool)va_arg(ap, int);
+    } else if (n == RAII_CHAR) {
+        arr[vector_length(arr)].schar = (char)va_arg(ap, int);
+    } else if (n == RAII_STRING) {
+        arr[vector_length(arr)].char_ptr = (string)va_arg(ap, string);
+    } else {
+        arr[vector_length(arr)].object = va_arg(ap, void_t);
+    }
+    va_end(ap);
     vector_set_size(arr, vector_length(arr) + 1);
 }
 
@@ -391,13 +414,13 @@ args_t args_for(size_t count, ...) {
 }
 
 RAII_INLINE bool is_vector(void_t params) {
-    return is_valid(params)
+    return is_empty(params) || is_null(params)
         ? false
         : vector_type((vectors_t)params) == RAII_VECTOR;
 }
 
 RAII_INLINE bool is_array(void_t params) {
-    if (is_valid(params))
+    if (is_empty(params) || is_null(params))
         return false;
 
     int param = vector_type((arrays_t)params);
@@ -405,7 +428,7 @@ RAII_INLINE bool is_array(void_t params) {
 }
 
 RAII_INLINE bool is_args(void_t params) {
-    return is_valid(params)
+    return is_empty(params) || is_null(params)
         ? false
         : vector_type((args_t)params) == RAII_ARGS;
 }

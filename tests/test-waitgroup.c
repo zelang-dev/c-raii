@@ -16,21 +16,21 @@ void *worker(params_t args) {
 }
 
 TEST(waitfor) {
-    int cid[5], i;
+    int cid[10], i;
 
     waitgroup_t wg = waitgroup();
-    ASSERT_TRUE(is_array(wg));
-    for (i = 0; i < 5; i++) {
+    ASSERT_TRUE(is_type(wg, RAII_HASH));
+    for (i = 0; i < 10; i++) {
         cid[i] = go(worker, 1, i);
         ASSERT_EQ(cid[i], i + 1);
     }
-    ASSERT_TRUE(($size(wg) == 5));
+    ASSERT_TRUE((hash_count(wg) == 10));
     waitresult_t wgr = waitfor(wg);
     ASSERT_TRUE(is_array(wgr));
     ASSERT_TRUE(($size(wgr) == 2));
 
-    ASSERT_TRUE((wgr[1].integer == result_for(cid[3]).integer));
-    ASSERT_STR(wgr[0].char_ptr, result_for(cid[2]).char_ptr);
+    ASSERT_TRUE((32 == result_for(cid[3]).integer));
+    ASSERT_STR("hello world", result_for(cid[2]).char_ptr);
 
     return 0;
 }

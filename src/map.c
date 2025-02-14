@@ -70,21 +70,21 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
             has = hash_get(hash->dict, k);
             if (is_empty(has)) {
                 if (n == RAII_DOUBLE) {
-                    kv = hash_double(hash->dict, k, va_arg(ap, double));
+                    kv = insert_double(hash->dict, k, va_arg(ap, double));
                 } else if (n == RAII_LLONG) {
-                    kv = hash_signed(hash->dict, k, va_arg(ap, int64_t));
+                    kv = insert_signed(hash->dict, k, va_arg(ap, int64_t));
                 } else if (n == RAII_MAXSIZE) {
-                    kv = hash_unsigned(hash->dict, k, va_arg(ap, size_t));
+                    kv = insert_unsigned(hash->dict, k, va_arg(ap, size_t));
                 } else if (n == RAII_FUNC) {
-                    kv = hash_func(hash->dict, k, va_arg(ap, raii_func_args_t));
+                    kv = insert_func(hash->dict, k, va_arg(ap, raii_func_args_t));
                 } else if (n == RAII_SHORT) {
-                    kv = hash_short(hash->dict, k, va_arg(ap, int));
+                    kv = insert_short(hash->dict, k, va_arg(ap, int));
                 } else if (n == RAII_BOOL) {
-                    kv = hash_bool(hash->dict, k, va_arg(ap, int));
+                    kv = insert_bool(hash->dict, k, va_arg(ap, int));
                 } else if (n == RAII_CHAR) {
-                    kv = hash_char(hash->dict, k, va_arg(ap, int));
+                    kv = insert_char(hash->dict, k, va_arg(ap, int));
                 } else if (n == RAII_STRING) {
-                    kv = hash_string(hash->dict, k, va_arg(ap, string));
+                    kv = insert_string(hash->dict, k, va_arg(ap, string));
                 } else {
                     kv = (kv_pair_t *)hash_put(hash->dict, k, va_arg(ap, void_t));
                 }
@@ -272,7 +272,7 @@ void_t map_remove(map_t hash, void_t value) {
         return nullptr;
 
     for (item = hash->head; item != nullptr; item = item->next) {
-        if (memcmp(item->value.object, value, sizeof(value)) == 0) {
+        if (is_equal(item->value.object, value)) {
             hash_delete(hash->dict, item->key);
             if (item->prev)
                 item->prev->next = item->next;

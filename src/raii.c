@@ -654,6 +654,14 @@ RAII_INLINE bool is_valid(void_t self) {
     return is_value(self) || is_instance(self);
 }
 
+RAII_INLINE bool is_invalid(void_t self) {
+    return type_of(self) < RAII_NULL;
+}
+
+RAII_INLINE bool is_null(void_t self) {
+    return type_of(self) == RAII_NULL;
+}
+
 RAII_INLINE bool is_zero(size_t self) {
     return self == 0;
 }
@@ -680,4 +688,8 @@ RAII_INLINE bool is_str_eq(const char *str, const char *str2) {
 
 RAII_INLINE bool is_str_empty(const char *str) {
     return is_str_eq(str, "");
+}
+
+RAII_INLINE bool is_equal(void_t mem, void_t mem2) {
+    return memcmp(mem, mem2, sizeof(mem2)) == 0;
 }

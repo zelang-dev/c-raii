@@ -118,7 +118,7 @@ typedef union {
     intptr_t **array_int;
     uintptr_t **array_uint;
     raii_func_t func;
-} value_t, *params_t, *ranges_t, *arrays_t, *waitgroup_t, *waitresult_t;
+} value_t, *params_t, *ranges_t, *arrays_t, *waitresult_t;
 typedef void_t(*callable_t)(params_t);
 
 enum {
@@ -154,11 +154,6 @@ typedef enum {
     RAII_PTR,
     RAII_FUNC,
     RAII_NAN,
-    RAII_ARRAY,
-    RAII_RANGE,
-    RAII_RANGE_CHAR,
-    RAII_VECTOR,
-    RAII_ARGS,
     RAII_HASH,
     RAII_MAP,
     RAII_DEF_ARR,
@@ -192,6 +187,11 @@ typedef enum {
     RAII_POOL,
     RAII_SYNC,
     RAII_NO_INSTANCE,
+    RAII_ARGS,
+    RAII_ARRAY,
+    RAII_RANGE,
+    RAII_RANGE_CHAR,
+    RAII_VECTOR,
     RAII_GUARDED_STATUS,
     RAII_SCHEME_TLS,
     RAII_SCHEME_TCP,

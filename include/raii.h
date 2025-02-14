@@ -104,6 +104,7 @@ make_atomic(result_t, atomic_result_t)
 
 struct raii_results_s {
     raii_type type;
+    volatile sig_atomic_t is_takeable;
 
     /* Stack size when creating a coroutine. */
     u32 stacksize;
@@ -118,54 +119,37 @@ struct raii_results_s {
     arrays_t gc;
     memory_t *scope;
 
-    /* Array of thread `coroutine` results in waitgroup. */
+    /* Array of `coroutine` results in an thread `waitgroup`. */
     waitresult_t group_result;
-    cacheline_pad_t _pad;
-
     raii_deque_t *queue;
-    cacheline_pad_t _pad1;
+    cacheline_pad_t _pad;
 
     /* Lock to collect thread `coroutine` results in waitgroup. */
     atomic_spinlock group_lock;
-    cacheline_pad_t _pad2;
 
     /* Exception/error indicator, only private `co_awaitable()`
     will clear to break any possible infinite wait/loop condition,
     normal cleanup code will not be executed. */
     atomic_flag is_errorless;
-    cacheline_pad_t _pad3;
-
     atomic_flag is_interruptable;
-    cacheline_pad_t _pad4;
-
     atomic_flag is_finish;
-    cacheline_pad_t _pad5;
-
     atomic_flag is_started;
-    cacheline_pad_t _pad6;
-
     atomic_flag is_waitable;
-    cacheline_pad_t _pad7;
 
     /* Used as flag and counter for an thread waitgroup results collected. */
     atomic_size_t group_count;
-    cacheline_pad_t _pad8;
 
     /* track the number of global coroutines active/available */
     atomic_size_t active_count;
-    cacheline_pad_t _pad9;
 
     /* coroutine unique id */
     atomic_size_t id_generate;
-    cacheline_pad_t _pad10;
 
     /* result generator also used to determent which thread's `run queue`
     receive next `coroutine` task, `counter % cpu cores` */
     atomic_size_t result_id_generate;
-    cacheline_pad_t _pad11;
-
+    atomic_size_t take_count;
     atomic_result_t *results;
-    cacheline_pad_t _pad12;
 };
 C_API future_results_t gq_result;
 
@@ -332,6 +316,8 @@ C_API bool is_instance_of(void_t, void_t);
 C_API bool is_value(void_t);
 C_API bool is_instance(void_t);
 C_API bool is_valid(void_t);
+C_API bool is_invalid(void_t);
+C_API bool is_null(void_t);
 C_API bool is_zero(size_t);
 C_API bool is_empty(void_t);
 C_API bool is_true(bool);
@@ -340,6 +326,7 @@ C_API bool is_str_in(const char *text, char *pattern);
 C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void_t self);
+C_API bool is_equal(void_t, void_t);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);
@@ -551,7 +538,7 @@ C_API arrays_t array_ex(memory_t *, size_t, va_list);
 C_API arrays_t array_copy(arrays_t des, arrays_t src);
 C_API void array_deferred_set(arrays_t, memory_t *);
 C_API void array_append(arrays_t, void_t);
-C_API void array_append_double(arrays_t, double);
+C_API void array_append_item(arrays_t arr, ...);
 C_API void array_delete(arrays_t);
 C_API void array_remove(arrays_t, int);
 C_API bool is_array(void_t);
@@ -571,7 +558,14 @@ C_API ranges_t range_char(string_t text);
 C_API arrays_t arrays(void);
 
 #define $append(arr, value) array_append((arrays_t)arr, (void_t)value)
-#define $append_double(arr, value) array_append_number((arrays_t)arr, (double)value)
+#define $append_double(arr, value) array_append_item((arrays_t)arr, RAII_DOUBLE, (double)value)
+#define $append_unsigned(arr, value) array_append_item((arrays_t)arr, RAII_MAXSIZE, (size_t)value)
+#define $append_signed(arr, value) array_append_item((arrays_t)arr, RAII_LLONG, (int64_t)value)
+#define $append_string(arr, value) array_append_item((arrays_t)arr, RAII_STRING, (string)value)
+#define $append_func(arr, value) array_append_item((arrays_t)arr, RAII_FUNC, (raii_func_args_t)value)
+#define $append_char(arr, value) array_append_item((arrays_t)arr, RAII_CHAR, (char)value)
+#define $append_bool(arr, value) array_append_item((arrays_t)arr, RAII_BOOL, (bool)value)
+#define $append_short(arr, value) array_append_item((arrays_t)arr, RAII_SHORT, (short)value)
 #define $remove(arr, index) array_remove((arrays_t)arr, index)
 
 C_API values_type get_arg(void_t);
