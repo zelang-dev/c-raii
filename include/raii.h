@@ -136,9 +136,6 @@ struct raii_results_s {
     atomic_flag is_started;
     atomic_flag is_waitable;
 
-    /* Used as flag and counter for an thread waitgroup results collected. */
-    atomic_size_t group_count;
-
     /* track the number of global coroutines active/available */
     atomic_size_t active_count;
 

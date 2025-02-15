@@ -197,29 +197,19 @@ struct raii_deque_s {
     cacheline_pad_t _pad;
 
     atomic_flag taken;
-    cacheline_pad_t pad;
-
     atomic_flag started;
-    cacheline_pad_t pad1;
-
     atomic_flag shutdown;
-    cacheline_pad_t pad2;
 
     /* Used to determent which thread's `run queue`
     receive next `coroutine` task, `counter % cpu cores` */
     atomic_size_t cpu_id_count;
-    cacheline_pad_t pad3;
-
     atomic_size_t available;
-    cacheline_pad_t pad4;
 
     /* Assume that they never overflow */
     atomic_size_t top, bottom;
-    cacheline_pad_t pad5;
-
     atomic_coro_array_t array;
-    cacheline_pad_t pad6;
 
+    cacheline_pad_t pad;
     raii_deque_t **local;
 };
 make_atomic(raii_deque_t *, thread_deque_t)
@@ -2312,7 +2302,6 @@ static void coro_initialize(void) {
     atomic_init(&gq_result.result_id_generate, 0);
     atomic_init(&gq_result.id_generate, 0);
     atomic_init(&gq_result.active_count, 0);
-    atomic_init(&gq_result.group_count, 0);
     atomic_init(&gq_result.take_count, 0);
     atomic_flag_clear(&gq_result.group_lock);
     atomic_flag_clear(&gq_result.is_finish);
