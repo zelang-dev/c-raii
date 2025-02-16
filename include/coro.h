@@ -293,7 +293,9 @@ extern "C" {
 
     /* Return the unique `result id` for the current coroutine. */
     C_API rid_t coro_id(void);
-    C_API void coro_thread_init(size_t queue_size);
+    C_API void coro_pool_init(size_t queue_size);
+
+    C_API int thrd_coro_init(coro_sys_func main, int argc, char **argv, size_t queue_size);
 
     /* This library provides its own ~main~,
     which call this function as an coroutine! */

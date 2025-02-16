@@ -4,6 +4,40 @@ thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
 future_results_t gq_result = {0};
 
+RAII_INLINE uint64_t get_timer(void) {
+    uint64_t lapse = 0;
+    struct timeval tv;
+    struct timespec ts;
+
+#ifdef HAVE_TIMESPEC_GET
+    if (timespec_get(&ts, TIME_UTC))
+        lapse = ts.tv_sec * 1000000000 + ts.tv_nsec * 1000;
+#elif defined(__APPLE__) || defined(__MACH__)
+    uint64_t t = mach_absolute_time();
+
+    if (&gq_result.timer)
+        lapse = t * ((double)gq_result.timer.numer / (double)gq_result.timer.denom);
+#elif defined(_CTHREAD_POSIX_)
+
+    /* Has 2038 issue if time_t: tv.tv_sec is 32-bit. */
+    if (!clock_gettime(CLOCK_MONOTONIC, &ts))
+        lapse = ts.tv_sec * 1000000000 + ts.tv_nsec * 1000;
+#elif defined(_WIN32)
+    LARGE_INTEGER count;
+
+    if (QueryPerformanceCounter(&count) && &gq_result.timer)
+        lapse = count.QuadPart / gq_result.timer.QuadPart;
+#endif
+
+    /* macOS , mingw.org, used on mingw-w64.
+       Has 2038 issue if time_t: tv.tv_sec is 32-bit.
+     */
+    if (!lapse && !gettimeofday(&tv, NULL))
+        lapse = tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
+
+    return lapse;
+}
+
 values_type *value_create(const_t data, raii_type op) {
     values_type *value = try_calloc(1, sizeof(values_type));
     size_t slen;

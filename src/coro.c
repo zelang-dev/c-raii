@@ -147,7 +147,7 @@ typedef struct {
     u32 group_count;
     /* indicator for thread termination. */
     u32 exiting;
-    /* thread id assigned by `coro_thread_init` */
+    /* thread id assigned by `coro_pool_init` */
     u32 thrd_id;
     /* number of other coroutine that ran while the current coroutine was waiting.*/
     u32 num_others_ran;
@@ -658,15 +658,6 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
     return 0;
 }
 #endif
-
-static size_t nsec(void) {
-    struct timeval tv;
-
-    if (gettimeofday(&tv, 0) < 0)
-        return -1;
-
-    return (size_t)tv.tv_sec * 1000 * 1000 * 1000 + tv.tv_usec * 1000;
-}
 
 #if defined(USE_UCONTEXT)
 static routine_t *coro_derive(void_t memory, size_t size) {
@@ -1803,7 +1794,7 @@ static void_t coro_wait_system(void_t v) {
         /* let everyone else run */
         while (coro_yielding_active() > 0)
             ;
-        now = nsec();
+        now = get_timer();
         coro_info(coro_active(), 1);
         while ((t = coro()->sleep_queue->head) && now >= t->alarm_time) {
             coro_remove(coro()->sleep_queue, t);
@@ -1825,7 +1816,7 @@ u32 sleepfor(u32 ms) {
         coro_stealer();
     }
 
-    now = nsec();
+    now = get_timer();
     when = now + (size_t)ms * 1000000;
     for (t = coro()->sleep_queue->head; !is_empty(t) && t->alarm_time < when; t = t->next)
         ;
@@ -1855,7 +1846,7 @@ u32 sleepfor(u32 ms) {
 
     coro_switch(coro_current());
 
-    return (u32)(nsec() - now) / 1000000;
+    return (u32)(get_timer() - now) / 1000000;
 }
 
 static void coro_sched_init(bool is_main, u32 thread_id) {
@@ -2291,9 +2282,10 @@ static void coro_initialize(void) {
     gq_result.is_takeable = 0;
     gq_result.cpu_count = thrd_cpu_count();
     gq_result.thread_count = gq_result.cpu_count + 1;
-    gq_result.queue_size = 1 << (gq_result.cpu_count > 7
-                                 ? 13
-                                 : gq_result.cpu_count * 2);
+    if (gq_result.queue_size == 0)
+        gq_result.queue_size = 1 << (gq_result.cpu_count > 7
+                                     ? 13
+                                     : gq_result.cpu_count * 2);
     gq_result.scope = unique_init();
     gq_result.queue = nullptr;
     gq_result.gc = nullptr;
@@ -2309,6 +2301,11 @@ static void coro_initialize(void) {
     atomic_flag_clear(&gq_result.is_waitable);
     atomic_flag_test_and_set(&gq_result.is_errorless);
     atomic_flag_test_and_set(&gq_result.is_interruptable);
+#if defined(_WIN32)
+    QueryPerformanceFrequency(&gq_result.timer);
+#elif defined(__APPLE__) || defined(__MACH__)
+    mach_timebase_info(&gq_result.timer);
+#endif
 }
 
 int raii_main(int argc, char **argv) {
@@ -2325,7 +2322,7 @@ int raii_main(int argc, char **argv) {
     ex_signal_setup();
     coro_initialize();
     coro_sched_init(true, 0);
-    coro_thread_init(gq_result.queue_size);
+    coro_pool_init(gq_result.queue_size);
     create_coro(main_main, nullptr, gq_result.stacksize * 8, CORO_RUN_MAIN);
     scheduler();
     unreachable;
@@ -2704,7 +2701,7 @@ RAII_INLINE void coro_stacksize_set(u32 size) {
     gq_result.stacksize = size;
 }
 
-void coro_thread_init(size_t queue_size) {
+void coro_pool_init(size_t queue_size) {
     atomic_thread_fence(memory_order_seq_cst);
     if (!thrd_queue_set) {
         thrd_queue_set = true;

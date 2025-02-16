@@ -105,6 +105,11 @@ make_atomic(result_t, atomic_result_t)
 struct raii_results_s {
     raii_type type;
     volatile sig_atomic_t is_takeable;
+#if defined(_WIN32)
+    LARGE_INTEGER timer;
+#elif defined(__APPLE__) || defined(__MACH__)
+    mach_timebase_info_data_t timer;
+#endif
 
     /* Stack size when creating a coroutine. */
     u32 stacksize;
@@ -324,6 +329,8 @@ C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void_t self);
 C_API bool is_equal(void_t, void_t);
+
+C_API uint64_t get_timer(void);
 
 C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);

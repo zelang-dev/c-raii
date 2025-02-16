@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     }
 
     int n = atoi(argv[1]);
-    coro_thread_init(25);
+    coro_pool_init(25);
     future_t fut = thrd_scope();
     rid_t results = thrd_spawn(fib, 1, (n));
 

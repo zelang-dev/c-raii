@@ -254,7 +254,7 @@ future_t thrd_scope(void) {
         if (raii_local()->threading)
             throw(logic_error);
 
-        coro_thread_init(0);
+        coro_pool_init(0);
         queue = raii_local()->queued;
     }
 
@@ -301,7 +301,7 @@ rid_t thrd_spawn(thrd_func_t fn, size_t num_of_args, ...) {
     f_work->queue = scope->queued;
     f_work->type = RAII_FUTURE_ARG;
 
-    $append(pool->jobs, (uintptr_t)result_id);
+    $append_unsigned(pool->jobs, result_id);
     pool->futures[result_id] = f;
    // if (!is_empty(queue->local))
        // thrd_add(f, queue, f_work, nil, nil);
@@ -372,4 +372,10 @@ RAII_INLINE bool thrd_is_finish(future_t f) {
     }
 
     return true;
+}
+
+int thrd_coro_init(coro_sys_func main, int argc, char **argv, size_t queue_size) {
+    coro_main_func = main;
+    gq_result.queue_size = queue_size;
+    return raii_main(argc, argv);
 }
