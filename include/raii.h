@@ -30,21 +30,6 @@ typedef char cacheline_pad_t[CACHELINE_SIZE];
     extern "C" {
 #endif
 
-#define make_deque(func_type)                       \
-    make_atomic(func_type *, atomic_##func_type)    \
-    typedef struct {                    \
-        atomic_size_t size;             \
-        atomic_##func_type buffer[];    \
-    } func_type##_array;                \
-    make_atomic(func_type##_array *, atomic_array_##func_type)  \
-    typedef struct {                    \
-        size_t capacity;                \
-        /* Assume that they never overflow */   \
-        atomic_size_t top, bottom;      \
-        atomic_array_##func_type array; \
-    } deque_##func_type;                \
-    make_atomic(deque_##func_type *, atomic_deque_##func_type)
-
 struct memory_s {
     void_t arena;
     bool is_recovered;
