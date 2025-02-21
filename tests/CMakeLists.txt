@@ -20,6 +20,7 @@ set(TARGET_LIST
  test-future-scope
  test-thrd_spawn
  test-waitgroup
+ test-channel
  test-http_request
  test-http_response
  test-parse_http

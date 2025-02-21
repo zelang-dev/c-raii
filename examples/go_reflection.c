@@ -15,7 +15,7 @@ reflect_struct(details,
 
 typedef string myType;
 
-void showDetails(reflect_type_t *i, interface j) {
+int showDetails(reflect_type_t *i, interface j) {
     char value[20] = {0};
     int index;
     reflect_field_t *val = reflect_value_of(i);
@@ -53,7 +53,7 @@ void showDetails(reflect_type_t *i, interface j) {
     reflect_get_field(j, 1, value);
     printf("\nThe Value passed in second parameter is: %s\n", c_char_ptr(value));
 
-    shuttingdown();
+    return exit_scope();
 }
 
 int main(int argc, char **argv) {
@@ -65,7 +65,5 @@ int main(int argc, char **argv) {
     person->age = 32;
     person->balance = 33000.203;
 
-    showDetails(person_r, iD_r);
-
-    return 0;
+    return showDetails(person_r, iD_r);
 }

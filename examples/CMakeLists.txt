@@ -26,6 +26,8 @@ set(TARGET_LIST defer_thread
  go_panic
  go_sleepfor
  go_waitgroup
+ go_channel
+ go_select
  fib )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )

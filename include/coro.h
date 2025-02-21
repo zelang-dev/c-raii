@@ -253,10 +253,11 @@ extern "C" {
     C_API awaitable_t async(callable_t, u64, ...);
     C_API value_t await(awaitable_t);
 
-    C_API string _itoa(int64_t number);
+    /* Check ~ptr~ and `free` using it's matching `type_of` ~cleanup~ function. */
+    C_API void delete(void_t ptr);
 
     /* Collect coroutines with references preventing immediate cleanup. */
-    C_API void coro_collector(routine_t *);
+    C_API void coro_gc(routine_t *);
     C_API routine_t *coro_ref_current(void);
     C_API void coro_ref(routine_t *);
     C_API void coro_unref(routine_t *);
@@ -272,6 +273,15 @@ extern "C" {
     /* Return handle to current coroutine. */
     C_API routine_t *coro_active(void);
 
+    /* Add coroutine to queue. */
+    C_API void coro_enqueue(routine_t *t);
+
+    /* Multithreading checker for available coroutines in `waitgroup`, if any,
+    transfer from `global` run queue, to current thread `local` run queue.
+
+    If `main/process thread` caller, will globally signal all child threads
+    to start there execution, and assign coroutines. */
+    C_API void coro_stealer(void);
     C_API value_t coro_await(callable_t, size_t, ...);
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);

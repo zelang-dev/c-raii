@@ -1,4 +1,4 @@
-#include "raii.h"
+#include "channel.h"
 
 static volatile bool thrd_queue_set = false;
 static volatile bool coro_init_set = false;
@@ -413,9 +413,12 @@ static routine_t *deque_peek(raii_deque_t *q, u32 index) {
 }
 
 static void coro_transfer(raii_deque_t *queue);
-static void coro_stealer(void);
-static RAII_INLINE void coro_collector_free(void);
-static RAII_INLINE void coro_scheduler(void);
+static void coro_destroy(void);
+static void coro_scheduler(void);
+
+static RAII_INLINE string _itoa(int64_t number) {
+    return simd_itoa(number, coro_active()->scrape);
+}
 
 /* Utility for aligning addresses. */
 static RAII_INLINE size_t _coro_align_forward(size_t addr, size_t align) {
@@ -541,8 +544,7 @@ static void coro_atomic_enqueue(routine_t *t) {
     atomic_fetch_add(&queue->available, 1);
 }
 
-/* Add coroutine to current scheduler queue, appending. */
-static RAII_INLINE void coro_enqueue(routine_t *t) {
+RAII_INLINE void coro_enqueue(routine_t *t) {
     t->ready = true;
     /* Don't add initial coroutine representing main/child thread to local `deque` run queue. */
     if (coro_is_threading()
@@ -633,29 +635,6 @@ int swapcontext(routine_t *oucp, const routine_t *ucp) {
         ret = setcontext((ucontext_t *)ucp);
     }
     return ret;
-}
-#endif
-
-#if defined(WIN32)
-int gettimeofday(struct timeval *tp, struct timezone *tzp) {
-    /*
-     * Note: some broken versions only have 8 trailing zero's, the correct
-     * epoch has 9 trailing zero's
-     */
-    static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
-
-    SYSTEMTIME  system_time;
-    FILETIME    file_time;
-    uint64_t    time;
-
-    GetSystemTime(&system_time);
-    SystemTimeToFileTime(&system_time, &file_time);
-    time = ((uint64_t)file_time.dwLowDateTime);
-    time += ((uint64_t)file_time.dwHighDateTime) << 32;
-
-    tp->tv_sec = (long)((time - EPOCH) / 10000000L);
-    tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
-    return 0;
 }
 #endif
 
@@ -2225,7 +2204,8 @@ static void coro_cleanup(void) {
         }
 
         coro_interrupt_cleanup(nullptr);
-        coro_collector_free();
+        coro_destroy();
+        channel_destroy();
         deque_destroy();
     }
 }
@@ -2333,13 +2313,13 @@ static int scheduler(void) {
                 && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) < 0)
                 atomic_fetch_add(&gq_result.active_count, 1);
 
-            if (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN)
+            if (!t->is_referenced && (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN))
                 local = RAII_ABORT_T;
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
             } else if (t->is_referenced) {
-                coro_collector(t);
+                coro_gc(t);
             } else if (t->is_event_err && coro_sched_empty()) {
                 coro_interrupt_cleanup(t);
             }
@@ -2467,7 +2447,7 @@ transfer from `global` ~array~ run queue, to current thread `local` run queue.
 
 If `main/process thread` caller, will globally signal all child threads
 to start there execution, and assign coroutines. */
-static void coro_stealer(void) {
+void coro_stealer(void) {
     atomic_thread_fence(memory_order_seq_cst);
     if (coro()->is_main) {
         if (coro_is_threading()) {
@@ -2552,10 +2532,9 @@ waitresult_t waitfor(waitgroup_t wg) {
         if (coro_sched_is_assignable(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed)))
             atomic_flag_test_and_set(&gq_result.is_waitable);
 
+        atomic_lock(&gq_result.group_lock);
         wgr = array_of(c->scope, 0);
         array_deferred_set(wgr, c->scope);
-
-        atomic_lock(&gq_result.group_lock);
         gq_result.group_result = wgr;
         atomic_unlock(&gq_result.group_lock);
         yielding();
@@ -2678,6 +2657,23 @@ value_t await(awaitable_t task) {
     return raii_values_empty->valued;
 }
 
+void delete(void_t ptr) {
+    match(ptr) {
+        and (RAII_CHANNEL)
+            channel_free(ptr);
+        or (RAII_HASH)
+            hash_free(ptr);
+        otherwise {
+            if (is_valid(ptr)) {
+                memset(ptr, 0, sizeof(ptr));
+                RAII_FREE(ptr);
+            } else {
+                RAII_LOG("Pointer not freed, possible double free attempt!");
+            }
+        }
+    }
+}
+
 value_t coro_await(callable_t fn, size_t num_of_args, ...) {
     va_list ap;
     waitgroup_t wg = waitgroup_ex(2);
@@ -2748,28 +2744,33 @@ RAII_INLINE void coro_interrupt_setup(raii_callable_t func) {
     }
 }
 
-static RAII_INLINE void coro_collector_free(void) {
+static RAII_INLINE void coro_destroy(void) {
     if (!is_empty(gq_result.gc)) {
-        foreach(t in gq_result.gc)
-            RAII_FREE(t.object);
+        atomic_lock(&gq_result.group_lock);
+        foreach(t in gq_result.gc) {
+            if (((routine_t *)t.object)->magic_number == CORO_MAGIC_NUMBER)
+                RAII_FREE(t.object);
+        }
 
         array_delete(gq_result.gc);
         gq_result.gc = nullptr;
+        atomic_unlock(&gq_result.group_lock);
     }
 }
 
-RAII_INLINE void coro_collector(routine_t *co) {
-    if (is_empty(gq_result.gc)) {
+RAII_INLINE void coro_gc(routine_t *co) {
+    atomic_lock(&gq_result.group_lock);
+    if (is_empty(gq_result.gc))
         gq_result.gc = array_of(gq_result.scope, 0);
-    }
 
     if (co->magic_number == CORO_MAGIC_NUMBER)
         $append(gq_result.gc, co);
+
+    atomic_unlock(&gq_result.group_lock);
 }
 
 RAII_INLINE void coro_ref(routine_t *t) {
     t->is_referenced = true;
-    t->taken = true;
 }
 
 RAII_INLINE void coro_unref(routine_t *t) {
@@ -2855,8 +2856,4 @@ void coro_pool_init(size_t queue_size) {
     } else if (raii_local()->threading) {
         throw(logic_error);
     }
-}
-
-RAII_INLINE string _itoa(int64_t number) {
-    return simd_itoa(number, coro_active()->scrape);
 }

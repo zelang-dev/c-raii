@@ -192,6 +192,9 @@ C_API memory_t *raii_init(void);
 /* Return current `context` ~scope~ smart pointer, in use! */
 C_API memory_t *get_scope(void);
 
+/* Begin `unwinding/executing`, current ~scope~ `raii_defer` statements. */
+C_API int exit_scope(void);
+
 C_API void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API int raii_deferred_init(defer_t *array);
 

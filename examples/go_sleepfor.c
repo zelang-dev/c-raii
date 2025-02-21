@@ -1,4 +1,3 @@
-
 #define USE_CORO
 #include "raii.h"
 

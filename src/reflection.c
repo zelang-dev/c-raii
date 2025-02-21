@@ -1,4 +1,5 @@
 #include "reflection.h"
+#include "channel.h"
 #include "map.h"
 
 string_t reflect_kind(void_t value) {
@@ -245,10 +246,6 @@ void println(u32 num_of_args, ...) {
     }
     va_end(argp);
     puts("");
-}
-
-RAII_INLINE void shuttingdown(void) {
-    raii_deferred_free(get_scope());
 }
 
 reflect_func(_awaitable_t,

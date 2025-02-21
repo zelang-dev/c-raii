@@ -40,8 +40,7 @@ TEST(reflect_var_t) {
         printf("%c ", item.schar);
     puts("");
 
-    shuttingdown();
-    return 0;
+    return exit_scope();
 }
 
 TEST(list) {
