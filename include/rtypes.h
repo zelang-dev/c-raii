@@ -156,6 +156,7 @@ typedef enum {
     RAII_NAN,
     RAII_HASH,
     RAII_MAP,
+    RAII_OBJECT,
     RAII_DEF_ARR,
     RAII_DEF_FUNC,
     RAII_ROUTINE,
@@ -239,6 +240,10 @@ typedef union {
     raii_func_t func;
     char buffer[64];
 } values_type, *vectors_t, *args_t;
+typedef void (*for_func_t)(i64, i64);
+typedef void_t(*result_func_t)(void_t result, size_t id, vectors_t iter);
+typedef void_t(*thrd_func_t)(args_t);
+typedef void (*wait_func)(void);
 
 typedef struct {
     values_type value;

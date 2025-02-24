@@ -16,13 +16,32 @@ An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memor
 * [Contributing](#contributing)
 * [License](#license)
 
+This branch, version `2.x` of **c-raii**, has an expanded feature set. It differs greatly from [1.x](https://github.com/zelang-dev/c-raii/blob/1.x/) to be in line with the fact that most ordinary `C` _libraries_ in-use will need _refactoring_ aka **rewrite**, to be use effectually with _memory safety_ as first class.
+
+The features now encompass most things you might find in higher level languages, specificity **ease of use**, _with the same old_ **C89**. Not new concepts, you'll find most implicit in every _program/application_, if not explicit, now available in additional header files.
+
+* dynamic data-structures [vector.h](https://github.com/zelang-dev/c-raii/blob/main/include/vector.h), [hashtable.h](https://github.com/zelang-dev/c-raii/blob/main/include/hashtable.h) and [map.h](https://github.com/zelang-dev/c-raii/blob/main/include/map.h).
+* parsers [url_http.h](https://github.com/zelang-dev/c-raii/blob/main/include/url_http.h) and [json.h](https://github.com/zelang-dev/c-raii/blob/main/include/json.h).
+* control flow constructs, _threads, coroutines, and channels_ [coro.h](https://github.com/zelang-dev/c-raii/blob/main/include/coro.h) and [channel.h](https://github.com/zelang-dev/c-raii/blob/main/include/channel.h).
+* string manipulation/handling [swar.h](https://github.com/zelang-dev/c-raii/blob/main/include/swar.h).
+* access/manipulate an individual integer bits, with string representation [bitset.h](https://github.com/zelang-dev/c-raii/blob/main/include/bitset.h).
+* runtime code [reflection.h](https://github.com/zelang-dev/c-raii/blob/main/include/reflection.h).
+
+> See [tests](https://github.com/zelang-dev/c-raii/blob/main/tests) and [examples](https://github.com/zelang-dev/c-raii/blob/main/examples) **folder** for _usage_.
+
+This library has come full circle from it's initial aim at being _decoupled_ from [c-coroutine](https://zelang-dev.github.io/c-coroutine) to _bridging_ it back with different startup strategy behavior. Must either **`#define USE_CORO`** or call **`coro_start(main_func, argc, argv, 0)`**. When active **C** become whatever _high level_ language you can imagine that offers _automatic memory management_, otherwise no coroutine support, program will **crash** calling any specific coroutine only functions.
+
+The one _essential_ thing that all languages must control and _redefine_ doing the compiler creation process, an _function_ **"creation/signature/entrance/exit"** _process_. The whole **"signature/entrance/exit"** process here is under **C-RAII** _coroutine_ control.
+
+**_Everything that follows at point is from version `1.x`_**
+
 This library has been decoupled from [c-coroutine](https://zelang-dev.github.io/c-coroutine) to be independently developed.
 
 In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), and [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [c-coroutine](https://github.com/zelang-dev/c-coroutine).
 
 This library uses an custom version of [rpmalloc](https://github.com/mjansson/rpmalloc) for **malloc/heap** allocation, not **C11** compiler `thread local` dependant, nor **C++** focus, _removed_. The customization is merged with required [cthread](https://github.com/zelang-dev/cthread) for **C11** _thread like emulation_.
 
-* The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's C** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
+* The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
 
 > As a side benefit, just including a single `#include "raii.h"` will make your **Linux** only application **Windows** compatible, see `work-steal.c` in [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder, it's from [Complementary Concurrency Programs for course "Linux Kernel Internals"](https://github.com/sysprog21/concurrent-programs), _2 minor changes_, using macro `make_atomic`.
 

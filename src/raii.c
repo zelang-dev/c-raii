@@ -32,10 +32,7 @@ RAII_INLINE uint64_t get_timer(void) {
     struct timeval tv;
     struct timespec ts;
 
-#ifdef HAVE_TIMESPEC_GET
-    if (timespec_get(&ts, TIME_UTC))
-        lapse = ts.tv_sec * 1000000000 + ts.tv_nsec * 1000;
-#elif defined(__APPLE__) || defined(__MACH__)
+#if defined(__APPLE__) || defined(__MACH__)
     uint64_t t = mach_absolute_time();
 
     if (&gq_result.timer)
@@ -52,11 +49,15 @@ RAII_INLINE uint64_t get_timer(void) {
         lapse = count.QuadPart / gq_result.timer.QuadPart;
 #endif
 
-    /* macOS , mingw.org, used on mingw-w64.
-       Has 2038 issue if time_t: tv.tv_sec is 32-bit.
-     */
-    if (!lapse && !gettimeofday(&tv, NULL))
-        lapse = tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
+    if (!lapse) {
+        /* macOS , mingw.org, used on mingw-w64.
+           Has 2038 issue if time_t: tv.tv_sec is 32-bit.
+         */
+        if (!gettimeofday(&tv, NULL))
+            lapse = tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
+        else if (timespec_get(&ts, TIME_UTC))
+            lapse = ts.tv_sec * 1000000000 + ts.tv_nsec * 1000;
+    }
 
     return lapse;
 }

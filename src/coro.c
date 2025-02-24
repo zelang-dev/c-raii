@@ -2663,6 +2663,8 @@ void delete(void_t ptr) {
             channel_free(ptr);
         or (RAII_HASH)
             hash_free(ptr);
+        or (RAII_OBJECT)
+            ((object_t *)ptr)->dtor(ptr);
         otherwise {
             if (is_valid(ptr)) {
                 memset(ptr, 0, sizeof(ptr));
