@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     if (argc > 1)
         numRoutines = (u32)atoi(argv[1]);
 
-    waitgroup_t wg = waitgroup();
+    waitgroup_t wg = waitgroup_ex(numRoutines);
     for (i = 0; i < numRoutines; i++) {
         go(func, 0);
     }

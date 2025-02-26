@@ -304,7 +304,7 @@ extern "C" {
     /* Return the unique `result id` for the current coroutine. */
     C_API rid_t coro_id(void);
     C_API void coro_pool_init(size_t queue_size);
-
+    C_API int coro_start(coro_sys_func, int argc, char **argv, size_t queue_size);
 
     /* This library provides its own ~main~,
     which call this function as an coroutine! */
@@ -315,8 +315,6 @@ extern "C" {
     C_API void preempt_disable(void);
     C_API void preempt_enable(void);
     C_API void preempt_stop(void);
-
-    C_API int thrd_coro_init(coro_sys_func main, int argc, char **argv, size_t queue_size);
 
     /* Calls fn (with args as arguments) in separate thread, returning without waiting
     for the execution of fn to complete. The value returned by fn can be accessed

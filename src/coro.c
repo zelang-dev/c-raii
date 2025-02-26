@@ -247,15 +247,6 @@ static void deque_init(raii_deque_t *q, u32 size_hint) {
     q->type = RAII_POOL;
 }
 
-static void deque_reset(raii_deque_t *q, u32 shrink) {
-    atomic_init(&q->top, 0);
-    atomic_init(&q->bottom, 0);
-    deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_consume);
-    a = try_realloc(a, sizeof(deque_array_t) + sizeof(routine_t *) * shrink);
-    atomic_init(&a->size, shrink);
-    atomic_init(&q->array, a);
-}
-
 static void deque_resize(raii_deque_t *q) {
     deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_relaxed);
     size_t old_size = a->size;
@@ -2313,9 +2304,6 @@ static int scheduler(void) {
                 && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) < 0)
                 atomic_fetch_add(&gq_result.active_count, 1);
 
-            if (!t->is_referenced && (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN))
-                local = RAII_ABORT_T;
-
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
             } else if (t->is_referenced) {
@@ -2505,13 +2493,30 @@ RAII_INLINE value_t result_for(rid_t id) {
 
 waitgroup_t waitgroup_ex(u32 capacity) {
     routine_t *c = coro_active();
-    if (!is_zero(capacity) && (capacity > gq_result.thread_count * 2))
-        hash_set_capacity(capacity + (capacity * 0.0025));
+    size_t i, resized = 0, cap = capacity;
+    if (!is_zero(capacity) && (capacity > gq_result.thread_count * 2)) {
+        cap = capacity + (capacity * 0.0025);
+        hash_set_capacity(cap);
+        resized = cap / gq_result.thread_count;
+    }
 
-    waitgroup_t wg = hash_create_ex(capacity + (capacity * 0.0025));
+    waitgroup_t wg = hash_create_ex(cap);
     c->wait_active = true;
     c->wait_group = wg;
     c->is_group_finish = false;
+
+    if (coro_is_threading() && resized) {
+        atomic_thread_fence(memory_order_seq_cst);
+        for (i = 0; i < gq_result.thread_count; i++) {
+            raii_deque_t *q = gq_result.queue->local[i];
+            if (atomic_load_explicit(&q->array->size, memory_order_relaxed) < resized) {
+                deque_array_t *a = (deque_array_t *)atomic_load_explicit(&q->array, memory_order_acquire);
+                a = try_realloc(a, sizeof(deque_array_t) + sizeof(routine_t *) * resized);
+                atomic_store_explicit(&q->array, a, memory_order_release);
+                atomic_store(&a->size, resized);
+            }
+        }
+    }
 
     return wg;
 }
@@ -2858,4 +2863,14 @@ void coro_pool_init(size_t queue_size) {
     } else if (raii_local()->threading) {
         throw(logic_error);
     }
+}
+
+int coro_start(coro_sys_func main, int argc, char **argv, size_t queue_size) {
+    if (is_empty(coro_main_func)) {
+        coro_main_func = main;
+        gq_result.queue_size = queue_size;
+        return raii_main(argc, argv);
+    }
+
+    return RAII_ERR;
 }

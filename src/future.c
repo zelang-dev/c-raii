@@ -373,9 +373,3 @@ RAII_INLINE bool thrd_is_finish(future_t f) {
 
     return true;
 }
-
-int thrd_coro_init(coro_sys_func main, int argc, char **argv, size_t queue_size) {
-    coro_main_func = main;
-    gq_result.queue_size = queue_size;
-    return raii_main(argc, argv);
-}
