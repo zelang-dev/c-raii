@@ -2,12 +2,7 @@
 #ifndef _CORO_H
 #define _CORO_H
 
-/* Public API qualifier. */
-#ifndef C_API
-#   define C_API extern
-#endif
-
-#include "rtypes.h"
+#include "future.h"
 #include "hashtable.h"
 
 /* Coroutine states. */
@@ -33,7 +28,7 @@ typedef enum {
 typedef struct routine_s routine_t;
 typedef struct raii_deque_s raii_deque_t;
 typedef struct hash_s *waitgroup_t;
-typedef int (*coro_sys_func)(int, char **);
+typedef int (*coro_sys_func)(u32, void_t);
 typedef struct awaitable_s {
     raii_type type;
     rid_t cid;
@@ -295,6 +290,7 @@ extern "C" {
 
     /* Print `current` coroutine internal data state, only active in `debug` builds. */
     C_API void coro_info_active(void);
+    C_API void coro_yield_info(void);
 
     /* Set global coroutine `runtime` stack size, default: 16Kb,
     `coro_main` preset to `128Kb`, `8x 'CORO_STACK_SIZE'`. */
@@ -304,7 +300,7 @@ extern "C" {
     /* Return the unique `result id` for the current coroutine. */
     C_API rid_t coro_id(void);
     C_API void coro_pool_init(size_t queue_size);
-    C_API int coro_start(coro_sys_func, int argc, char **argv, size_t queue_size);
+    C_API int coro_start(coro_sys_func, u32 argc, void_t argv, size_t queue_size);
 
     /* This library provides its own ~main~,
     which call this function as an coroutine! */
@@ -315,51 +311,6 @@ extern "C" {
     C_API void preempt_disable(void);
     C_API void preempt_enable(void);
     C_API void preempt_stop(void);
-
-    /* Calls fn (with args as arguments) in separate thread, returning without waiting
-    for the execution of fn to complete. The value returned by fn can be accessed
-    by calling `thrd_get()`. */
-    C_API future thrd_async(thrd_func_t fn, size_t, ...);
-
-    /* Same as `thrd_async`, allows passing custom `context` scope for internal `promise`
-    for auto cleanup within caller's `scope`. */
-    C_API future thrd_async_ex(memory_t *scope, thrd_func_t fn, void_t args);
-
-    /* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
-    function blocks the calling thread and waits until it is ready. */
-    C_API values_type thrd_get(future);
-
-    /* This function blocks the calling thread and waits until `future` is ready,
-    will execute provided `yield` callback function continuously. */
-    C_API void thrd_wait(future, wait_func yield);
-
-    /* Check status of `future` object state, if `true` indicates thread execution has ended,
-    any call thereafter to `thrd_get` is guaranteed non-blocking. */
-    C_API bool thrd_is_done(future);
-    C_API void thrd_delete(future);
-    C_API uintptr_t thrd_self(void);
-    C_API size_t thrd_cpu_count(void);
-
-    /* Return/create an arbitrary `vector/array` set of `values`, only available within `thread/future` */
-    C_API vectors_t thrd_data(size_t, ...);
-
-    /* Return/create an single `vector/array` ~value~, only available within `thread/future` */
-    #define $(val) thrd_data(1, (val))
-
-    /* Return/create an pair `vector/array` ~values~, only available within `thread/future` */
-    #define $$(val1, val2) thrd_data(2, (val1), (val2))
-
-    C_API future_t thrd_scope(void);
-    C_API future_t thrd_sync(future_t);
-    C_API rid_t thrd_spawn(thrd_func_t fn, size_t, ...);
-    C_API values_type thrd_result(rid_t id);
-    C_API void thrd_set_result(raii_values_t *, int);
-
-    C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);
-
-    C_API void thrd_then(result_func_t callback, future_t iter, void_t result);
-    C_API void thrd_destroy(future_t);
-    C_API bool thrd_is_finish(future_t);
 
     C_API coro_sys_func coro_main_func;
     C_API bool coro_sys_set;

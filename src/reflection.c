@@ -1,6 +1,4 @@
 #include "reflection.h"
-#include "channel.h"
-#include "map.h"
 
 string_t reflect_kind(void_t value) {
     reflect_types res = (reflect_types)type_of(value);
@@ -282,6 +280,7 @@ reflect_func(_result_t,
              (UINT, rid_t, id),
              (STRUCT, raii_values_t *, result)
 )
+reflect_alias(_result_t)
 
 reflect_func(worker_t,
              (INTEGER, int, id),

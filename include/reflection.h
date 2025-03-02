@@ -1,7 +1,8 @@
 #ifndef REFLECTION_H_
 #define REFLECTION_H_
 
-#include "raii.h"
+#include "channel.h"
+#include "map.h"
 
 /*
  * A reflection library for C
@@ -239,6 +240,11 @@ typedef struct reflect_type_s {
         return &type_info; \
     }
 
+#define RE_DEFINE_ALIAS(TYPE_NAME)                      \
+    RAII_INLINE reflect_type_t* reflect##TYPE_NAME() {  \
+        return reflect_##TYPE_NAME();                   \
+    }
+
 #define RE_DEFINE_PROTO(TYPE_NAME) C_API reflect_type_t* reflect_##TYPE_NAME(void);
 
 #define RE_DEFINE_STRUCT(TYPE_NAME, ...) \
@@ -308,6 +314,11 @@ C_API void println(u32, ...);
 * - ARRAY_SIZE - size of array, if a field is an array
 */
 #define reflect_func(TYPE_NAME, ...) RE_DEFINE_METHOD(TYPE_NAME, (ENUM, raii_type, type), __VA_ARGS__)
+
+/**
+* Create alias function to `reflect_func`, but without extra `_` in TYPE_NAME,
+for `incomplete struct types` being an ~pointer~. */
+#define reflect_alias(TYPE_NAME) RE_DEFINE_ALIAS(TYPE_NAME)
 
 /**
 * Creates a reflection function proto as `extern reflect_type_t *reflect_*TYPE_NAME*(void);`
@@ -380,6 +391,10 @@ reflect_proto(defer_func_t);
 reflect_proto(object_t);
 reflect_proto(promise);
 
+reflect_proto(channel_t);
+reflect_proto(map_t);
+reflect_proto(map_iter_t);
+reflect_proto(map_item_t);
 #ifdef __cplusplus
 }
 #endif

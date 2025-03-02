@@ -4,7 +4,7 @@
 [![centos](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml)
 [![various cpu's](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml)
 
-An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety, _smarty!_
+An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety _smartly_, with **ultra** simple `threading` capabilities.
 
 * [Synopsis](#synopsis)
   * [There is _1 way_ to create an smart memory pointer.](#there-is-1-way-to-create-an-smart-memory-pointer)
@@ -18,22 +18,32 @@ An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memor
 
 This branch, version `2.x` of **c-raii**, has an expanded feature set. It differs greatly from [1.x](https://github.com/zelang-dev/c-raii/blob/1.x/) to be in line with the fact that most ordinary `C` _libraries_ in-use will need _refactoring_ aka **rewrite**, to be use effectually with _memory safety_ as first class.
 
-The features now encompass most things you might find in higher level languages, specificity **ease of use**, _with the same old_ **C89**. Not new concepts, you'll find most implicit in every _program/application_, if not explicit, now available in additional header files.
+The features now encompass most things you might find in higher level languages, specificity **ease of use**, _with the same old_ **C89**. Not new concepts, you'll find most implicit in every _program/application_, if not explicit, now available in additional header files:
 
 * dynamic data-structures [vector.h](https://github.com/zelang-dev/c-raii/blob/main/include/vector.h), [hashtable.h](https://github.com/zelang-dev/c-raii/blob/main/include/hashtable.h) and [map.h](https://github.com/zelang-dev/c-raii/blob/main/include/map.h).
 * parsers [url_http.h](https://github.com/zelang-dev/c-raii/blob/main/include/url_http.h) and [json.h](https://github.com/zelang-dev/c-raii/blob/main/include/json.h).
-* control flow constructs, _threads, coroutines, and channels_ [coro.h](https://github.com/zelang-dev/c-raii/blob/main/include/coro.h) and [channel.h](https://github.com/zelang-dev/c-raii/blob/main/include/channel.h).
+* execution context and control flow constructs, _threads, coroutines, and channels_, [future.h](https://github.com/zelang-dev/c-raii/blob/main/include/future.h), [coro.h](https://github.com/zelang-dev/c-raii/blob/main/include/coro.h) and [channel.h](https://github.com/zelang-dev/c-raii/blob/main/include/channel.h).
 * string manipulation/handling [swar.h](https://github.com/zelang-dev/c-raii/blob/main/include/swar.h).
 * access/manipulate an individual integer bits, with string representation [bitset.h](https://github.com/zelang-dev/c-raii/blob/main/include/bitset.h).
-* runtime code [reflection.h](https://github.com/zelang-dev/c-raii/blob/main/include/reflection.h).
+* runtime code [reflection.h](https://github.com/zelang-dev/c-raii/blob/main/include/reflection.h), behavior similar to [C++ Reflection - Back on Track](https://youtu.be/nBUgjFPkoto) **video**.
 
 > See [tests](https://github.com/zelang-dev/c-raii/blob/main/tests) and [examples](https://github.com/zelang-dev/c-raii/blob/main/examples) **folder** for _usage_.
 
 This library has come full circle from it's initial aim at being _decoupled_ from [c-coroutine](https://zelang-dev.github.io/c-coroutine) to _bridging_ it back with different startup strategy behavior. Must either **`#define USE_CORO`** or call **`coro_start(main_func, argc, argv, 0)`**. When active **C** become whatever _high level_ language you can imagine that offers _automatic memory management_, otherwise no coroutine support, program will **crash** calling any specific coroutine only functions.
 
-The one _essential_ thing that all languages must control and _redefine_ doing the compiler creation process, an _function_ **"creation/signature/entrance/exit"** _process_. The whole **"signature/entrance/exit"** process here is under **C-RAII** _coroutine_ control.
+> The one _essential_ thing that all languages must _control_ and _redefine_ doing the compiler creation process, _function_ **"creation/signature/entrance/exit"** _process_. The whole **"signature/entrance/exit"** process hereforth is under **C-RAII** control.
 
-**_Everything that follows at point is from version `1.x`_**
+The threading model, _execution context_ provided here is nothing new, the concept has been around for **C** aka _C89_ for quite awhile. The behavior is the same, but called under different _terminology_:
+
+* [Effect handlers](https://en.wikipedia.org/wiki/Effect_system) model with various implementations listed in [effect-handlers-bench](https://github.com/effect-handlers/effect-handlers-bench).
+* Various high level languages have direct compiler support for [Async/Await](https://en.wikipedia.org/wiki/Async/await),
+but don't have [work stealing](https://en.wikipedia.org/wiki/Work_stealing) in that _paradigm_.
+
+The model here mimics [Go concurrency](https://en.wikipedia.org/wiki/Go_(programming_language)#Concurrency) aka [Green thread](https://en.wikipedia.org/wiki/Green_thread) in _execution_ with follows [Cilk](https://en.wikipedia.org/wiki/Cilk) behavior.
+
+**_Everything that follows at this point is from version `1.x`, noteing [c-coroutine repo](https://zelang-dev.github.io/c-coroutine) will be restructured/refactored for the sole purpose of integrate [libuv](https://github.com/libuv/libuv), the coroutine part to be removed._**
+
+---
 
 This library has been decoupled from [c-coroutine](https://zelang-dev.github.io/c-coroutine) to be independently developed.
 

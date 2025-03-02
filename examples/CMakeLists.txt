@@ -28,6 +28,7 @@ set(TARGET_LIST defer_thread
  go_waitgroup
  go_channel
  go_select
+ go_future_wait
  fib )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )

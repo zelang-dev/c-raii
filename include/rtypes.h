@@ -13,7 +13,7 @@
         #define SYS_CONSOLE "\\\\?\\CON"
         /* O.S. physical ~null~ `DEVICE`. */
         #define SYS_NULL "\\\\?\\NUL"
-        /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
+        /* O.S. physical ~pipe~ prefix, add `string name` including trailing slash. */
         #define SYS_PIPE "\\\\.\\pipe\\"
     #endif
 #else
@@ -22,7 +22,7 @@
         #define SYS_CONSOLE "/dev/tty"
         /* O.S. physical ~null~ `DEVICE`. */
         #define SYS_NULL "/dev/null"
-        /* O.S. physical ~pipe~ prefix `string name` including trailing slash. */
+        /* O.S. physical ~pipe~ prefix, add `string name` including trailing slash. */
         #define SYS_PIPE "./"
     #endif
     #include <libgen.h>
@@ -206,11 +206,20 @@ typedef enum {
 /* Smart memory pointer, the allocated memory requested in `arena` field,
 all other fields private, this object binds any additional requests to it's lifetime. */
 typedef struct memory_s memory_t;
+typedef struct raii_results_s raii_results_t;
+typedef struct raii_deque_s raii_deque_t;
 typedef struct _future *future;
 typedef struct future_pool *future_t;
-typedef struct raii_deque_s raii_deque_t;
-typedef struct raii_results_s future_results_t;
+typedef struct hash_s hash_t;
+typedef struct map_s _map_t;
+typedef struct map_item_s map_item_t;
+typedef struct map_iterator_s map_iter_t;
 typedef memory_t unique_t;
+
+/*
+ * channel communication
+ */
+typedef struct channel_s _channel_t;
 
 /* Generic simple union storage types. */
 typedef union {
@@ -341,6 +350,29 @@ s\
 #   define _CACHE_LINE 256
 #else
 #   define _CACHE_LINE 64
+#endif
+
+#ifndef O_BINARY
+#   define O_BINARY 0
+#endif
+
+#ifndef CACHELINE_SIZE
+#   define CACHELINE_SIZE _CACHE_LINE
+#endif
+
+ /* The estimated size of the CPU's cache line when atomically updating memory.
+  Add this much padding or align to this boundary to avoid atomically-updated
+  memory from forcing cache invalidations on near, but non-atomic, memory.
+
+  https://en.wikipedia.org/wiki/False_sharing
+  https://github.com/golang/go/search?q=CacheLinePadSize
+  https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
+ */
+typedef char cacheline_pad_t[CACHELINE_SIZE];
+
+#ifndef C_API
+ /* Public API qualifier. */
+#   define C_API extern
 #endif
 
 #endif /* RAII_DEFINE_TYPES_H */

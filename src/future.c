@@ -148,6 +148,11 @@ future thrd_async_ex(memory_t *scope, thrd_func_t fn, void_t args) {
     return f;
 }
 
+RAII_INLINE future thrd_launch(thrd_func_t fn, void_t args) {
+    args_t params = args_for(1, args);
+    return thrd_async_ex(get_scope(), fn, params);
+}
+
 values_type thrd_get(future f) {
     if (is_type(f, RAII_FUTURE) && !is_empty(f->value) && is_type(f->value, RAII_PROMISE)) {
         raii_values_t *r = promise_get(f->value);
@@ -172,6 +177,10 @@ RAII_INLINE bool thrd_is_done(future f) {
 RAII_INLINE void thrd_wait(future f, wait_func yield) {
     while (!thrd_is_done(f))
         yield();
+}
+
+RAII_INLINE void thrd_until(future fut) {
+    thrd_wait(fut, coro_yield_info);
 }
 
 vectors_t thrd_data(size_t numof, ...) {

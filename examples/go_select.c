@@ -42,7 +42,7 @@ int fibonacci(channel_t c, channel_t quit) {
             unsigned long tmp = x + y;
             x = y;
             y = tmp;
-        _else _recv(quit, na)
+        _else_if _recv(quit, na)
             puts("quit");
             return 0;
         _break;

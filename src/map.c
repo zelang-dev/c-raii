@@ -1,13 +1,14 @@
 
 #include "map.h"
+#include "reflection.h"
 
 struct map_item_s {
     raii_type type;
     values_type value;
     u32 indic;
     string_t key;
-    struct map_item_s *prev;
-    struct map_item_s *next;
+    map_item_t *prev;
+    map_item_t *next;
 };
 
 struct map_s {
@@ -19,20 +20,20 @@ struct map_s {
     int64_t length;
     hash_t *dict;
     slice_t *slice;
-    struct map_item_s *head;
-    struct map_item_s *tail;
+    map_item_t *head;
+    map_item_t *tail;
 };
 
 struct map_iterator_s {
     raii_type type;
     bool forward;
     map_t hash;
-    struct map_item_s *item;
+    map_item_t *item;
 };
 
 static void map_add_pair(map_t hash, kv_pair_t *kv) {
-    struct map_item_s *item;
-    item = (struct map_item_s *)try_calloc(1, sizeof(struct map_item_s));
+    map_item_t *item;
+    item = (map_item_t *)try_calloc(1, sizeof(map_item_t));
     item->type = kv->type;
     item->indic++;
     item->key = kv->key;
@@ -52,7 +53,7 @@ static void map_add_pair(map_t hash, kv_pair_t *kv) {
 static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
     va_list ap;
     raii_type n = RAII_ERR;
-    struct map_item_s *item;
+    map_item_t *item;
     kv_pair_t *kv;
     void_t has;
     string k;
@@ -137,7 +138,7 @@ map_t map_for(u32 num_of_pairs, ...) {
 }
 
 void map_free(map_t hash) {
-    struct map_item_s *next;
+    map_item_t *next;
 
     if (!hash)
         return;
@@ -160,10 +161,10 @@ void map_free(map_t hash) {
 
 u32 map_push(map_t hash, void_t value) {
     char hash_key[SCRAPE_SIZE] = {0};
-    struct map_item_s *item;
+    map_item_t *item;
     kv_pair_t *kv;
 
-    item = (struct map_item_s *)try_calloc(1, sizeof(struct map_item_s));
+    item = (map_item_t *)try_calloc(1, sizeof(map_item_t));
     item->indic++;
     simd_itoa(item->indic, hash_key);
     kv = (kv_pair_t *)hash_put(hash->dict, hash_key, value);
@@ -186,7 +187,7 @@ u32 map_push(map_t hash, void_t value) {
 
 values_type map_pop(map_t hash) {
     values_type value;
-    struct map_item_s *item;
+    map_item_t *item;
 
     if (!hash || !hash->tail)
         return raii_values_empty->value;
@@ -206,13 +207,13 @@ values_type map_pop(map_t hash) {
 
 u32 map_shift(map_t hash, void_t value) {
     char hash_key[SCRAPE_SIZE] = {0};
-    struct map_item_s *item;
+    map_item_t *item;
     kv_pair_t *kv;
 
     if (!hash)
         return;
 
-    item = (struct map_item_s *)try_calloc(1, sizeof(struct map_item_s));
+    item = (map_item_t *)try_calloc(1, sizeof(map_item_t));
     item->type = RAII_MAP_VALUE;
     item->prev = nullptr;
     item->next = hash->head;
@@ -240,7 +241,7 @@ u32 map_shift(map_t hash, void_t value) {
 
 values_type map_unshift(map_t hash) {
     values_type value;
-    struct map_item_s *item;
+    map_item_t *item;
 
     if (!hash || !hash->head)
         return raii_values_empty->value;
@@ -266,7 +267,7 @@ RAII_INLINE size_t map_count(map_t hash) {
 }
 
 void_t map_remove(map_t hash, void_t value) {
-    struct map_item_s *item;
+    map_item_t *item;
 
     if (!hash)
         return nullptr;
@@ -306,7 +307,7 @@ RAII_INLINE values_type map_get(map_t hash, string_t key) {
 }
 
 RAII_INLINE void map_put(map_t hash, string_t key, void_t value) {
-    struct map_item_s *item;
+    map_item_t *item;
     kv_pair_t *kv;
     void_t has = hash_get(hash->dict, key);
     if (is_empty(has)) {
@@ -351,7 +352,7 @@ map_iter_t *iter_create(map_t hash, bool forward) {
 
 map_iter_t *iter_next(map_iter_t *iterator) {
     if (iterator) {
-        struct map_item_s *item;
+        map_item_t *item;
 
         item = iterator->forward ? iterator->item->next : iterator->item->prev;
         if (item) {
@@ -388,7 +389,7 @@ RAII_INLINE string_t iter_key(map_iter_t *iterator) {
 }
 
 map_iter_t *iter_remove(map_iter_t *iterator) {
-    struct map_item_s *item;
+    map_item_t *item;
 
     if (!iterator)
         return nullptr;
@@ -423,3 +424,30 @@ map_iter_t *iter_remove(map_iter_t *iterator) {
 
     return iterator;
 }
+
+reflect_func(map_item_t,
+             (UNION, values_type, value),
+             (UINT, u32, indic),
+             (CONST_CHAR, string_t, key),
+             (STRUCT, map_item_t *, prev),
+             (STRUCT, map_item_t *, next)
+)
+
+reflect_func(_map_t,
+             (ENUM, raii_type, item_type),
+             (BOOL, bool, started),
+             (BOOL, bool, sliced),
+             (UINT, u32, num_slices),
+             (LLONG, int64_t, length),
+             (STRUCT, hash_t *, dict),
+             (STRUCT, slice_t *, slice),
+             (STRUCT, map_item_t *, head),
+             (STRUCT, map_item_t *, tail)
+)
+reflect_alias(_map_t)
+
+reflect_func(map_iter_t,
+             (BOOL, bool, forward),
+             (STRUCT, map_t, hash),
+             (STRUCT, map_item_t *, item)
+)

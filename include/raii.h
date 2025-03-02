@@ -8,24 +8,6 @@
 #include <time.h>
 #include "coro.h"
 
-#ifndef O_BINARY
-#   define O_BINARY 0
-#endif
-
-#ifndef CACHELINE_SIZE
-/* The estimated size of the CPU's cache line when atomically updating memory.
- Add this much padding or align to this boundary to avoid atomically-updated
- memory from forcing cache invalidations on near, but non-atomic, memory.
-
- https://en.wikipedia.org/wiki/False_sharing
- https://github.com/golang/go/search?q=CacheLinePadSize
- https://github.com/ziglang/zig/blob/a69d403cb2c82ce6257bfa1ee7eba52f895c14e7/lib/std/atomic.zig#L445
-*/
-#   define CACHELINE_SIZE _CACHE_LINE
-#endif
-
-typedef char cacheline_pad_t[CACHELINE_SIZE];
-
 #ifdef __cplusplus
     extern "C" {
 #endif
@@ -134,7 +116,7 @@ struct raii_results_s {
     atomic_size_t take_count;
     atomic_result_t *results;
 };
-C_API future_results_t gq_result;
+C_API raii_results_t gq_result;
 
 C_API memory_t *raii_local(void);
 /* Return current `thread` smart memory pointer. */
@@ -268,6 +250,7 @@ C_API bool is_str_eq(const char *str, const char *str2);
 C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void_t self);
 C_API bool is_equal(void_t, void_t);
+C_API bool is_equal_ex(void_t, void_t);
 
 /* Tries to query the system for current time using `MONOTONIC` clock,
  or whatever method ~system/platform~ provides for `REALTIME`. */

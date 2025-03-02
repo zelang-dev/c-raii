@@ -2,7 +2,7 @@
 
 thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
-future_results_t gq_result = {0};
+raii_results_t gq_result = {0};
 
 #if defined(WIN32)
 int gettimeofday(struct timeval *tp, struct timezone *tzp) {
@@ -755,4 +755,25 @@ RAII_INLINE bool is_str_empty(const char *str) {
 
 RAII_INLINE bool is_equal(void_t mem, void_t mem2) {
     return memcmp(mem, mem2, sizeof(mem2)) == 0;
+}
+
+bool is_equal_ex(void_t mem, void_t mem2) {
+    size_t len;
+    match(mem2) {
+        and (RAII_HASH)
+            len = sizeof((hash_t *)mem2);
+        or (RAII_CHANNEL)
+            len = sizeof((_channel_t *)mem2);
+        or (RAII_MAP)
+            len = sizeof((_map_t *)mem2);
+        or (RAII_FUTURE)
+            len = sizeof((struct _future *)mem2);
+        or (RAII_PROMISE)
+            len = sizeof((promise *)mem2);
+        or (RAII_OBJECT)
+            len = sizeof((object_t *)mem2);
+        otherwise
+            len = sizeof(mem2);
+    }
+    return memcmp(mem, mem2, len) == 0;
 }

@@ -2532,7 +2532,7 @@ waitresult_t waitfor(waitgroup_t wg) {
     u32 group_capacity, cap, i;
     bool is_wait = false, has_completed = false, has_erred = false;
 
-    if (c->wait_active && is_equal(c->wait_group, wg)) {
+    if (c->wait_active && is_equal_ex(c->wait_group, wg)) {
         c->is_group_finish = true;
         if (coro_sched_is_assignable(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed)))
             atomic_flag_test_and_set(&gq_result.is_waitable);
@@ -2813,6 +2813,11 @@ RAII_INLINE void coro_info_active(void) {
     coro_info(nullptr, 0);
 }
 
+RAII_INLINE void coro_yield_info(void) {
+    coro_info(coro_active(), 1);
+    yielding();
+}
+
 RAII_INLINE void coro_stacksize_set(u32 size) {
     atomic_thread_fence(memory_order_seq_cst);
     gq_result.stacksize = size;
@@ -2865,11 +2870,11 @@ void coro_pool_init(size_t queue_size) {
     }
 }
 
-int coro_start(coro_sys_func main, int argc, char **argv, size_t queue_size) {
+int coro_start(coro_sys_func main, u32 argc, void_t argv, size_t queue_size) {
     if (is_empty(coro_main_func)) {
         coro_main_func = main;
         gq_result.queue_size = queue_size;
-        return raii_main(argc, argv);
+        return raii_main((int)argc, (char **)argv);
     }
 
     return RAII_ERR;

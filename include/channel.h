@@ -3,10 +3,7 @@
 
 #include "raii.h"
 
-/*
- * channel communication
- */
-typedef struct channel_s *channel_t;
+typedef _channel_t *channel_t;
 
 /* Creates an unbuffered channel, similar to golang channels. */
 C_API channel_t channel(void);
@@ -45,15 +42,15 @@ Will `yield` execution, if no target ~channel~ is selected as ready. */
   }
 
 /* Will send `data` and execute block, only if `ch` is target and ready.
-Must use `_else` to end block, or `_break` to end an `_else` chain. */
+Must use `_else_if` to end block, or `_break` to end an `_else_if` chain. */
 #define _send(ch, data) \
   if (chan_ready(ch) && $##__FUNCTION__##_fs == false) {    \
       chan_ready_reset(ch); chan_send(ch, data);
 
-#define _else   _break else
+#define _else_if   _break else
 
 /* Will receive `data` and execute block, only if `ch` is target and ready.
-Must use `_else` to end block, or `_break` to end an `_else` chain. */
+Must use `_else_if` to end block, or `_break` to end an `_else_if` chain. */
 #define _recv(ch, data) \
   if (chan_ready(ch) && $##__FUNCTION__##_fs == false) {    \
       chan_ready_reset(ch); values_type data = chan_recv(ch);
@@ -64,7 +61,7 @@ Must use `_else` to end block, or `_break` to end an `_else` chain. */
 
 /* The `_default` is run only if no `channel` is ready.
 Must also closed out with `_break()`. */
-#define _default()      \
-  _else if ($##__FUNCTION__##_fs == false) {
+#define _default        \
+  _else_if if ($##__FUNCTION__##_fs == false) {
 
 #endif

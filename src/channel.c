@@ -1,5 +1,5 @@
 #include "channel.h"
-#include "hashtable.h"
+#include "reflection.h"
 
 typedef struct {
     hash_t *gc;
@@ -404,3 +404,18 @@ RAII_INLINE values_type chan_recv(channel_t c) {
     _channel_op(c, CHANNEL_RECV, c->data, 1);
     return c->data->value;
 }
+
+reflect_func(_channel_t,
+             (BOOL, bool, select_ready),
+             (UINT, u32, bufsize),
+             (UINT, u32, elem_size),
+             (UINT, u32, nbuf),
+             (UINT, u32, off),
+             (UINT, u32, id),
+             (STRING, char *, name),
+             (UCHAR_P, unsigned char *, buf),
+             (STRUCT, msg_queue_t, a_send),
+             (STRUCT, msg_queue_t, a_recv),
+             (STRUCT, raii_values_t *, data)
+)
+reflect_alias(_channel_t)

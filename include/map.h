@@ -3,8 +3,7 @@
 
 #include "hashtable.h"
 
-typedef struct map_s *map_t;
-typedef struct map_iterator_s map_iter_t;
+typedef _map_t *map_t;
 typedef map_t slice_t;
 
 C_API map_t maps(void);

@@ -32,7 +32,6 @@ typedef struct kv_pair_s {
     values_type *extended;
 } kv_pair_t;
 
-typedef struct hash_s hash_t;
 typedef void_t(*hash_iter_func)(void_t variable, string_t key, const_t value);
 typedef void (*probe_func)(hash_t *htable, size_t *from_idx);
 typedef void (*print_key)(const_t k);
