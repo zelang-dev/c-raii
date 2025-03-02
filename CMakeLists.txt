@@ -161,6 +161,7 @@ install(
     TARGETS ${PROJECT_NAME} cthread
     EXPORT "${PROJECT_NAME}Targets"
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
@@ -175,14 +176,8 @@ install(TARGETS ${PROJECT_NAME} DESTINATION lib)
 if(WIN32)
     install(DIRECTORY include/ DESTINATION include)
 else()
-    install(FILES
- include/catomic.h
- include/cthread.h
- include/exception.h
- include/raii.h
- include/rpmalloc.h
- include/rtypes.h
-    DESTINATION include)
+    file(GLOB HEADER_LIST "include/*.h")
+    install(FILES ${HEADER_LIST} DESTINATION include)
 endif()
 
 set(CPACK_INSTALL_CMAKE_CONFIGURATIONS Release)
