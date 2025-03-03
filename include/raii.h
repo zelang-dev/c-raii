@@ -18,7 +18,7 @@ struct memory_s {
     bool is_protected;
     bool is_emulated;
     int threading;
-    int status;
+    raii_type status;
     size_t mid;
     defer_t defer;
     future_t threaded;

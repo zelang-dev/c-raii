@@ -663,7 +663,9 @@ void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
 }
 
 void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind) {
-    raii_local()->status = RAII_UNGUARDED_STATUS;
+    if (is_empty(scope))
+        raii_local()->status = RAII_UNGUARDED_STATUS;
+
     raii_local()->arena = scope;
     ex_swap_reset(ex_local());
     ex_local()->is_guarded = false;
