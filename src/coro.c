@@ -407,7 +407,7 @@ static void coro_transfer(raii_deque_t *queue);
 static void coro_destroy(void);
 static void coro_scheduler(void);
 
-static RAII_INLINE string _itoa(int64_t number) {
+static RAII_INLINE string __itoa(int64_t number) {
     return simd_itoa(number, coro_active()->scrape);
 }
 
@@ -1748,12 +1748,12 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     if (c->event_active && !is_empty(c->event_group)) {
         t->event_active = true;
         t->is_waiting = true;
-        hash_put(c->event_group, _itoa(id), t);
+        hash_put(c->event_group, __itoa(id), t);
         c->event_active = false;
     } else if (is_group) {
         t->is_waiting = true;
         t->is_group = true;
-        hash_put(c->wait_group, _itoa(id), t);
+        hash_put(c->wait_group, __itoa(id), t);
     }
 
     if (c->interrupt_active) {
@@ -2712,7 +2712,7 @@ void coro_interrupt_event(func_t fn, void_t handle, func_t dtor) {
     co->event_active = true;
 
     u32 cid = go((callable_t)fn, 1, handle);
-    routine_t *c = (routine_t *)((values_type *)hash_get(eg, _itoa(cid)))->object;
+    routine_t *c = (routine_t *)((values_type *)hash_get(eg, __itoa(cid)))->object;
     if (!is_empty(dtor)) {
         raii_deferred(c->scope, dtor, handle);
         r = snprintf(c->name, sizeof(c->name), "event #%d", (int)cid);

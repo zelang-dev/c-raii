@@ -150,7 +150,7 @@ void println(u32 num_of_args, ...) {
     ranges_t lists;
     map_t *list;
     reflect_type_t *kind;
-    int i, type;
+    u32 i;
 
     va_start(argp, num_of_args);
     for (i = 0; i < num_of_args; i++) {
@@ -178,7 +178,7 @@ void println(u32 num_of_args, ...) {
                     printf("invalid: %p ", has(item).object);
             }
         } else if (is_reflection(arguments)) {
-            reflect_type_t *kind = (reflect_type_t *)arguments;
+            kind = (reflect_type_t *)arguments;
             printf("[ %d, %s, %zu, %zu, %zu ]\n",
                    reflect_type_enum(kind),
                    reflect_type_of(kind),
@@ -210,7 +210,7 @@ void println(u32 num_of_args, ...) {
                 and (RAII_INTEGER)
                     printf("%d ", c_int(((var_t *)arguments)->value));
                 or (RAII_LONG)
-                    printf("%ls ", c_long(((var_t *)arguments)->value));
+                    printf("%lu ", c_long(((var_t *)arguments)->value));
                 or (RAII_MAXSIZE)
                 and (RAII_ULONG)
                     printf("%zu ", c_size_t(((var_t *)arguments)->value));

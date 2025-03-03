@@ -80,7 +80,6 @@ static RAII_INLINE void bitset_not(bits_t set, i32 lo, i32 hi) {
 }
 
 RAII_INLINE bits_t bitset_create(i32 length) {
-    i32 i;
     bits_t set = (bits_t)try_malloc(sizeof(struct bits_s));
     if (length > 0)
         set->words = try_calloc(nwords(length), sizeof(u64));

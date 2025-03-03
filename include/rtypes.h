@@ -353,10 +353,6 @@ s\
 #   define _CACHE_LINE 64
 #endif
 
-#ifndef O_BINARY
-#   define O_BINARY 0
-#endif
-
 #ifndef CACHELINE_SIZE
 #   define CACHELINE_SIZE _CACHE_LINE
 #endif

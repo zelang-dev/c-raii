@@ -57,7 +57,7 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
     kv_pair_t *kv;
     void_t has;
     string k;
-    int i;
+    u32 i;
 
     if (is_empty(hash))
         hash = map_create();

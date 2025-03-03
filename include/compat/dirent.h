@@ -8,10 +8,9 @@
 
 #ifdef _MSC_VER
 #include <windows.h>
-#include <dirent_msvc.h>
+#include "dirent_msvc.h"
 #else
 #include_next <dirent.h>
 #endif
 
 #endif
-

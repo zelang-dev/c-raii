@@ -3,7 +3,7 @@
 #define _JSON_H
 
 #if defined(_WIN32) || defined(_WIN64)
-#   include "compat/dirent.h"
+#   include "compat/unistd.h"
 #else
 #   include <dirent.h>
 #endif

@@ -17,7 +17,7 @@ void *test_receive(params_t arg) {
 
 TEST(chan_send) {
     channel_t c = channel_buf(3);
-    int i, s;
+    int i;
 
     go(test_receive, 1, c);
     for (i = 0; i < 10; i++) {

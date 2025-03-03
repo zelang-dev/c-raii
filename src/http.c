@@ -1,5 +1,15 @@
 #include "url_http.h"
 
+#if defined(_WIN32) || defined(_WIN64)
+struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
+    int r = gmtime_s(buf, timer);
+    if (r)
+        return NULL;
+
+    return buf;
+}
+#endif
+
 static string_t method_strings[] = {
 "DELETE", "GET", "HEAD", "POST", "PUT", "CONNECT", "OPTIONS", "TRACE", "COPY", "LOCK", "MKCOL", "MOVE", "PROPFIND", "PROPPATCH", "SEARCH", "UNLOCK", "REPORT", "MKACTIVITY", "CHECKOUT", "MERGE", "M-SEARCH", "NOTIFY", "SUBSCRIBE", "UNSUBSCRIBE", "PATCH", "PURGE"
 };

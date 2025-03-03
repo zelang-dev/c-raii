@@ -184,7 +184,7 @@ static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, string_t s, uint
 }
 
 RAII_INLINE uint16_t utoa2p(uint64_t x) {
-    static const section(text) uint8_t pairs[50] = { // 0..49, little endian
+    static const CODE_SECTION uint8_t pairs[50] = { // 0..49, little endian
         0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90,
         0x01, 0x11, 0x21, 0x31, 0x41, 0x51, 0x61, 0x71, 0x81, 0x91,
         0x02, 0x12, 0x22, 0x32, 0x42, 0x52, 0x62, 0x72, 0x82, 0x92,
@@ -482,7 +482,7 @@ RAII_INLINE double simd_atod(string_t s, uint32_t len) {
     dpart = _copySign(ipart, dpart);
 
     // Array of 20 * 8 = 160 bytes
-    static const section(text) double scales[20] = {
+    static const CODE_SECTION double scales[20] = {
         1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10,
         1e-11, 1e-12, 1e-13, 1e-14, 1e-15, 1e-16, 1e-17, 1e-18, 1e-19, 1e-20};
 

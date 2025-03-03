@@ -45,7 +45,6 @@ key_ops_t key_ops_string = {djb2_hash, hash_string_eq, hash_string_cp, RAII_FREE
 val_ops_t val_ops_string = {hash_string_eq, hash_string_cp, RAII_FREE, nullptr};
 
 hash_t *hashtable_init(key_ops_t key_ops, val_ops_t val_ops, probe_func probing, u32 cap) {
-    int i;
     hash_t *htable = try_calloc(1, sizeof(*htable));
     u32 capacity = is_zero(cap) ? hash_initial_capacity : cap;
     atomic_init(&htable->size, 0);
