@@ -2823,7 +2823,8 @@ RAII_INLINE void coro_stacksize_set(u32 size) {
     gq_result.stacksize = size;
 }
 
-void coro_pool_init(size_t queue_size) {
+raii_deque_t *coro_pool_init(size_t queue_size) {
+    raii_deque_t **local, *queue = nullptr;
     atomic_thread_fence(memory_order_seq_cst);
     if (!thrd_queue_set) {
         thrd_queue_set = true;
@@ -2831,7 +2832,6 @@ void coro_pool_init(size_t queue_size) {
             coro_initialize();
 
         size_t i;
-        raii_deque_t **local, *queue;
         unique_t *scope = gq_result.scope, *global = coro_sys_set ? coro_scope() : raii_init();
         if (queue_size > 0) {
             local = (raii_deque_t **)calloc_full(scope, gq_result.thread_count, sizeof(local[0]), RAII_FREE);
@@ -2868,6 +2868,8 @@ void coro_pool_init(size_t queue_size) {
     } else if (raii_local()->threading) {
         throw(logic_error);
     }
+
+    return queue;
 }
 
 int coro_start(coro_sys_func main, u32 argc, void_t argv, size_t queue_size) {

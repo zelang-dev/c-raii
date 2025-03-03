@@ -263,8 +263,7 @@ future_t thrd_scope(void) {
         if (raii_local()->threading)
             throw(logic_error);
 
-        coro_pool_init(0);
-        queue = raii_local()->queued;
+        queue = coro_pool_init(0);
     }
 
     scope = unique_init();

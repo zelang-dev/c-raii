@@ -330,6 +330,7 @@ are only valid between these sections.
     exception_setup_func = guard_set;                   \
     unique_t *_$##__FUNCTION__ = unique_init();         \
     (_$##__FUNCTION__)->status = RAII_GUARDED_STATUS;   \
+    raii_local()->status = (_$##__FUNCTION__)->status;  \
     raii_local()->arena = (void_t)_$##__FUNCTION__;     \
     ex_try {                                            \
         do {
