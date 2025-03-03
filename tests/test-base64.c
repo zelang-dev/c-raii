@@ -23,6 +23,8 @@ TEST(raii_encode64) {
         ASSERT_STR("amM=", base64);
         ASSERT_TRUE(is_base64(base64));
     }
+
+    return 0;
 }
 
 TEST(raii_decode64) {
@@ -52,6 +54,8 @@ TEST(raii_decode64) {
         u_string data = raii_decode64(base64);
         ASSERT_NULL(data);
     }
+
+    return 0;
 }
 
 TEST(list) {
@@ -66,5 +70,4 @@ TEST(list) {
 
 int main(int argc, char **argv) {
     TEST_FUNC(list());
-    raii_destroy();
 }

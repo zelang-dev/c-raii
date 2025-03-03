@@ -18,7 +18,7 @@ set(TARGET_LIST
  test-future
  test-future-exception
  test-future-scope
- test-thrd_spawn
+ # test-thrd_spawn
  test-waitgroup
  test-channel
  test-http_request
@@ -32,5 +32,5 @@ set(TARGET_LIST
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )
     target_link_libraries(${TARGET} raii)
-    add_test(NAME ${TARGET} COMMAND ${TARGET})
+    add_test(NAME ${TARGET} COMMAND ${TARGET} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endforeach()

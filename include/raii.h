@@ -240,6 +240,7 @@ C_API bool is_value(void_t);
 C_API bool is_instance(void_t);
 C_API bool is_valid(void_t);
 C_API bool is_invalid(void_t);
+C_API bool is_union(void_t);
 C_API bool is_null(void_t);
 C_API bool is_zero(size_t);
 C_API bool is_empty(void_t);

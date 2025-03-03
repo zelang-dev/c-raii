@@ -197,7 +197,7 @@ void println(u32 num_of_args, ...) {
                        reflect_field_array_size(kind, i)
                 );
             }
-        } else if (is_valid(arguments)) {
+        } else if (is_valid(arguments) || is_union(arguments)) {
             match(arguments) {
                 and (RAII_STRING)
                 and (RAII_CHAR_P)
@@ -239,7 +239,7 @@ void println(u32 num_of_args, ...) {
                     printf("%p ", c_ptr(((var_t *)arguments)->value));
             }
         } else {
-            printf("%s ", c_char_ptr(arguments));
+            printf("%p ", c_object(arguments));
         }
     }
     va_end(argp);

@@ -724,6 +724,11 @@ RAII_INLINE bool is_invalid(void_t self) {
     return type_of(self) < RAII_NULL;
 }
 
+RAII_INLINE bool is_union(void_t self) {
+    return type_of(self) > RAII_NO_INSTANCE
+        && type_of(self) < RAII_GUARDED_STATUS;
+}
+
 RAII_INLINE bool is_null(void_t self) {
     return type_of(self) == RAII_NULL;
 }
