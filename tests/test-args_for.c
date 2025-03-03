@@ -24,7 +24,7 @@ TEST(args_for) {
     memory_t *s = unique_init();
     args_t d = args_for_ex(s, 3, "hello", "world", 32);
     args_deferred_set(d, s);
-    _defer(raii_delete, s);
+    deferring(raii_delete, s);
 
     string arg1 = d[0].char_ptr;
     string arg2 = d[1].char_ptr;

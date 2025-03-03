@@ -448,7 +448,7 @@ RAII_INLINE size_t deferring(func_t func, void_t data) {
 }
 
 RAII_INLINE void raii_recover(func_t func, void_t data) {
-    raii_deferred_any(raii_local(), func, data, (void_t)"err");
+    raii_deferred_any(get_scope(), func, data, (void_t)"err");
 }
 
 RAII_INLINE void raii_recover_by(memory_t *scope, func_t func, void_t data) {

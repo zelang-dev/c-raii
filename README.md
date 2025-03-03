@@ -200,7 +200,7 @@ void g(int i) {
 void f_print(void *na) {
     puts("In defer in f");
     fflush(stdout);
-    if (_recover(_get_message())) {
+    if (_recovered(_get_message())) {
         printf("Recovered in f = %s\n", _get_message());
         fflush(stdout);
     }
@@ -528,7 +528,7 @@ C_API size_t deferring(func_t func, void_t data);
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`.
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
 C_API bool is_recovered(const char *err);
-#define _recover(err) is_recovered(err)
+#define _recovered(err) is_recovered(err)
 
 /* Get scoped error condition string.
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
