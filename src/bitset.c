@@ -97,10 +97,7 @@ RAII_INLINE bits_t bitset_create(i32 length) {
 
 RAII_INLINE bits_t bitset(i32 length, u64 ul) {
     bits_t bits = bitset_create(length);
-    if (!coro_sys_set)
-        _defer(bitset_free, bits);
-    else
-        raii_deferred(get_scope(), (func_t)bitset_free, bits);
+    deferring((func_t)bitset_free, bits);
 
     *bits->words = ul;
 

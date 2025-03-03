@@ -566,18 +566,15 @@ On exit will begin executing deferred functions. */
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call.
 
 Execution begins when current `guard` scope exits or panic/throw. */
-C_API size_t deferring(func_t func, void_t data);
-#define _defer(func, ptr) deferring(func, ptr)
+#define _defer(func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`.
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
-C_API bool is_recovered(const char *err);
-#define _recover(err) is_recovered(err)
+#define _recover(err)
 
 /* Get scoped error condition string.
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
-C_API const char *err_message(void);
-#define _get_message() err_message()
+#define _get_message()
 
 /* Stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */

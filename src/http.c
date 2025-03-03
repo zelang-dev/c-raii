@@ -137,7 +137,7 @@ string_t http_status_str(uint16_t const status) {
 
 hash_http_t *parse_str(string lines, string sep, string part) {
     hash_http_t *this = hashtable_init(key_ops_string, val_ops_string, hash_lp_idx, SCRAPE_SIZE);
-    raii_deferred(get_scope(), (func_t)hash_free, this);
+    deferring((func_t)hash_free, this);
     if (is_empty((void_t)part))
         part = "=";
 

@@ -21,7 +21,7 @@ void *is_future(args_t args) {
 TEST(thrd_async_ex) {
     memory_t *s = unique_init();
     future fut = thrd_async_ex(s, is_future, args_for(3, "hello world", 128, some_worker));
-    _defer(raii_delete, s);
+    deferring((func_t)raii_delete, s);
 
     ASSERT_TRUE(is_type(fut, RAII_FUTURE));
     ASSERT_FALSE(thrd_is_done(fut));

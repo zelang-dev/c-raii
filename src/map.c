@@ -118,10 +118,7 @@ map_t map_create(void) {
 
 RAII_INLINE map_t maps(void) {
     map_t hash = map_create();
-    if (!coro_sys_set)
-        _defer(map_free, hash);
-    else
-        raii_deferred(get_scope(), (func_t)map_free, hash);
+    deferring((func_t)map_free, hash);
 
     return hash;
 }

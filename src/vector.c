@@ -163,7 +163,7 @@ RAII_INLINE vectors_t vector_variant(void) {
     memory_t *scope = unique_init();
     vector_grow(vec, n, scope);
     raii_deferred(scope, (func_t)vector_delete, vec);
-    _defer(raii_delete, scope);
+    deferring((func_t)raii_delete, scope);
 
     return vec;
 }
@@ -184,7 +184,7 @@ RAII_INLINE void args_destructor_set(args_t params) {
     if (vector_type(params) == RAII_ARGS && !vector_deferred(params)) {
         vector_defer_set(params);
         memory_t *scope = vector_context(params);
-        _defer(raii_delete, scope);
+        deferring((func_t)raii_delete, scope);
         raii_deferred(scope, (func_t)vector_delete, params);
         raii_local()->local = params;
     }
@@ -382,7 +382,7 @@ RAII_INLINE arrays_t arrays(void) {
     arrays_t array = array_of(scope, 0);
     array_deferred_set(array, scope);
     if (!coro_sys_set)
-        _defer(raii_delete, scope);
+        deferring((func_t)raii_delete, scope);
 
     return array;
 }

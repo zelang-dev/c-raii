@@ -14,7 +14,7 @@ TEST(array_of) {
     ASSERT_TRUE(is_array(d));
     ASSERT_TRUE(($size(d) == 8));
     array_deferred_set(d, s);
-    _defer(raii_delete, s);
+    deferring((func_t)raii_delete, s);
 
     string ar1 = d[0].char_ptr;
     string ar2 = d[1].char_ptr;

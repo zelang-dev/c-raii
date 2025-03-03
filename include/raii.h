@@ -283,19 +283,19 @@ DO NOT FREE, will `throw/panic` if memory request fails. */
 #define _calloc(count, size)    calloc_local(count, size)
 
 /* Defer execution `LIFO` of given function with argument,
-execution begins when current `context` scope exits or panic/throw. */
-#define _defer(func, ptr)       deferring((func_t)func, ptr)
+execution begins when current `guard` scope exits or panic/throw. */
+#define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, (func_t)func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _recover(err)           is_recovered(err)
+#define _recover(err)           raii_is_caught(raii_local()->arena, err)
 
 /* Compare `err` to scoped error condition,
 will mark exception handled, if `true`.
 DO NOT PUT `err` in quote's like "err". */
-#define _is_caught(err)         is_recovered(EX_STR(err))
+#define _is_caught(err)         raii_is_caught(raii_local()->arena, EX_STR(err))
 
 /* Get scoped error condition string. */
-#define _get_message()  err_message()
+#define _get_message()          raii_message_by(raii_local()->arena)
 
 /* Stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */
