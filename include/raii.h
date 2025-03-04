@@ -14,12 +14,10 @@
 
 struct memory_s {
     void_t arena;
+    raii_type status;
+    int threading;
     bool is_recovered;
     bool is_protected;
-    bool is_emulated;
-    int threading;
-    raii_type status;
-    size_t mid;
     defer_t defer;
     future_t threaded;
     vectors_t local;
@@ -131,8 +129,6 @@ C_API int exit_scope(void);
 C_API void raii_unwind_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API int raii_deferred_init(defer_t *array);
 
-C_API size_t raii_mid(void);
-C_API size_t raii_last_mid(memory_t *scope);
 C_API result_t raii_result_create(void);
 C_API result_t raii_result_get(rid_t);
 
@@ -146,12 +142,6 @@ C_API size_t raii_defer(func_t, void_t);
 /* Defer execution `LIFO` of given function with argument,
 execution begins when current `context` scope exits or panic/throw. */
 C_API size_t deferring(func_t func, void_t data);
-
-C_API void raii_defer_cancel(size_t index);
-C_API void raii_deferred_cancel(memory_t *scope, size_t index);
-
-C_API void raii_defer_fire(size_t index);
-C_API void raii_deferred_fire(memory_t *scope, size_t index);
 
 /* Same as `raii_defer` but allows recover from an Error condition throw/panic,
 you must call `raii_caught` inside function to mark Error condition handled. */

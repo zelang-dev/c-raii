@@ -5,6 +5,7 @@
 #   include "compat/dirent.h"
 #   define TESTDIR "../../tests/valid"
 #else
+#   include <dirent.h>
 #   define TESTDIR "../tests/valid"
 #endif
 

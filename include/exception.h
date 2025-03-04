@@ -382,7 +382,6 @@ struct ex_context_s {
     bool is_rethrown;
     bool is_guarded;
     bool is_raii;
-    bool is_emulated;
     int unstack;
     int volatile caught;
 
@@ -419,7 +418,6 @@ struct ex_context_s {
 /* stack of protected pointer */
 struct ex_ptr_s {
     int type;
-    bool is_emulated;
     ex_ptr_t *next;
     ex_unwind_func func;
     void **ptr;

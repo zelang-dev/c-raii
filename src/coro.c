@@ -1,7 +1,6 @@
 #include "channel.h"
 
 static volatile bool thrd_queue_set = false;
-static volatile bool coro_init_set = false;
 static volatile bool coro_interrupt_set = false;
 static volatile sig_atomic_t can_cleanup = true;
 static raii_callable_t coro_coroutine_loop = nullptr;
@@ -153,7 +152,7 @@ typedef struct {
     u32 num_others_ran;
     /* record thread integration code */
     i32 interrupt_code;
-    void_t interrput_data;
+    void_t unused_data[3];
     routine_t *sleep_handle;
     /* record which coroutine is executing for scheduler */
     routine_t *running;
@@ -173,6 +172,8 @@ typedef struct {
     routine_t active_buffer[1];
     /* record thread integration handler */
     void_t interrput_handle;
+    void_t interrupt_default;
+    void_t interrupt_buffer;
     /* array for thread integration `misc` data */
     arrays_t interrput_args;
 } coro_thread_t;
@@ -609,6 +610,15 @@ int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...) {
 #endif
     /* Save/Restore the full machine context */
     ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
+
+    /* Copy the arguments */
+    va_start(ap, argc);
+    for (i = 0; i < argc; i++) {
+        memcpy(sp, ap, 8);
+        ap += 8;
+        sp += 8;
+    }
+    va_end(ap);
 
     return 0;
 }
@@ -1945,7 +1955,8 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->interrupt_code = 0;
     coro()->interrput_handle = nullptr;
     coro()->interrput_args = nullptr;
-    coro()->interrput_data = nullptr;
+    coro()->interrupt_default = nullptr;
+    coro()->interrupt_buffer = nullptr;
 }
 
 /* Check `thread` local coroutine use count for zero. */
@@ -2195,8 +2206,8 @@ static void coro_cleanup(void) {
         }
 
         coro_interrupt_cleanup(nullptr);
-        coro_destroy();
         channel_destroy();
+        coro_destroy();
         deque_destroy();
     }
 }
@@ -2284,6 +2295,7 @@ static int scheduler(void) {
         coro()->running = t;
         coro()->num_others_ran++;
         t->cycles++;
+
         coro_interrupter();
         if (!is_status_invalid(t) && !t->halt)
             coro_switch(t);
@@ -2354,35 +2366,42 @@ static void_t main_main(void_t v) {
 
 static void coro_initialize(void) {
     atomic_thread_fence(memory_order_seq_cst);
-    coro_init_set = true;
-    gq_result.stacksize = CORO_STACK_SIZE;
-    gq_result.is_takeable = 0;
-    gq_result.cpu_count = thrd_cpu_count();
-    gq_result.thread_count = gq_result.cpu_count + 1;
-    if (gq_result.queue_size == 0)
-        gq_result.queue_size = 1 << (gq_result.cpu_count > 7
-                                     ? 13
-                                     : gq_result.cpu_count * 2);
-    gq_result.scope = unique_init();
-    gq_result.queue = nullptr;
-    gq_result.gc = nullptr;
-    gq_result.group_result = nullptr;
-    atomic_init(&gq_result.results, nullptr);
-    atomic_init(&gq_result.result_id_generate, 0);
-    atomic_init(&gq_result.id_generate, 0);
-    atomic_init(&gq_result.active_count, 0);
-    atomic_init(&gq_result.take_count, 0);
-    atomic_flag_clear(&gq_result.group_lock);
-    atomic_flag_clear(&gq_result.is_finish);
-    atomic_flag_clear(&gq_result.is_started);
-    atomic_flag_clear(&gq_result.is_waitable);
-    atomic_flag_test_and_set(&gq_result.is_errorless);
-    atomic_flag_test_and_set(&gq_result.is_interruptable);
+    if (!coro_sys_set) {
+        coro_sys_set = true;
+        exception_setup_func = coro_unwind_setup;
+        exception_unwind_func = (ex_unwind_func)coro_deferred_free;
+        exception_ctrl_c_func = (ex_terminate_func)coro_cleanup;
+        exception_terminate_func = (ex_terminate_func)coro_cleanup;
+        gq_result.stacksize = CORO_STACK_SIZE;
+        gq_result.is_takeable = 0;
+        gq_result.cpu_count = thrd_cpu_count();
+        gq_result.thread_count = gq_result.cpu_count + 1;
+        if (gq_result.queue_size == 0)
+            gq_result.queue_size = 1 << (gq_result.cpu_count > 7
+                                         ? 13
+                                         : gq_result.cpu_count * 2);
+        gq_result.scope = unique_init();
+        gq_result.queue = nullptr;
+        gq_result.gc = nullptr;
+        gq_result.group_result = nullptr;
+        atomic_init(&gq_result.results, nullptr);
+        atomic_init(&gq_result.result_id_generate, 0);
+        atomic_init(&gq_result.id_generate, 0);
+        atomic_init(&gq_result.active_count, 0);
+        atomic_init(&gq_result.take_count, 0);
+        atomic_flag_clear(&gq_result.group_lock);
+        atomic_flag_clear(&gq_result.is_finish);
+        atomic_flag_clear(&gq_result.is_started);
+        atomic_flag_clear(&gq_result.is_waitable);
+        atomic_flag_test_and_set(&gq_result.is_errorless);
+        atomic_flag_test_and_set(&gq_result.is_interruptable);
 #if defined(_WIN32)
-    QueryPerformanceFrequency(&gq_result.timer);
+        QueryPerformanceFrequency(&gq_result.timer);
 #elif defined(__APPLE__) || defined(__MACH__)
-    mach_timebase_info(&gq_result.timer);
+        mach_timebase_info(&gq_result.timer);
 #endif
+        ex_signal_setup();
+    }
 }
 
 int raii_main(int argc, char **argv) {
@@ -2390,16 +2409,9 @@ int raii_main(int argc, char **argv) {
     coro_argv = argv;
 
     rpmalloc_init();
-    atomic_thread_fence(memory_order_seq_cst);
-    coro_sys_set = true;
-    exception_setup_func = coro_unwind_setup;
-    exception_unwind_func = (ex_unwind_func)coro_deferred_free;
-    exception_ctrl_c_func = (ex_terminate_func)coro_cleanup;
-    exception_terminate_func = (ex_terminate_func)coro_cleanup;
-    ex_signal_setup();
     coro_initialize();
-    coro_sched_init(true, 0);
     coro_pool_init(gq_result.queue_size);
+    coro_sched_init(true, 0);
     create_coro(main_main, nullptr, gq_result.stacksize * 8, CORO_RUN_MAIN);
     scheduler();
     unreachable;
@@ -2624,7 +2636,12 @@ rid_t go(callable_t fn, u64 num_of_args, ...) {
 
 void launch(func_t fn, u64 num_of_args, ...) {
     va_list ap;
-    go((callable_t)fn, num_of_args, ap);
+
+    va_start(ap, num_of_args);
+    params_t params = array_ex(coro_scope(), num_of_args, ap);
+    va_end(ap);
+
+    create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
     yielding();
 }
 
@@ -2699,9 +2716,19 @@ value_t coro_await(callable_t fn, size_t num_of_args, ...) {
 
 value_t coro_interrupt(callable_t fn, size_t num_of_args, ...) {
     va_list ap;
-    routine_t *co = coro_active();
-    co->interrupt_active = true;
-    return coro_await(fn, num_of_args, ap);
+    waitgroup_t wg = waitgroup_ex(2);
+    coro_active()->interrupt_active = true;
+
+    va_start(ap, num_of_args);
+    params_t params = array_ex(coro_scope(), num_of_args, ap);
+    va_end(ap);
+
+    rid_t rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
+    waitresult_t wgr = waitfor(wg);
+    if (!is_empty(wgr))
+        return result_for(rid);
+
+    return raii_values_empty->valued;
 }
 
 void coro_interrupt_event(func_t fn, void_t handle, func_t dtor) {
@@ -2825,11 +2852,8 @@ RAII_INLINE void coro_stacksize_set(u32 size) {
 
 raii_deque_t *coro_pool_init(size_t queue_size) {
     raii_deque_t **local, *queue = nullptr;
-    atomic_thread_fence(memory_order_seq_cst);
     if (!thrd_queue_set) {
         thrd_queue_set = true;
-        if (!coro_init_set)
-            coro_initialize();
 
         size_t i;
         unique_t *scope = gq_result.scope, *global = coro_sys_set ? coro_scope() : raii_init();

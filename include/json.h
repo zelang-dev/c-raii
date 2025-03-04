@@ -2,12 +2,6 @@
 #ifndef _JSON_H
 #define _JSON_H
 
-#if defined(_WIN32) || defined(_WIN64)
-#   include "compat/unistd.h"
-#else
-#   include <dirent.h>
-#endif
-
 #include "raii.h"
 #include "parson.h"
 

@@ -84,9 +84,10 @@ inline void assert_expected(long res, long expected, const char *file, unsigned 
 
 #define ASSERT_STR(expected, actual) ASSERT_EQ_(expected, actual, strcmp(expected, actual) == 0, "%s")
 #define ASSERT_PTR(expected, actual) ASSERT_EQ_(expected, actual, memcmp(expected, actual, sizeof(actual)) == 0, "%p")
-#define ASSERT_UEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%zu")
-#define ASSERT_EQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%d")
-#define ASSERT_EQU(expected, actual) ASSERT_ERR_(expected, actual, expected == actual, "%d")
+#define ASSERT_UEQ(expected, actual) ASSERT_EQ_((size_t)expected, actual, expected == actual, "%zu")
+#define ASSERT_DOUBLE(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%f")
+#define ASSERT_EQ(expected, actual) ASSERT_EQ_((int)expected, actual, expected == actual, "%d")
+#define ASSERT_EQU(expected, actual) ASSERT_ERR_((int)expected, actual, expected == actual, "%d")
 #define ASSERT_CHAR(expected, actual) ASSERT_EQ_((char)expected, (char)actual, expected == actual, "%c")
 #define ASSERT_LEQ(expected, actual) ASSERT_EQ_(expected, actual, expected == actual, "%i")
 #define ASSERT_XEQ(expected, actual) ASSERT_EQ_((long)(expected), (long)(actual), expected == actual, "%ld")

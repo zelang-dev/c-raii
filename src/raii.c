@@ -30,7 +30,6 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 RAII_INLINE uint64_t get_timer(void) {
     uint64_t lapse = 0;
     struct timeval tv;
-    struct timespec ts;
 
 #if defined(__APPLE__) || defined(__MACH__)
     uint64_t t = mach_absolute_time();
@@ -46,7 +45,7 @@ RAII_INLINE uint64_t get_timer(void) {
     LARGE_INTEGER count;
 
     if (QueryPerformanceCounter(&count) && &gq_result.timer)
-        lapse = count.QuadPart / gq_result.timer.QuadPart;
+        lapse = (count.QuadPart * 1000000000)/ gq_result.timer.QuadPart ;
 #endif
 
     if (!lapse) {
@@ -55,8 +54,6 @@ RAII_INLINE uint64_t get_timer(void) {
          */
         if (!gettimeofday(&tv, NULL))
             lapse = tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
-        else if (timespec_get(&ts, TIME_UTC))
-            lapse = ts.tv_sec * 1000000000 + ts.tv_nsec * 1000;
     }
 
     return lapse;
@@ -277,7 +274,6 @@ memory_t *raii_init(void) {
         scope->queued = NULL;
         scope->is_protected = false;
         scope->is_recovered = false;
-        scope->mid = RAII_ERR;
 
         ex_context_t *ctx = ex_init();
         ctx->data = (void_t)scope;
@@ -290,14 +286,6 @@ memory_t *raii_init(void) {
     }
 
     return scope;
-}
-
-RAII_INLINE size_t raii_mid(void) {
-    return raii_local()->mid;
-}
-
-RAII_INLINE size_t raii_last_mid(memory_t *scope) {
-    return scope->mid;
 }
 
 void_t try_calloc(int count, size_t size) {
@@ -369,7 +357,6 @@ unique_t *unique_init(void) {
     raii->arena = NULL;
     raii->protector = NULL;
     raii->is_protected = false;
-    raii->mid = RAII_ERR;
     return raii;
 }
 
@@ -378,10 +365,9 @@ void_t malloc_full(memory_t *scope, size_t size, func_t func) {
     if (is_empty(scope->protector))
         scope->protector = try_malloc(sizeof(ex_ptr_t));
 
-    scope->protector->is_emulated = scope->is_emulated;
     ex_protect_ptr(scope->protector, arena, func);
     scope->is_protected = true;
-    scope->mid = raii_deferred(scope, func, arena);
+    raii_deferred(scope, func, arena);
 
     return arena;
 }
@@ -395,10 +381,9 @@ void_t calloc_full(memory_t *scope, int count, size_t size, func_t func) {
     if (is_empty(scope->protector))
         scope->protector = try_calloc(1, sizeof(ex_ptr_t));
 
-    scope->protector->is_emulated = scope->is_emulated;
     ex_protect_ptr(scope->protector, arena, func);
     scope->is_protected = true;
-    scope->mid = raii_deferred(scope, func, arena);
+    raii_deferred(scope, func, arena);
 
     return arena;
 }
@@ -473,42 +458,6 @@ static RAII_INLINE raii_array_t *raii_deferred_array_get_element(const defer_t *
 
 static RAII_INLINE size_t raii_deferred_array_len(const defer_t *array) {
     return array->base.elements;
-}
-
-static void deferred_canceled(void_t data) {}
-
-static void raii_deferred_internal(memory_t *scope, defer_func_t *deferred) {
-    const size_t num_defers = raii_deferred_array_len(&scope->defer);
-
-    RAII_ASSERT(num_defers != 0 && deferred != NULL);
-
-    if (deferred == (defer_func_t *)raii_deferred_array_get_element(&scope->defer, num_defers - 1)) {
-        /* If we're cancelling the last defer we armed, there's no need to waste
-         * space of a deferred callback to an empty function like
-         * disarmed_defer(). */
-        raii_array_t *defer_base = (raii_array_t *)&scope->defer;
-        defer_base->elements--;
-    } else {
-        deferred->func = deferred_canceled;
-        deferred->check = NULL;
-    }
-}
-
-void raii_deferred_cancel(memory_t *scope, size_t index) {
-    RAII_ASSERT(index >= 0);
-
-    raii_deferred_internal(scope, (defer_func_t *)raii_deferred_array_get_element(&scope->defer, index));
-}
-
-void raii_deferred_fire(memory_t *scope, size_t index) {
-    RAII_ASSERT(index >= 0);
-
-    defer_func_t *deferred = (defer_func_t *)raii_deferred_array_get_element(&scope->defer, index);
-    RAII_ASSERT(scope);
-
-    deferred->func(deferred->data);
-
-    raii_deferred_internal(scope, deferred);
 }
 
 static void raii_deferred_run(memory_t *scope, size_t generation) {
@@ -643,14 +592,6 @@ RAII_INLINE const char *raii_message_by(memory_t *scope) {
 
 RAII_INLINE const char *err_message(void) {
     return raii_message_by(get_scope());
-}
-
-RAII_INLINE void raii_defer_cancel(size_t index) {
-    raii_deferred_cancel(raii_local(), index);
-}
-
-RAII_INLINE void raii_defer_fire(size_t index) {
-    raii_deferred_fire(raii_local(), index);
 }
 
 void guard_set(ex_context_t *ctx, const char *ex, const char *message) {

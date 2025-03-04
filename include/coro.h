@@ -161,7 +161,7 @@ typedef struct awaitable_s {
 /*[amd64, aarch64]:
    Win64 only: provides a small speed-up, but will break stack unwinding
    do not use this if your application uses exceptions or setjmp/longjmp */
-#define NO_TIB 1
+/* #define NO_TIB */
 
 #if defined(__clang__)
   #pragma clang diagnostic ignored "-Wparentheses"

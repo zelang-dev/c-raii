@@ -336,7 +336,6 @@ ex_context_t *ex_init(void) {
         context->is_rethrown = false;
         context->is_guarded = false;
         context->is_raii = false;
-        context->is_emulated = false;
         context->ex = NULL;
         context->panic = NULL;
         memset(context->backtrace->ctx, 0, sizeof(context->backtrace->ctx));

@@ -19,7 +19,7 @@ TEST(map_for) {
     ASSERT_TRUE((type_of(list) == RAII_MAP_STRUCT));
     ASSERT_UEQ(3, map_count(list));
     ASSERT_EQ(index1, map_get(list, "__1_").integer);
-    ASSERT_EQ((double)2.0, map_get(list, "two").precision);
+    ASSERT_DOUBLE(2.0, map_get(list, "two").precision);
     ASSERT_STR(index3, map_get(list, "3").char_ptr);
 
     map_put(list, "4", &index4);
