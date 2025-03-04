@@ -2854,6 +2854,7 @@ raii_deque_t *coro_pool_init(size_t queue_size) {
     raii_deque_t **local, *queue = nullptr;
     if (!thrd_queue_set) {
         thrd_queue_set = true;
+        coro_initialize();
 
         size_t i;
         unique_t *scope = gq_result.scope, *global = coro_sys_set ? coro_scope() : raii_init();
