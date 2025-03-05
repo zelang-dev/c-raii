@@ -152,7 +152,7 @@ typedef struct {
     u32 num_others_ran;
     /* record thread integration code */
     i32 interrupt_code;
-    void_t unused_data[3];
+    void_t unused_data[1];
     routine_t *sleep_handle;
     /* record which coroutine is executing for scheduler */
     routine_t *running;
@@ -2003,7 +2003,7 @@ static bool coro_take(raii_deque_t *queue, bool take_all) {
     atomic_thread_fence(memory_order_seq_cst);
     if ((available = atomic_load_explicit(&queue->available, memory_order_relaxed)) > 0) {
         work_taken = true;
-        active = take_all || (available > (int)(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) - 1))
+        active = take_all || (available > (int)(atomic_load(&gq_result.active_count) - 1))
             ? available : 1;
         for (i = 0; i < active; i++) {
             routine_t *t = deque_steal(queue);
