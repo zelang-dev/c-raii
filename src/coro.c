@@ -152,14 +152,14 @@ typedef struct {
     u32 num_others_ran;
     /* record thread integration code */
     i32 interrupt_code;
-    void_t unused_data[1];
+    void_t interrupt_data;
+    /* record thread integration handle */
+    void_t interrput_handle;
+    /* array for thread integration data */
+    arrays_t interrput_args;
     routine_t *sleep_handle;
     /* record which coroutine is executing for scheduler */
     routine_t *running;
-    /* record which coroutine sleeping in scheduler */
-    scheduler_t sleep_queue[1];
-    /* coroutines's FIFO scheduler queue */
-    scheduler_t run_queue[1];
     /* Variable holding the current running coroutine per thread. */
     routine_t *active_handle;
     /* Variable holding the main target `scheduler` that gets called once an coroutine
@@ -170,12 +170,10 @@ typedef struct {
     /* Store/hold the registers of the default coroutine thread state,
     allows the ability to switch from any function, non coroutine context. */
     routine_t active_buffer[1];
-    /* record thread integration handler */
-    void_t interrput_handle;
-    void_t interrupt_default;
-    void_t interrupt_buffer;
-    /* array for thread integration `misc` data */
-    arrays_t interrput_args;
+    /* record which coroutine sleeping in scheduler */
+    scheduler_t sleep_queue[1];
+    /* coroutines's FIFO scheduler queue */
+    scheduler_t run_queue[1];
 } coro_thread_t;
 thrd_static(coro_thread_t, coro, nullptr)
 
@@ -212,6 +210,7 @@ struct raii_deque_s {
 
     cacheline_pad_t pad;
     raii_deque_t **local;
+    cacheline_pad_t pad_;
 };
 make_atomic(raii_deque_t *, thread_deque_t)
 
@@ -1955,8 +1954,7 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->interrupt_code = 0;
     coro()->interrput_handle = nullptr;
     coro()->interrput_args = nullptr;
-    coro()->interrupt_default = nullptr;
-    coro()->interrupt_buffer = nullptr;
+    coro()->interrupt_data = nullptr;
 }
 
 /* Check `thread` local coroutine use count for zero. */
