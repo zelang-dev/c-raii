@@ -225,7 +225,7 @@ void g(int i) {
 void f_print(void *na) {
     puts("In defer in f");
     fflush(stdout);
-    if (_recover(_get_message())) {
+    if (_recovered(_get_message())) {
         printf("Recovered in f = %s\n", _get_message());
         fflush(stdout);
     }
@@ -565,7 +565,7 @@ Execution begins when current `guard` scope exits or panic/throw. */
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`.
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
-#define _recover(err)
+#define _recovered(err)
 
 /* Get scoped error condition string.
 Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */

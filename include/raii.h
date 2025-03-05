@@ -282,7 +282,7 @@ execution begins when current `guard` scope exits or panic/throw. */
 #define _defer(func, ptr)       raii_recover_by(_$##__FUNCTION__, (func_t)func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`. */
-#define _recover(err)           raii_is_caught(raii_local()->arena, err)
+#define _recovered(err)           raii_is_caught(raii_local()->arena, err)
 
 /* Compare `err` to scoped error condition,
 will mark exception handled, if `true`.

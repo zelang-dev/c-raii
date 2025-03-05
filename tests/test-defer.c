@@ -15,7 +15,7 @@ int f_print(void *args) {
     ASSERT_STR("4", err);
     puts("In defer in f");
     fflush(stdout);
-    if (_recover(err)) {
+    if (_recovered(err)) {
         printf("Recovered in f = %s\n\n", err);
         fflush(stdout);
     }
