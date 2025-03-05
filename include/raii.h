@@ -12,6 +12,10 @@
     extern "C" {
 #endif
 
+#ifndef O_BINARY
+#   define O_BINARY 0
+#endif
+
 struct memory_s {
     void_t arena;
     raii_type status;

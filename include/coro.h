@@ -151,7 +151,7 @@ typedef struct awaitable_s {
 /*[amd64, arm, ppc, x86]:
    by default, coro_swap_function is marked as a text (code) section
    if not supported, uncomment the below line to use mprotect instead */
-#define MPROTECT 1
+/* #define MPROTECT */
 
 /*[amd64]:
    Win64 only: provides a substantial speed-up, but will thrash XMM regs
@@ -180,6 +180,8 @@ typedef struct awaitable_s {
 #endif
 
 #if defined(_MSC_VER)
+  #undef  MPROTECT
+  #define MPROTECT
   #define section(name) __declspec(allocate("." #name))
 #elif defined(__APPLE__)
   #define section(name) __attribute__((section("__TEXT,__" #name)))

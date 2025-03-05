@@ -211,7 +211,7 @@ TEST(itoa) {
 
     for (x = LLONG_MIN;
          x < LLONG_MIN; x += 13371) {
-        sprintf(test_buf, "%zi", x);
+        sprintf(test_buf, "%lli", x);
         simd_itoa(x, itoa_returned);
         if (strcmp(itoa_returned, test_buf) != 0)
             ASSERT_STR(itoa_returned, test_buf);
