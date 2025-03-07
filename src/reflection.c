@@ -40,7 +40,7 @@ string_t reflect_kind(void_t value) {
             return "float";
         case RAII_DOUBLE:
             return "double";
-        case RAII_OBJ:
+        case RAII_OBJECT:
             return "* object(struct)";
         case RAII_PTR:
             return "* ptr";
@@ -170,7 +170,7 @@ void println(u32 num_of_args, ...) {
                     printf("%s ", has(item).char_ptr);
                 else if (iter_type(item) == RAII_CHAR)
                     printf("%c ", has(item).schar);
-                else if (iter_type(item) == RAII_OBJ)
+                else if (iter_type(item) == RAII_OBJ || iter_type(item) == RAII_OBJECT)
                     printf("%p ", has(item).object);
                 else if (iter_type(item) == RAII_BOOL)
                     printf(has(item).boolean ? "true " : "false ");
