@@ -72,8 +72,6 @@ struct raii_results_s {
     volatile sig_atomic_t is_takeable;
 #if defined(_WIN32)
     LARGE_INTEGER timer;
-#elif defined(__APPLE__) || defined(__MACH__)
-    mach_timebase_info_data_t timer;
 #endif
 
     /* Stack size when creating a coroutine. */

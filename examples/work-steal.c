@@ -17,9 +17,12 @@
 #include "raii.h"
 #include <assert.h>
 
+#if (defined(__APPLE__) || defined(__MACH__)) && !defined(static_assert)
+#define static_assert _Static_assert
+#endif
 struct work_internal;
 
-/* A 'task_t' represents a function pointer that accepts a pointer to a 'work_t'
+/* A 'task_func' represents a function pointer that accepts a pointer to a 'work_t'
  * struct as input and returns another 'work_t' struct as output. The input to
  * this function is always a pointer to the encompassing 'work_t' struct.
  *
@@ -29,14 +32,14 @@ struct work_internal;
  * reductions. Additionally, it could be useful to determine the destination
  * worker's queue for appending further tasks.
  *
- * The 'task_t' trampoline is responsible for delivering the subsequent unit of
+ * The 'task_func' trampoline is responsible for delivering the subsequent unit of
  * work to be executed. It returns the next work item if it is prepared for
  * execution, or NULL if the task is not ready to proceed.
  */
-typedef struct work_internal *(*task_t)(struct work_internal *);
+typedef struct work_internal *(*task_func)(struct work_internal *);
 
 typedef struct work_internal {
-    task_t code;
+    task_func code;
     atomic_size_t join_count;
     void *args[];
 } work_t;
@@ -242,7 +245,7 @@ work_t *done_task(work_t *w) {
 
 int main(int argc, char **argv) {
     /* Check that top and bottom are 64-bit so they never overflow */
-    static_assert(sizeof(atomic_size_t) == 8,
+    _Static_assert(sizeof(atomic_size_t) == 8,
                   "Assume atomic_size_t is 8 byte wide");
 
     pthread_t threads[N_THREADS];

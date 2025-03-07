@@ -26,7 +26,6 @@ typedef enum {
 } run_mode;
 
 typedef struct routine_s routine_t;
-typedef struct raii_deque_s raii_deque_t;
 typedef struct hash_s *waitgroup_t;
 typedef int (*coro_sys_func)(u32, void_t);
 typedef struct awaitable_s {

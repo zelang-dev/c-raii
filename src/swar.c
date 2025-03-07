@@ -838,7 +838,7 @@ u_string str_encode64_ex(memory_t *defer, u_string_t src) {
 
 u_string str_decode64_ex(memory_t *defer, u_string_t src) {
     u_string out, pos;
-    u_char block[4];
+    u8 block[4];
     size_t i, count, olen;
     int pad = 0;
     size_t len = simd_strlen(src);
@@ -857,7 +857,7 @@ u_string str_decode64_ex(memory_t *defer, u_string_t src) {
 
     count = 0;
     for (i = 0; i < len; i++) {
-        u_char tmp = base64_decode_table[src[i]];
+        u8 tmp = base64_decode_table[src[i]];
         if (tmp == 0x80)
             continue;
 
@@ -866,9 +866,9 @@ u_string str_decode64_ex(memory_t *defer, u_string_t src) {
         block[count] = tmp;
         count++;
         if (count == 4) {
-            *pos++ = (u_char)((block[0] << 2) | (block[1] >> 4));
-            *pos++ = (u_char)((block[1] << 4) | (block[2] >> 2));
-            *pos++ = (u_char)((block[2] << 6) | block[3]);
+            *pos++ = (u8)((block[0] << 2) | (block[1] >> 4));
+            *pos++ = (u8)((block[1] << 4) | (block[2] >> 2));
+            *pos++ = (u8)((block[2] << 6) | block[3]);
             count = 0;
             if (pad) {
                 if (pad == 1)

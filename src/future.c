@@ -85,7 +85,7 @@ static void future_close(future f) {
         if (!f->is_pool)
             thrd_join(f->thread, NULL);
 
-        memset(f, 0, sizeof(f));
+        memset(f, 0, sizeof(*f));
         RAII_FREE(f);
     }
 }
@@ -106,7 +106,7 @@ static int thrd_raii_wrapper(void_t arg) {
 
     promise_set(f->value, res->object);
     if (is_type(f, RAII_FUTURE_ARG)) {
-        memset(f, 0, sizeof(f));
+        memset(f, 0, sizeof(*f));
         RAII_FREE(f);
     }
 

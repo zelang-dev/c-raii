@@ -4,7 +4,9 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <inttypes.h>
-
+#if defined(__APPLE__) || defined(__MACH__)
+#include <ctype.h>
+#endif
 #if defined(_WIN32) || defined(_WIN64)
     #include "compat/sys/time.h"
     #include <excpt.h>
@@ -323,11 +325,7 @@ typedef struct {
 #  define COMPILER_GCC
 #endif
 
-#if defined(COMPILER_CLANG)
-#  define FILE_NAME __FILE_NAME__
-#else
 #  define FILE_NAME __FILE__
-#endif
 
 #define Statement(s) do {\
 s\

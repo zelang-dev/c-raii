@@ -31,12 +31,7 @@ RAII_INLINE uint64_t get_timer(void) {
     uint64_t lapse = 0;
     struct timeval tv;
 
-#if defined(__APPLE__) || defined(__MACH__)
-    uint64_t t = mach_absolute_time();
-
-    if (&gq_result.timer)
-        lapse = t * ((double)gq_result.timer.numer / (double)gq_result.timer.denom);
-#elif defined(_CTHREAD_POSIX_)
+#if defined(_CTHREAD_POSIX_)
     struct timespec ts;
 
     /* Has 2038 issue if time_t: tv.tv_sec is 32-bit. */

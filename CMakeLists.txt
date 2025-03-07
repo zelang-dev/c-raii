@@ -56,7 +56,11 @@ else()
 endif()
 
 if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -rdynamic -Wno-format -D USE_DEBUG -D USE_VALGRIND")
+    if(APPLE)
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -Wno-format -D USE_DEBUG ")
+    else()
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -rdynamic -Wno-format -D USE_DEBUG -D USE_VALGRIND")
+    endif()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
 else()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG ")
@@ -65,8 +69,8 @@ else()
 endif()
 
 FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.1.0.5.zip
- URL_MD5 c2f9c95988249f072e2dd42e9cd2c065
+ URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.1.0.6.zip
+ URL_MD5 61d80d7dc5a5235c4ce3e8d73292db43
 )
 FetchContent_MakeAvailable(threads)
 

@@ -344,7 +344,7 @@ static void deque_free(raii_deque_t *q) {
             RAII_FREE((void_t)a);
         }
 
-        memset(q, 0, sizeof(q));
+        memset(q, 0, sizeof(*q));
         RAII_FREE(q);
     }
 }
@@ -391,7 +391,7 @@ static void deque_clear(raii_deque_t *q) {
             RAII_FREE((void_t)a);
         }
 
-        memset(q, 0, sizeof(q));
+        memset(q, 0, sizeof(*q));
     }
 }
 
@@ -2395,8 +2395,6 @@ static void coro_initialize(void) {
         atomic_flag_test_and_set(&gq_result.is_interruptable);
 #if defined(_WIN32)
         QueryPerformanceFrequency(&gq_result.timer);
-#elif defined(__APPLE__) || defined(__MACH__)
-        mach_timebase_info(&gq_result.timer);
 #endif
         ex_signal_setup();
     }
