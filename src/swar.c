@@ -244,7 +244,12 @@ RAII_INLINE string simd_itoa(int64_t x, string buf) {
     bool neg = x < 0;
     *buf = '-'; // Always write
     buf += neg; // But advance only if negative
+
+#if defined(__APPLE__) || defined(__MACH__)
+    x = llabs(x);
+#else
     x = abs(x);
+#endif
 
     char tmp[20];
     string p = tmp + 20;
@@ -788,7 +793,7 @@ static inline size_t str_base64_len(size_t decoded_len) {
 }
 
 RAII_INLINE bool is_base64(u_string_t src) {
-    size_t i, len = simd_strlen(src);
+    size_t i, len = simd_strlen((string_t)src);
     for (i = 0; i < len; i++) {
         if (base64_decode_table[src[i]] == 0x80)
             return false;
@@ -801,7 +806,7 @@ u_string str_encode64_ex(memory_t *defer, u_string_t src) {
     u_string out, pos;
     u_string_t end, begin;
     size_t olen;
-    size_t len = simd_strlen(src);
+    size_t len = simd_strlen((string_t)src);
 
     olen = str_base64_len(len) + 1 /* for NUL termination */;
     if (olen < len)
@@ -841,7 +846,7 @@ u_string str_decode64_ex(memory_t *defer, u_string_t src) {
     u8 block[4];
     size_t i, count, olen;
     int pad = 0;
-    size_t len = simd_strlen(src);
+    size_t len = simd_strlen((string_t)src);
 
     count = 0;
     for (i = 0; i < len; i++) {

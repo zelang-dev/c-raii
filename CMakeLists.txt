@@ -7,7 +7,7 @@ endif()
 project(
     raii
     VERSION 2.0.0
-    DESCRIPTION "An robust high-level Defer, RAII implementation for C, automatic memory safety, custom malloc, with ultra simple threading and Go like capabilities."
+    DESCRIPTION "An robust high-level Defer, RAII implementation for C, automatic memory safety, custom malloc, with ultra simple threading, Go like capabilities."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
 )

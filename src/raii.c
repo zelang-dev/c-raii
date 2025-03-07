@@ -36,7 +36,7 @@ RAII_INLINE uint64_t get_timer(void) {
 
     /* Has 2038 issue if time_t: tv.tv_sec is 32-bit. */
     if (!clock_gettime(CLOCK_MONOTONIC, &ts))
-        lapse = ts.tv_sec * 1000000000 + ts.tv_nsec * 1000;
+        lapse = ts.tv_sec * 1000000000 + ts.tv_nsec;
 #elif defined(_WIN32)
     LARGE_INTEGER count;
 
@@ -612,7 +612,7 @@ void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind) {
 
 void guard_delete(memory_t *ptr) {
     if (is_guard(ptr)) {
-        memset(ptr, RAII_ERR, sizeof(ptr));
+        memset(ptr, RAII_ERR, sizeof(*ptr));
         RAII_FREE(ptr);
         ptr = NULL;
     }
