@@ -8,6 +8,10 @@
 #include <time.h>
 #include "coro.h"
 
+#if defined(__APPLE__) || defined(__MACH__)
+#include<mach/mach_time.h>
+#endif
+
 #ifdef __cplusplus
     extern "C" {
 #endif
