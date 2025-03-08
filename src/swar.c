@@ -439,7 +439,11 @@ RAII_INLINE string simd_memchr(string_t s, uint8_t c, uint32_t len) {
 }
 
 RAII_INLINE string simd_memrchr(string_t s, uint8_t c, uint32_t len) {
+#ifdef _WIN32
+    return (string)str_memrchr((const_t)s, (int)c, (size_t)len);
+#else
     return (string)s + _memrchr(false, false, s, len, c);
+#endif
 }
 
 RAII_INLINE uint32_t memchrk(string_t s, uint32_t len, uint8_t c) {
@@ -528,6 +532,21 @@ RAII_INLINE string utoap(int N, uint64_t x, string s) {
 
     s[N] = '\0';
     return s;
+}
+
+RAII_INLINE const_t str_memrchr(const_t s, int c, size_t n) {
+    u_string_t e;
+    if (0 == n) {
+        return nullptr;
+    }
+
+    for (e = (u_string_t)s + n - 1; e >= (u_string_t)s; e--) {
+        if (*e == (u_char_t)c) {
+            return (const_t)e;
+        }
+    }
+
+    return nullptr;
 }
 
 int strpos(string_t text, string pattern) {

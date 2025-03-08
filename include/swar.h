@@ -159,6 +159,7 @@ C_API u_string str_encode64_ex(memory_t *defer, u_string_t src);
 C_API u_string str_decode64_ex(memory_t *defer, u_string_t src);
 C_API bool is_base64(u_string_t src);
 C_API int strpos(string_t text, string pattern);
+C_API const_t str_memrchr(const_t s, int c, size_t n);
 
 C_API string str_trim(string_t str, size_t length);
 C_API string str_dup(string_t str);

@@ -15,6 +15,10 @@ TEST(json_parse_file) {
     json_t *encoded;
     int unused;
 
+#if defined(_WIN32) || defined(_WIN64)
+    unused = chdir("Debug");
+#endif
+
     dirp = opendir(TESTDIR);
     deferring((func_t)closedir, dirp);
     unused = chdir(TESTDIR);

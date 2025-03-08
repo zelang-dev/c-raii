@@ -52,21 +52,6 @@ static raii_type scheme_type(string scheme) {
     }
 }
 
-static RAII_INLINE const_t str_memrchr(const_t s, int c, size_t n) {
-    u_string_t e;
-    if (0 == n) {
-        return nullptr;
-    }
-
-    for (e = (u_string_t)s + n - 1; e >= (u_string_t)s; e--) {
-        if (*e == (u_char_t)c) {
-            return (const_t)e;
-        }
-    }
-
-    return nullptr;
-}
-
 static int htoi(string s) {
     int value;
     int c;
