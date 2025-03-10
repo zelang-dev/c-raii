@@ -27,6 +27,7 @@ set(TARGET_LIST
  test-parse_url
  test-json
  test-json_parser
+ test-slice
 )
 
 foreach (TARGET ${TARGET_LIST})

@@ -295,6 +295,20 @@ void_t hash_get(hash_t *htable, const_t key) {
         : (atomic_get(kv_pair_t *, &htable->buckets[idx]))->value;
 }
 
+kv_pair_t *hash_get_pair(hash_t *htable, const_t key) {
+    uint32_t hash_val = htable->key_ops.hash(key);
+    size_t idx = hash_val % (u32)atomic_load(&htable->capacity);
+
+    if (is_empty((void_t)atomic_load(&htable->buckets[idx])))
+        return nullptr;
+
+    idx = hash_getidx(htable, idx, hash_val, key, GET);
+
+    return is_empty(atomic_get(void_t, &htable->buckets[idx]))
+        ? nullptr
+        : (atomic_get(kv_pair_t *, &htable->buckets[idx]));
+}
+
 bool hash_has(hash_t *htable, const_t key) {
     uint32_t hash_val = htable->key_ops.hash(key);
     size_t idx = hash_val % (u32)atomic_load(&htable->capacity);

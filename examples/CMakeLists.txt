@@ -28,6 +28,7 @@ set(TARGET_LIST defer_thread
  go_channel
  go_select
  go_future_wait
+ go_slice_ref
  fib )
 foreach (TARGET ${TARGET_LIST})
     add_executable(${TARGET} ${TARGET}.c )

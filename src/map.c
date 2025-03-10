@@ -4,7 +4,7 @@
 
 struct map_item_s {
     raii_type type;
-    values_type value;
+    values_type *value;
     u32 indic;
     string_t key;
     map_item_t *prev;
@@ -16,6 +16,7 @@ struct map_s {
     raii_type item_type;
     bool started;
     bool sliced;
+    u32 indices;
     u32 num_slices;
     int64_t length;
     hash_t *dict;
@@ -34,12 +35,16 @@ struct map_iterator_s {
 static void map_add_pair(map_t hash, kv_pair_t *kv) {
     map_item_t *item;
     item = (map_item_t *)try_calloc(1, sizeof(map_item_t));
-    item->type = kv->type;
-    item->indic++;
+    if (hash->item_type == RAII_MAP_ARR)
+        item->indic = hash->indices;
+    else
+        item->indic = hash->indices++;
+
     item->key = kv->key;
-    item->value = *kv->extended;
+    item->value = kv->extended;
     item->prev = hash->tail;
     item->next = nullptr;
+    item->type = kv->type;
 
     hash->tail = item;
     hash->length++;
@@ -93,9 +98,9 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
                 map_add_pair(hash, kv);
             } else {
                 for (item = hash->head; item; item = item->next) {
-                    if (item->value.char_ptr == ((values_type *)has)->char_ptr) {
+                    if (item->value->char_ptr == ((values_type *)has)->char_ptr) {
                         kv = (kv_pair_t *)hash_replace(hash->dict, k, va_arg(ap, void_t));
-                        item->value = *kv->extended;
+                        item->value = kv->extended;
                         item->type = kv->type;
                         break;
                     }
@@ -106,6 +111,104 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
     }
 
     return hash;
+}
+
+static void slice_free(slice_t array) {
+    map_item_t *tmp, *next;
+    slice_t each;
+    u32 i;
+
+    if (is_empty(array))
+        return;
+
+    for (i = 0; i <= array->num_slices; i++) {
+        each = array->slice[array->num_slices - i];
+        if (each) {
+            while (each->head) {
+                next = each->head->next;
+                tmp = each->head;
+                ZE_FREE(tmp);
+                each->head = next;
+            }
+            ZE_FREE(each);
+        }
+    }
+
+    ZE_FREE(array->slice);
+}
+
+static void slice_set(slice_t array, kv_pair_t *kv, int64_t index) {
+    if (!is_empty(kv)) {
+        struct map_item_s *item = (struct map_item_s *)try_calloc(1, sizeof(struct map_item_s));
+        item->indic = index;
+        item->key = kv->key;
+        item->value = kv->extended;
+        item->prev = array->tail;
+        item->next = nullptr;
+        item->type = kv->type;
+
+        array->tail = item;
+        array->length++;
+
+        if (!array->head)
+            array->head = item;
+        else
+            item->prev->next = item;
+    }
+}
+
+slice_t slice(map_array_t array, int64_t start, int64_t end) {
+    char hash_key[SCRAPE_SIZE] = {0};
+    if (array->item_type != RAII_MAP_ARR)
+        raii_panic("slice() only accept `map_array_t` type!");
+
+    if (array->num_slices % 64 == 0) {
+        array->slice = ZE_REALLOC(array->slice, (array->num_slices + 64) * sizeof(array->slice[0]));
+        if (array->slice == nullptr)
+            raii_panic("realloc() failed");
+    }
+
+    slice_t slice = (slice_t)try_calloc(1, sizeof(_map_t));
+    int64_t i, index = 0;
+    for (i = start; i < end; i++) {
+        simd_itoa(i, hash_key);
+        slice_set(slice, hash_get_pair(array->dict, hash_key), index);
+        index++;
+    }
+
+    slice->sliced = true;
+    slice->type = array->type;
+    slice->dict = array->dict;
+    slice->item_type = array->item_type;
+    array->slice[array->num_slices++] = slice;
+    array->slice[array->num_slices] = nullptr;
+
+    return slice;
+}
+
+static string_t slice_find(map_array_t array, int64_t index) {
+    struct map_item_s *item;
+    if (is_empty(array) || !array->sliced)
+        return nullptr;
+
+    for (item = array->head; item != nullptr; item = item->next) {
+        if (item->indic == index)
+            return item->key;
+    }
+
+    return nullptr;
+}
+
+RAII_INLINE void slice_put(slice_t hash, int64_t index, void_t value) {
+    map_put(hash, slice_find(hash, index), value);
+}
+
+RAII_INLINE values_type slice_get(slice_t hash, int64_t index) {
+    return map_get(hash, slice_find(hash, index));
+}
+
+RAII_INLINE void_t slice_delete(slice_t hash, int64_t index) {
+    return map_delete(hash, slice_find(hash, index));
 }
 
 map_t map_create(void) {
@@ -134,6 +237,56 @@ map_t map_for(u32 num_of_pairs, ...) {
     return hash;
 }
 
+static void map_append(map_array_t hash, array_type type, void_t value) {
+    char k[SCRAPE_SIZE] = {0};
+    kv_pair_t *kv;
+
+    if (!hash->started) {
+        hash->started = true;
+        hash->indices = 0;
+    } else {
+        hash->indices++;
+    }
+
+    simd_itoa(hash->indices, k);
+    if (type == RAII_DOUBLE || type == RAII_FLOAT) {
+        kv = insert_double(hash->dict, k, *(double *)&value);
+    } else if (type == RAII_LLONG || type == RAII_LONG || type == RAII_INT) {
+        kv = insert_signed(hash->dict, k, *(int64_t *)&value);
+    } else if (type == RAII_MAXSIZE) {
+        kv = insert_unsigned(hash->dict, k, *(size_t *)&value);
+    } else if (type == RAII_FUNC) {
+        kv = insert_func(hash->dict, k, (raii_func_args_t)value);
+    } else if (type == RAII_SHORT) {
+        kv = insert_short(hash->dict, k, *(short *)&value);
+    } else if (type == RAII_BOOL) {
+        kv = insert_bool(hash->dict, k, *(bool *)&value);
+    } else if (type == RAII_CHAR) {
+        kv = insert_char(hash->dict, k, *(char *)&value);
+    } else if (type == RAII_STRING) {
+        kv = insert_string(hash->dict, k, (string)value);
+    } else {
+        kv = (kv_pair_t *)hash_put(hash->dict, k, value);
+    }
+
+    map_add_pair(hash, kv);
+}
+
+map_array_t map_array(array_type type, u32 num_of_items, ...) {
+    map_array_t array = maps();
+    va_list argp;
+    u32 i;
+
+    array->num_slices = 0;
+    array->item_type = RAII_MAP_ARR;
+    va_start(argp, num_of_items);
+    for (i = 0; i < num_of_items; i++)
+        map_append(array, type, va_arg(argp, void_t));
+    va_end(argp);
+
+    return array;
+}
+
 void map_free(map_t hash) {
     map_item_t *next;
 
@@ -149,37 +302,27 @@ void map_free(map_t hash) {
         }
 
         hash_free(hash->dict);
-        //if (hash->slice != nullptr)
-        //    slice_free(hash);
+        if (!is_empty(hash->slice))
+            slice_free(hash);
 
         ZE_FREE(hash);
     }
 }
 
-u32 map_push(map_t hash, void_t value) {
+void map_push(map_t hash, void_t value) {
     char hash_key[SCRAPE_SIZE] = {0};
-    map_item_t *item;
     kv_pair_t *kv;
 
-    item = (map_item_t *)try_calloc(1, sizeof(map_item_t));
-    item->indic++;
-    simd_itoa(item->indic, hash_key);
+    if (!hash->started) {
+        hash->started = true;
+        hash->indices = 0;
+    } else {
+        hash->indices++;
+    }
+
+    simd_itoa(hash->indices, hash_key);
     kv = (kv_pair_t *)hash_put(hash->dict, hash_key, value);
-    item->type = kv->type;
-    item->key = kv->key;
-    item->value = *kv->extended;
-    item->prev = hash->tail;
-    item->next = nullptr;
-
-    hash->tail = item;
-    hash->length++;
-
-    if (!hash->head)
-        hash->head = item;
-    else
-        item->prev->next = item;
-
-    return item->indic;
+    map_add_pair(hash, kv);
 }
 
 values_type map_pop(map_t hash) {
@@ -196,7 +339,7 @@ values_type map_pop(map_t hash) {
     if (hash->length == 0)
         hash->head = nullptr;
 
-    value = item->value;
+    value = *item->value;
     ZE_FREE(item);
 
     return value;
@@ -230,7 +373,7 @@ u32 map_shift(map_t hash, void_t value) {
     simd_itoa(item->indic, hash_key);
     kv = (kv_pair_t *)hash_put(hash->dict, hash_key, value);
     item->key = kv->key;
-    item->value = *kv->extended;
+    item->value = kv->extended;
     item->type = kv->type;
 
     return item->indic;
@@ -250,7 +393,7 @@ values_type map_unshift(map_t hash) {
     if (hash->length == 0)
         hash->tail = nullptr;
 
-    value = item->value;
+    value = *item->value;
     ZE_FREE(item);
 
     return value;
@@ -270,7 +413,7 @@ void_t map_remove(map_t hash, void_t value) {
         return nullptr;
 
     for (item = hash->head; item != nullptr; item = item->next) {
-        if (is_equal(item->value.object, value)) {
+        if (is_equal(item->value->object, value)) {
             hash_delete(hash->dict, item->key);
             if (item->prev)
                 item->prev->next = item->next;
@@ -308,13 +451,13 @@ RAII_INLINE void map_put(map_t hash, string_t key, void_t value) {
     kv_pair_t *kv;
     void_t has = hash_get(hash->dict, key);
     if (is_empty(has)) {
-        kv_pair_t *kv = (kv_pair_t *)hash_put(hash->dict, key, value);
+        kv = (kv_pair_t *)hash_put(hash->dict, key, value);
         map_add_pair(hash, kv);
     } else {
         for (item = hash->head; item; item = item->next) {
-            if (item->value.char_ptr == ((values_type *)has)->char_ptr) {
+            if (item->value->char_ptr == ((values_type *)has)->char_ptr) {
                 kv = (kv_pair_t *)hash_replace(hash->dict, key, value);
-                item->value = *kv->extended;
+                item->value = kv->extended;
                 item->type = kv->type;
                 break;
             }
@@ -336,10 +479,10 @@ map_iter_t *iter_create(map_t hash, bool forward) {
         map_iter_t *iterator;
 
         iterator = (map_iter_t *)try_calloc(1, sizeof(map_iter_t));
-        iterator->type = RAII_MAP_ITER;
         iterator->hash = hash;
         iterator->item = forward ? hash->head : hash->tail;
         iterator->forward = forward;
+        iterator->type = RAII_MAP_ITER;
 
         return iterator;
     }
@@ -366,7 +509,7 @@ map_iter_t *iter_next(map_iter_t *iterator) {
 
 RAII_INLINE values_type iter_value(map_iter_t *iterator) {
     if (iterator)
-        return iterator->item->value;
+        return *iterator->item->value;
 
     return raii_values_empty->value;
 }
@@ -423,7 +566,7 @@ map_iter_t *iter_remove(map_iter_t *iterator) {
 }
 
 reflect_func(map_item_t,
-             (UNION, values_type, value),
+             (UNION, values_type *, value),
              (UINT, u32, indic),
              (CONST_CHAR, string_t, key),
              (STRUCT, map_item_t *, prev),
@@ -434,6 +577,7 @@ reflect_func(_map_t,
              (ENUM, raii_type, item_type),
              (BOOL, bool, started),
              (BOOL, bool, sliced),
+             (UINT, u32, indices),
              (UINT, u32, num_slices),
              (LLONG, int64_t, length),
              (STRUCT, hash_t *, dict),
