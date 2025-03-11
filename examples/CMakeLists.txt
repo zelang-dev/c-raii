@@ -17,7 +17,7 @@ set(TARGET_LIST defer_thread
  try_unprotected
  work-steal
  thrd_async
- thrd_spawn_fib
+ # thrd_spawn_fib
  benchmark
  map_insert
  go_reflection
