@@ -86,7 +86,7 @@ TEST(map_push) {
 
 TEST(map_shift) {
     map_t list = map_create();
-    const char *value;
+    string value;
 
     map_shift(list, _value_1);
     ASSERT_XEQ(map_count(list), 1);

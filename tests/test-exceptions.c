@@ -137,15 +137,15 @@ int test_throw_in_finally(void) {
 
 /* test for assert */
 int test_assert(void) {
-    int caught = 0;
+    int my_caught = 0;
 
     try {
         raise(SIGABRT);
     } catch (sig_abrt) {
-        caught = 1;
+        my_caught = 1;
     } end_trying;
 
-    ASSERT_EQ(1, caught);
+    ASSERT_EQ(1, my_caught);
     return 0;
 }
 
