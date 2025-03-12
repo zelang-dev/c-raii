@@ -542,10 +542,16 @@ fileinfo_t *pathinfo(string filepath) {
     ptrdiff_t idx;
 
     dir_name = str_trim(filepath, path_len);
+#if defined(__APPLE__) || defined(__MACH__)
+    file->dirname = str_dup(dirname(dir_name));
+    file->filename = str_dup(basename(dir_name));
+    file->base = str_dup(basename((string)file->dirname));
+#else
     dirname(dir_name);
     file->dirname = dir_name;
     file->base = basename((string)file->dirname);
     file->filename = basename((string)filepath);
+#endif
 
     p = str_memrchr(file->filename, '.', simd_strlen(file->filename));
     if (p) {

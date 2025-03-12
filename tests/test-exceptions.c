@@ -79,12 +79,10 @@ int test_rethrow_pt2(int *caught_1, int *finally_1) {
 }
 
 int test_rethrow(void) {
-    int caught_1, caught_2;
-    int finally_1, finally_2;
+    int caught_1 = 0, caught_2;
+    int finally_1 = 0, finally_2;
 
-    caught_1 = 0;
     caught_2 = 0;
-    finally_1 = 0;
     finally_2 = 0;
 
     try {
@@ -95,7 +93,10 @@ int test_rethrow(void) {
         finally_2 = 1;
     } end_try;
 
-    ASSERT_EQ( true, caught_1 && caught_2 && finally_1 && finally_2);
+    ASSERT_EQ(1, caught_2);
+    ASSERT_EQ(1, finally_2);
+    ASSERT_EQ(1, finally_1);
+    ASSERT_EQ(1, caught_1);
     return 0;
 }
 
@@ -128,7 +129,8 @@ int test_throw_in_finally(void) {
             caught_2 = 1;
         } end_trying;
 
-        ASSERT_EQ(true, caught_1 && caught_2);
+        ASSERT_EQ(1, caught_2);
+        ASSERT_EQ(1, caught_1);
     }
     return 0;
 }
@@ -149,7 +151,7 @@ int test_assert(void) {
 
 int test_finally(void) {
     int ran_finally;
-    int caught;
+    int my_caught;
 
     /* In normal conditions, finally should be run after the try block */
 
@@ -177,30 +179,31 @@ int test_finally(void) {
     /* If we have try .. finally with no catch, the finally block
      * should run and the exception be passed higher up the stack. */
 
-    caught = 0;
+    my_caught = 0;
     ran_finally = 0;
 
     try {
         test_finally_pt2(&ran_finally);
     } finality {
-        caught = 1;
+        my_caught = 1;
     } end_trying;
 
-    ASSERT_EQ( true, caught && ran_finally);
+    ASSERT_EQ(true, my_caught && ran_finally);
     return 0;
 }
 
-int test_list(void)
-{
-    test_basic_catch();
-    test_types();
-    test_subtypes();
-    test_finally();
-    test_rethrow();
-    test_throw_in_finally();
-    test_assert();
+TEST(list) {
+    int result = 0;
 
-    return 0;
+    EXEC_TEST(basic_catch);
+    EXEC_TEST(types);
+    EXEC_TEST(subtypes);
+    EXEC_TEST(finally);
+    EXEC_TEST(rethrow);
+    EXEC_TEST(throw_in_finally);
+    EXEC_TEST(assert);
+
+    return result;
 }
 
 int main(int argc, char **argv) {

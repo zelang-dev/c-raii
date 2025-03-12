@@ -483,14 +483,14 @@ C_API memory_t *get_scope(void);
 
 /* Returns protected raw memory pointer of given `size`,
 DO NOT FREE, will `throw/panic` if memory request fails.
-This uses current `thread` smart pointer, unless called
-between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
+This uses current `context` smart pointer, being in `guard` blocks,
+inside `thread/future`, or active `coroutine` call. */
 C_API void *malloc_local(size_t size);
 
 /* Returns protected raw memory pointer of given `size`,
 DO NOT FREE, will `throw/panic` if memory request fails.
-This uses current `thread` smart pointer, unless called
-between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
+This uses current `context` smart pointer, being in `guard` blocks,
+inside `thread/future`, or active `coroutine` call. */
 C_API void *calloc_local(int count, size_t size);
 
 /* Defer execution `LIFO` of given function with argument,
@@ -558,17 +558,17 @@ On exit will begin executing deferred functions. */
 #define _calloc(count, size) calloc_local(count, size)
 
 /* Defer execution `LIFO` of given function with argument,
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call.
+Only valid between `guard` blocks or inside `thread/future` call.
 
 Execution begins when current `guard` scope exits or panic/throw. */
 #define _defer(func, ptr)
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`.
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+Only valid between `guard` blocks or inside `thread/future` call. */
 #define _recovered(err)
 
 /* Get scoped error condition string.
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+Only valid between `guard` blocks or inside `thread/future` call. */
 #define _get_message()
 
 /* Stops the ordinary flow of control and begins panicking,

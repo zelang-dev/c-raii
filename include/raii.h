@@ -76,6 +76,8 @@ struct raii_results_s {
     volatile sig_atomic_t is_takeable;
 #if defined(_WIN32)
     LARGE_INTEGER timer;
+#elif defined(__APPLE__) || defined(__MACH__)
+    mach_timebase_info_data_t timer;
 #endif
 
     /* Stack size when creating a coroutine. */
@@ -164,7 +166,7 @@ C_API bool raii_caught(const char *err);
 C_API bool raii_is_caught(memory_t *scope, const char *err);
 
 /* Compare `err` to scoped error condition, will mark exception handled, if `true`.
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+Only valid between `guard` blocks or inside `thread/future` call. */
 C_API bool is_recovered(const char *err);
 
 /* Get current error condition string. */
@@ -174,7 +176,7 @@ C_API const char *raii_message(void);
 C_API const char *raii_message_by(memory_t *scope);
 
 /* Get scoped error condition string.
-Only valid between `guard` blocks or inside ~c++11~ like `thread/future` call. */
+Only valid between `guard` blocks or inside `thread/future` call. */
 C_API const char *err_message(void);
 
 /* Defer execution `LIFO` of given function with argument,
@@ -216,14 +218,14 @@ C_API unique_t *unique_init(void);
 
 /* Returns protected raw memory pointer of given `size`,
 DO NOT FREE, will `throw/panic` if memory request fails.
-This uses current `thread` smart pointer, unless called
-between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
+This uses current `context` smart pointer, being in `guard` blocks,
+inside `thread/future`, or active `coroutine` call. */
 C_API void_t malloc_local(size_t size);
 
 /* Returns protected raw memory pointer of given `size`,
 DO NOT FREE, will `throw/panic` if memory request fails.
-This uses current `thread` smart pointer, unless called
-between `guard` blocks, or inside ~c++11~ like `thread/future` call. */
+This uses current `context` smart pointer, being in `guard` blocks,
+inside `thread/future`, or active `coroutine` call. */
 C_API void_t calloc_local(int count, size_t size);
 
 C_API values_type *value_create(const_t, raii_type);

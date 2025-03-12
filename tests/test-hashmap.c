@@ -66,18 +66,18 @@ TEST(map_push) {
     map_push(list, _value_1);
     ASSERT_XEQ(map_count(list), 1);
     value = map_pop(list).char_ptr;
-    ASSERT_PTR(value, _value_1);
+    ASSERT_TRUE(is_equal(value, _value_1));
     ASSERT_XEQ(map_count(list), 0);
 
     map_push(list, _value_2);
     ASSERT_XEQ(map_count(list), 1);
     map_push(list, _value_3);
     ASSERT_XEQ(map_count(list), 2);
-    value = map_pop(list).char_ptr;
-    ASSERT_PTR(value, _value_3);
+    value = map_pop(list).object;
+    ASSERT_TRUE(is_equal(value, _value_3));
     ASSERT_XEQ(map_count(list), 1);
-    value = map_pop(list).char_ptr;
-    ASSERT_PTR(value, _value_2);
+    value = map_pop(list).object;
+    ASSERT_TRUE(is_equal(value, _value_2));
     ASSERT_XEQ(map_count(list), 0);
 
     map_free(list);
@@ -90,19 +90,19 @@ TEST(map_shift) {
 
     map_shift(list, _value_1);
     ASSERT_XEQ(map_count(list), 1);
-    value = map_unshift(list).char_ptr;
-    ASSERT_PTR(value, _value_1);
+    value = map_unshift(list).object;
+    ASSERT_TRUE(is_equal(value, _value_1));
     ASSERT_XEQ(map_count(list), 0);
 
     map_shift(list, _value_2);
     ASSERT_XEQ(map_count(list), 1);
     map_shift(list, _value_3);
     ASSERT_XEQ(map_count(list), 2);
-    value = map_unshift(list).char_ptr;
-    ASSERT_PTR(value, _value_3);
+    value = map_unshift(list).object;
+    ASSERT_TRUE(is_equal(value, _value_3));
     ASSERT_XEQ(map_count(list), 1);
-    value = map_unshift(list).char_ptr;
-    ASSERT_PTR(value, _value_2);
+    value = map_unshift(list).object;
+    ASSERT_TRUE(is_equal(value, _value_2));
     ASSERT_XEQ(map_count(list), 0);
 
     map_free(list);

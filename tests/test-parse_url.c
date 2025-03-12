@@ -17,8 +17,8 @@ TEST(parse_url) {
     ASSERT_TRUE((type_of(fileinfo) == RAII_URLINFO));
     ASSERT_STR("/this/is/a/very/deep/directory/structure/and", fileinfo->dirname);
     ASSERT_STR("and", fileinfo->base);
-    ASSERT_STR("html", fileinfo->extension);
     ASSERT_STR("file.html", fileinfo->filename);
+    ASSERT_STR("html", fileinfo->extension);
 
     raii_destroy();
     return 0;

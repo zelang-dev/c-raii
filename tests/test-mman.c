@@ -308,11 +308,17 @@ int test_map_mprotect() {
             *(p++) = 'a';
 
         printf("Loop completed\n");     /* Should never happen */
+#if defined(__APPLE__) || defined(__MACH__)
+    } catch (sig_bus) {
+#else
     } catch (sig_segv) {
+#endif
         result = 0;
     } end_trying;
 
-    free(buffer);
+#if !defined(__APPLE__) || !defined(__MACH__)
+        free(buffer);
+#endif
     return result;
 }
 
