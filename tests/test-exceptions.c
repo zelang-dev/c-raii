@@ -118,12 +118,12 @@ int test_throw_in_finally_pt2(volatile int *caught) {
 }
 
 int test_throw_in_finally(void) {
-    int caught_1, caught_2;
+    volatile int caught_1, caught_2;
     int i;
 
     for (i = 0; i < 10; ++i) {
 
-        volatile caught_1 = 0;
+        caught_1 = 0;
         caught_2 = 0;
 
         try {
