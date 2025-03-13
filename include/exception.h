@@ -174,7 +174,7 @@ enum {
 
  /* context savings
 */
-#ifdef sigsetjmp
+#if defined(sigsetjmp) || defined(__APPLE__) || defined(__MACH__)
     #define ex_jmp_buf  sigjmp_buf
     #define ex_setjmp(buf)  sigsetjmp(buf,1)
     #define ex_longjmp(buf,st)  siglongjmp(buf,st)

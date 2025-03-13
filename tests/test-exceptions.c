@@ -64,7 +64,7 @@ void test_finally_pt2(int *ran_finally) {
 }
 
 /* test rethrowing an exception after it is caught */
-int test_rethrow_pt2(int *caught_1, int *finally_1) {
+int test_rethrow_pt2(volatile int *caught_1, volatile int *finally_1) {
     try {
         raise(SIGSEGV);
     } catch (sig_segv) {
@@ -79,8 +79,10 @@ int test_rethrow_pt2(int *caught_1, int *finally_1) {
 }
 
 int test_rethrow(void) {
-    int caught_1 = 0, caught_2;
-    int finally_1 = 0, finally_2;
+    volatile int caught_1 = 0;
+    volatile int finally_1 = 0;
+    int caught_2;
+    int finally_2;
 
     caught_2 = 0;
     finally_2 = 0;
@@ -97,11 +99,12 @@ int test_rethrow(void) {
     ASSERT_EQ(1, finally_2);
     ASSERT_EQ(1, finally_1);
     ASSERT_EQ(1, caught_1);
+
     return 0;
 }
 
 /* test throw inside finally block */
-int test_throw_in_finally_pt2(int *caught) {
+int test_throw_in_finally_pt2(volatile int *caught) {
     try {
         raise(SIGSEGV);
     } catch (sig_segv) {
@@ -120,7 +123,7 @@ int test_throw_in_finally(void) {
 
     for (i = 0; i < 10; ++i) {
 
-        caught_1 = 0;
+        volatile caught_1 = 0;
         caught_2 = 0;
 
         try {
