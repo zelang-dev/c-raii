@@ -646,8 +646,7 @@ if(NOT raii_FOUND)
     FetchContent_MakeAvailable(raii)
 endif()
 
-target_include_directories(raii AFTER PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(your_project PUBLIC $<BUILD_INTERFACE:${RAII_INCLUDE_DIR} $<INSTALL_INTERFACE:${RAII_INCLUDE_DIR})
 target_link_libraries(your_project PUBLIC raii)
 ```
 

@@ -86,11 +86,13 @@ typedef const unsigned char u_char_t;
 /* Unsigned int, raii ~result id~ type. */
 typedef u32 rid_t;
 
+typedef void (*call_t)(void);
 typedef void (*func_t)(void_t);
 typedef void_t(*raii_func_t)(void_t);
 typedef void (*func_args_t)(void_t, ...);
 typedef void_t(*raii_func_args_t)(void_t, ...);
 typedef intptr_t(*raii_callable_t)(intptr_t);
+typedef intptr_t(*call_interrupter_t)(void_t, intptr_t);
 typedef uintptr_t(*raii_callable_args_t)(uintptr_t, ...);
 typedef uintptr_t *(*raii_callable_const_t)(const char *, ...);
 
@@ -223,6 +225,7 @@ typedef memory_t unique_t;
  * channel communication
  */
 typedef struct channel_s _channel_t;
+typedef struct bits_s *bits_t;
 
 /* Generic simple union storage types. */
 typedef union {

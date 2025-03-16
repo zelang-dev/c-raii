@@ -3,7 +3,9 @@
 static volatile bool thrd_queue_set = false;
 static volatile bool coro_interrupt_set = false;
 static volatile sig_atomic_t can_cleanup = true;
-static raii_callable_t coro_coroutine_loop = nullptr;
+static call_interrupter_t coro_interrupt_loop = nullptr;
+static call_t coro_interrupt_init = nullptr;
+static func_t coro_interrupt_shutdown = nullptr;
 static int coro_argc;
 static char **coro_argv;
 static void(fastcall *coro_swap)(routine_t *, routine_t *) = 0;
@@ -157,10 +159,10 @@ typedef struct {
     i32 interrupt_code;
     void_t interrupt_data;
     /* record thread integration handle */
-    void_t interrput_handle;
-    void_t interrupt_default;
+    void_t interrupt_handle;
+    bits_t interrupt_bitset;
     /* array for thread integration data */
-    arrays_t interrput_args;
+    arrays_t interrupt_args;
     routine_t *sleep_handle;
     /* record which coroutine is executing for scheduler */
     routine_t *running;
@@ -1716,6 +1718,8 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CORO_MAGIC_NUMBER;
+    if (coro_interrupt_set && is_empty(coro()->interrupt_handle))
+        coro_interrupt_init();
 
     return co;
 }
@@ -1960,8 +1964,8 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->main_handle = nullptr;
     coro()->current_handle = nullptr;
     coro()->interrupt_code = 0;
-    coro()->interrput_handle = nullptr;
-    coro()->interrput_args = nullptr;
+    coro()->interrupt_handle = nullptr;
+    coro()->interrupt_args = nullptr;
     coro()->interrupt_data = nullptr;
 }
 
@@ -2192,7 +2196,7 @@ static void_t coro_thread_main(void_t args) {
 
 static RAII_INLINE void coro_interrupter(void) {
     if (coro_interrupt_set)
-        coro_coroutine_loop(2);
+        coro_interrupt_loop(coro()->interrupt_handle, INTERRUPT_MODE);
 }
 
 static void coro_cleanup(void) {
@@ -2211,7 +2215,9 @@ static void coro_cleanup(void) {
             coro()->sleep_handle = nullptr;
         }
 
-        coro_interrupt_cleanup(nullptr);
+        if (coro_interrupt_set)
+            coro_interrupt_shutdown(nullptr);
+
         channel_destroy();
         coro_destroy();
         deque_destroy();
@@ -2351,8 +2357,8 @@ static int scheduler(void) {
                 coro_delete(t);
             } else if (t->is_referenced) {
                 coro_gc(t);
-            } else if (t->is_event_err && coro_sched_empty()) {
-                coro_interrupt_cleanup(t);
+            } else if (coro_interrupt_set && t->is_event_err && coro_sched_empty()) {
+                coro_interrupt_shutdown(t);
             }
         }
     }
@@ -2380,7 +2386,7 @@ static int thrd_coro_wrapper(void_t arg) {
         RAII_FREE(coro()->sleep_handle);
 
     if (coro_interrupt_set)
-        coro_interrupt_cleanup(nullptr);
+        coro_interrupt_shutdown(nullptr);
 
     rpmalloc_thread_finalize(1);
     thrd_exit(res);
@@ -2425,7 +2431,6 @@ static void coro_initialize(void) {
         atomic_flag_clear(&gq_result.is_started);
         atomic_flag_clear(&gq_result.is_waitable);
         atomic_flag_test_and_set(&gq_result.is_errorless);
-        atomic_flag_test_and_set(&gq_result.is_interruptable);
 #if defined(_WIN32)
         QueryPerformanceFrequency(&gq_result.timer);
 #elif defined(__APPLE__) || defined(__MACH__)
@@ -2802,11 +2807,53 @@ RAII_INLINE void coro_interrupt_switch(routine_t *co) {
         coro_switch(co);
 }
 
-RAII_INLINE void coro_interrupt_setup(raii_callable_t func) {
-    if (!coro_interrupt_set && func) {
+RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc, func_t shutdownfunc) {
+    if (!coro_interrupt_set && loopfunc && perthreadfunc && shutdownfunc) {
         coro_interrupt_set = true;
-        coro_coroutine_loop = func;
+        coro_interrupt_loop = loopfunc;
+        coro_interrupt_init = perthreadfunc;
+        coro_interrupt_shutdown = shutdownfunc;
     }
+}
+
+RAII_INLINE void_t interrupt_handle(void) {
+    return coro()->interrupt_handle;
+}
+
+RAII_INLINE void_t interrupt_data(void) {
+    return coro()->interrupt_data;
+}
+
+RAII_INLINE i32 interrupt_code(void) {
+    return coro()->interrupt_code;
+}
+
+RAII_INLINE bits_t interrupt_bitset(void) {
+    return coro()->interrupt_bitset;
+}
+
+RAII_INLINE arrays_t interrupt_args(void) {
+    return coro()->interrupt_args;
+}
+
+RAII_INLINE void set_interrupt_handle(void_t handle) {
+    coro()->interrupt_handle = handle;
+}
+
+RAII_INLINE void set_interrupt_data(void_t data) {
+    coro()->interrupt_data = data;
+}
+
+RAII_INLINE void set_interrupt_code(i32 code) {
+    coro()->interrupt_code = code;
+}
+
+RAII_INLINE void set_interrupt_bitset(bits_t mask) {
+    coro()->interrupt_bitset = mask;
+}
+
+RAII_INLINE void set_interrupt_args(arrays_t args) {
+    coro()->interrupt_args = args;
 }
 
 static RAII_INLINE void coro_destroy(void) {
@@ -2847,9 +2894,6 @@ RAII_INLINE routine_t *coro_ref_current(void) {
     coro_ref(t);
 
     return t;
-}
-
-RAII_INLINE void coro_interrupt_cleanup(void_t handle) {
 }
 
 RAII_INLINE void_t coro_interrupt_erred(routine_t *co, int code) {

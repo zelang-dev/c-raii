@@ -80,6 +80,10 @@ typedef struct awaitable_s {
 #endif
 #endif
 
+#ifndef INTERRUPT_MODE
+#define INTERRUPT_MODE 2
+#endif
+
 #ifdef USE_CORO
 #define main(...)                       \
     main(int argc, char** argv) {       \
@@ -278,20 +282,31 @@ extern "C" {
     If `main/process thread` caller, will globally signal all child threads
     to start there execution, and assign coroutines. */
     C_API void coro_stealer(void);
+
     C_API value_t coro_await(callable_t, size_t, ...);
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);
-    C_API void coro_interrupt_cleanup(void_t);
     C_API void coro_interrupt_switch(routine_t *);
     C_API void coro_interrupt_complete(routine_t *, void_t);
-    C_API void coro_interrupt_setup(raii_callable_t);
+    C_API void coro_interrupt_setup(call_interrupter_t, call_t, func_t);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
-    C_API void coro_interrupt_process(func_t, void_t);
-    C_API signed int coro_err_code(void);
+
+    C_API void_t interrupt_handle(void);
+    C_API void_t interrupt_data(void);
+    C_API i32 interrupt_code(void);
+    C_API bits_t interrupt_bitset(void);
+    C_API arrays_t interrupt_args(void);
+
+    C_API void set_interrupt_handle(void_t);
+    C_API void set_interrupt_data(void_t);
+    C_API void set_interrupt_code(i32);
+    C_API void set_interrupt_bitset(bits_t);
+    C_API void set_interrupt_args(arrays_t);
 
     /* Print `current` coroutine internal data state, only active in `debug` builds. */
     C_API void coro_info_active(void);
     C_API void coro_yield_info(void);
+    C_API signed int coro_err_code(void);
 
     /* Set global coroutine `runtime` stack size, default: 16Kb,
     `coro_main` preset to `128Kb`, `8x 'CORO_STACK_SIZE'`. */

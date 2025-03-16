@@ -105,7 +105,6 @@ struct raii_results_s {
     will clear to break any possible infinite wait/loop condition,
     normal cleanup code will not be executed. */
     atomic_flag is_errorless;
-    atomic_flag is_interruptable;
     atomic_flag is_finish;
     atomic_flag is_started;
     atomic_flag is_waitable;
