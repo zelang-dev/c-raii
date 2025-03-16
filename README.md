@@ -605,27 +605,14 @@ ex_unwind_func exception_unwind_func;
 
 ## Installation
 
-The build system uses **cmake**, by default produces **static** library stored under `built`, and the complete `include` folder is needed.
+Any **commit** with an **tag** is considered _stable_ for **release** at that _version_ point.
 
-**As cmake project dependency**
+If there are no _binary_ available for your platform under **Releases** then build using **cmake**,
+which produces **static** libraries by default.
 
-```c
-if(UNIX)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -D USE_DEBUG")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
-endif()
+You will need the _binary_ stored under `built`, and `*.h` headers, or complete `include` _folder_ if **Windows**.
 
-if(WIN32)
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D USE_DEBUG")
-    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
-    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715")
-endif()
-
-add_subdirectory(deps/raii)
-target_link_libraries(project PUBLIC raii)
-```
-
-**Linux**
+### Linux
 
 ```shell
 mkdir build
@@ -634,13 +621,34 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug/Release -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=O
 cmake --build .
 ```
 
-**Windows**
+### Windows
 
 ```shell
 mkdir build
 cd build
 cmake .. -D BUILD_TESTS=OFF -D BUILD_EXAMPLES=OFF # use to not build tests and examples
 cmake --build . --config Debug/Release
+```
+
+### As cmake project dependency
+
+> For **CMake** versions earlier than `3.14`, see <https://cmake.org/cmake/help/v3.14/module/FetchContent.html>
+
+Add to **CMakeLists.txt**
+
+```c
+find_package(raii QUIET)
+if(NOT raii_FOUND)
+    FetchContent_Declare(raii
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/2.0.0.zip
+        URL_MD5 TBD
+    )
+    FetchContent_MakeAvailable(raii)
+endif()
+
+target_include_directories(raii AFTER PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(your_project PUBLIC raii)
 ```
 
 ## Contributing

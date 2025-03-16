@@ -77,6 +77,8 @@ struct routine_s {
 #if defined(_WIN32) && (defined(_M_X64) || defined(_M_IX86))
     void_t stack_limit;
 #endif
+    /* Used to check stack overflow. */
+    size_t magic_number;
     /* Coroutine stack size. */
     size_t stack_size;
     bool taken;
@@ -121,8 +123,6 @@ struct routine_s {
     char name[64];
     char state[64];
     char scrape[SCRAPE_SIZE];
-    /* Used to check stack overflow. */
-    size_t magic_number;
 };
 
 /* scheduler queue struct */
@@ -150,11 +150,15 @@ typedef struct {
     u32 thrd_id;
     /* number of other coroutine that ran while the current coroutine was waiting.*/
     u32 num_others_ran;
+    /* random seed (for work stealing) */
+    u32 seed;
+    u32 stolen_count;
     /* record thread integration code */
     i32 interrupt_code;
     void_t interrupt_data;
     /* record thread integration handle */
     void_t interrput_handle;
+    void_t interrupt_default;
     /* array for thread integration data */
     arrays_t interrput_args;
     routine_t *sleep_handle;
@@ -203,6 +207,7 @@ struct raii_deque_s {
     receive next `coroutine` task, `counter % cpu cores` */
     atomic_size_t cpu_id_count;
     atomic_size_t available;
+    atomic_size_t steal_count;
 
     /* Assume that they never overflow */
     atomic_size_t top, bottom;
@@ -238,6 +243,7 @@ static void deque_init(raii_deque_t *q, u32 size_hint) {
     atomic_init(&a->size, size_hint);
     atomic_init(&q->array, a);
     atomic_init(&q->available, 0);
+    atomic_init(&q->steal_count, 0);
     atomic_init(&q->cpu_id_count, 0);
     atomic_flag_clear(&q->shutdown);
     atomic_flag_clear(&q->started);
@@ -531,8 +537,8 @@ static void coro_atomic_enqueue(routine_t *t) {
     atomic_thread_fence(memory_order_acquire);
     raii_deque_t *queue = gq_result.queue->local[t->tid];
     deque_push(queue, t);
-    atomic_thread_fence(memory_order_release);
     atomic_fetch_add(&queue->available, 1);
+    atomic_thread_fence(memory_order_release);
 }
 
 RAII_INLINE void coro_enqueue(routine_t *t) {
@@ -1947,6 +1953,8 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->sleeping_counted = 0;
     coro()->used_count = 0;
     coro()->group_count = 0;
+    coro()->seed = 0;
+    coro()->stolen_count = 0;
     coro()->sleep_handle = nullptr;
     coro()->active_handle = nullptr;
     coro()->main_handle = nullptr;
@@ -2210,9 +2218,56 @@ static void coro_cleanup(void) {
     }
 }
 
+/* Simple random number generated (like rand) using the given seed. */
+static RAII_INLINE u32 rng(u32 *seed, int max) {
+    u32 next = *seed;
+
+    next *= 1103515245;
+    next += 12345;
+
+    *seed = next;
+
+    return next % max;
+}
+
+/**
+ * (Try to) steal and execute a task from a random worker.
+ */
+static routine_t *deque_random_steal(void) {
+    routine_t *t = RAII_EMPTY_T;
+    if (coro_sched_is_stealable()) {
+        u32 i, victim = (coro()->thrd_id + 1 + rng(&coro()->seed, gq_result.thread_count - 1)) % gq_result.thread_count;
+        for (i = victim; i < gq_result.thread_count; i++) {
+            if (i == coro()->thrd_id) {
+                continue;
+            }
+
+            raii_deque_t *queue = gq_result.queue->local[i];
+            if (atomic_load(&queue->available) > 1) {
+                t = deque_take(queue);
+                if (t == RAII_EMPTY_T)
+                    continue;
+
+                atomic_fetch_sub(&queue->available, 1);
+                if (t->system || t->is_group || t->run_code == CORO_RUN_THRD) {
+                    coro_enqueue(t);
+                    t = RAII_EMPTY_T;
+                    continue;
+                }
+
+                atomic_fetch_add(&queue->steal_count, 1);
+                coro()->stolen_count++;
+                t->tid = coro()->thrd_id;
+                break;
+            }
+        }
+    }
+
+    return t;
+}
+
 static int scheduler(void) {
-    routine_t *local = nullptr, *t = nullptr;
-    size_t i;
+    routine_t *t = nullptr;
     bool stole, have_work = false;
 
     for (;;) {
@@ -2225,8 +2280,8 @@ static int scheduler(void) {
                 t = nullptr;
         }
 
-        if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T || local == RAII_ABORT_T) {
-            if (coro()->is_main && (local == RAII_ABORT_T || atomic_flag_load(&gq_result.is_finish)
+        if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T) {
+            if (coro()->is_main && (atomic_flag_load(&gq_result.is_finish)
                     || !atomic_flag_load(&gq_result.is_errorless)
                     || (coro_global_is_empty() && coro_sched_empty()))) {
                 coro_cleanup();
@@ -2237,37 +2292,15 @@ static int scheduler(void) {
                     RAII_LOG("\nCoro scheduler exited");
                     exit(0);
                 }
-            } else if (!coro()->is_main && !coro_sched_active() && t != RAII_EMPTY_T && local != RAII_ABORT_T
+            } else if (!coro()->is_main && !coro_sched_active() && t != RAII_EMPTY_T
                        && !atomic_flag_load(&gq_result.is_finish)
-                       && !coro_sched_is_sleeping() && coro_sched_is_stealable()) {
-                t = RAII_EMPTY_T;
+                       && !coro_sched_is_sleeping()) {
         /* TODO: bug fix stealing logic and account for any stolen coroutines back to thread taken from. */
-                for (i = 1; i < gq_result.thread_count; i++) {
-                    if (i == coro()->thrd_id)
-                        continue;
-
-                    raii_deque_t *queue = gq_result.queue->local[i];
-                    if (atomic_load(&queue->available) > 1) {
-                        t = deque_take(queue);
-                        if (t == RAII_EMPTY_T)
-                            continue;
-
-                        atomic_fetch_sub(&queue->available, 1);
-                        if (t->system || t->is_group || t->run_code == CORO_RUN_THRD) {
-                            coro_enqueue(t);
-                            t = RAII_EMPTY_T;
-                            continue;
-                        }
-
-                        stole = true;
-                        break;
-                    }
-                }
-
-                if (t == RAII_EMPTY_T)
+                if ((t = deque_random_steal()) == RAII_EMPTY_T)
                     continue;
-            } else if (!coro()->is_main && (coro_sched_empty() || local == RAII_ABORT_T
-                                            || atomic_flag_load(&gq_result.is_finish)
+
+                stole = true;
+            } else if (!coro()->is_main && (coro_sched_empty() || atomic_flag_load(&gq_result.is_finish)
                                             || !atomic_flag_load(&gq_result.is_errorless))) {
                 if (coro_is_threading() && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
