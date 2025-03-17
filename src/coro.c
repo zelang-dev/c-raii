@@ -112,6 +112,7 @@ struct routine_s {
 #if defined(USE_VALGRIND)
     u32 vg_stack_id;
 #endif
+    void_t user_data;
     void_t args;
     /* Coroutine result of function return/exit. */
     value_t *results;
@@ -1605,6 +1606,30 @@ RAII_INLINE memory_t *coro_scope(void) {
     return coro_active()->scope;
 }
 
+RAII_INLINE memory_t *get_coro_scope(routine_t * co) {
+    return co->scope;
+}
+
+RAII_INLINE signed int get_coro_err(routine_t *co) {
+    return co->event_err_code;
+}
+
+RAII_INLINE void coro_err_set(routine_t *co, signed int code) {
+    co->event_err_code = code;
+}
+
+RAII_INLINE void_t get_coro_data(routine_t *co) {
+    return co->user_data;
+}
+
+RAII_INLINE void coro_data_set(routine_t *co, void_t data) {
+    co->user_data = data;
+}
+
+RAII_INLINE value_t *get_coro_result(routine_t *co) {
+    return co->results;
+}
+
 /* Return handle to previous coroutine. */
 static RAII_INLINE routine_t *coro_current(void) {
     return coro()->current_handle;
@@ -1668,7 +1693,7 @@ RAII_INLINE void coro_suspend(void) {
 }
 
 /* Check for coroutine completetion and return. */
-static RAII_INLINE bool coro_terminated(routine_t *co) {
+RAII_INLINE bool coro_terminated(routine_t *co) {
     return co->halt;
 }
 
@@ -1715,6 +1740,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->event_err_code = 0;
     co->cycles = 0;
     co->results = nullptr;
+    co->user_data = nullptr;
     co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CORO_MAGIC_NUMBER;
@@ -1853,7 +1879,7 @@ static string_t coro_state(int status) {
     }
 }
 
-static RAII_INLINE void coro_info(routine_t *t, int pos) {
+RAII_INLINE void coro_info(routine_t *t, int pos) {
 #ifdef USE_DEBUG
     bool line_end = false;
     if (is_empty(t)) {
@@ -2814,6 +2840,14 @@ RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthr
         coro_interrupt_init = perthreadfunc;
         coro_interrupt_shutdown = shutdownfunc;
     }
+}
+
+RAII_INLINE void coro_halt_set(routine_t *co) {
+    co->halt = true;
+}
+
+RAII_INLINE void coro_halt_clear(routine_t *co) {
+    co->halt = false;
 }
 
 RAII_INLINE void_t interrupt_handle(void) {
