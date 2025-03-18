@@ -268,7 +268,8 @@ extern "C" {
     C_API void coro_err_set(routine_t *, signed int code);
     C_API void_t get_coro_data(routine_t *);
     C_API void coro_data_set(routine_t *, void_t data);
-    C_API value_t *get_coro_result(routine_t *co);
+    C_API value_t *get_coro_result(routine_t *);
+    C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_info(routine_t *, int pos);
 
     /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
@@ -294,7 +295,9 @@ extern "C" {
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);
     C_API void coro_interrupt_switch(routine_t *);
-    C_API void coro_interrupt_complete(routine_t *, void_t);
+    C_API void coro_interrupt_complete(routine_t *, void_t result);
+    C_API void coro_interrupt_finisher(routine_t *, void_t result,
+                                       func_t cleanup, void_t ptr, bool halt, bool switcher);
     C_API void coro_interrupt_setup(call_interrupter_t, call_t, func_t);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
 

@@ -1630,6 +1630,10 @@ RAII_INLINE value_t *get_coro_result(routine_t *co) {
     return co->results;
 }
 
+RAII_INLINE routine_t *get_coro_context(routine_t *co) {
+    return co->context;
+}
+
 /* Return handle to previous coroutine. */
 static RAII_INLINE routine_t *coro_current(void) {
     return coro()->current_handle;
@@ -2821,10 +2825,23 @@ RAII_INLINE void coro_interrupt_process(func_t fn, void_t handle) {
     coro_interrupt_event(fn, handle, nullptr);
 }
 
-RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t data) {
+RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result) {
     co->halt = true;
-    coro_result_set(co, data);
+    coro_result_set(co, result);
     coro_interrupt_switch(co->context);
+    coro_scheduler();
+}
+
+RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result,
+                                         func_t cleanup, void_t ptr, bool halt, bool switcher) {
+    co->halt = halt;
+    coro_result_set(co, result);
+    if (switcher)
+        coro_interrupt_switch(co->context);
+
+    if (cleanup)
+        cleanup(ptr);
+
     coro_scheduler();
 }
 
