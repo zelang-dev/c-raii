@@ -1,6 +1,10 @@
 #ifndef RAII_H
 #define RAII_H
 
+#define RAII_VERSION_MAJOR 2
+#define RAII_VERSION_MINOR 0
+#define RAII_VERSION_PATCH 0
+
 #include "vector.h"
 #include "cthread.h"
 #include "catomic.h"

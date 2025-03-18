@@ -147,7 +147,7 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Lawrence Stubbs <${CPACK_PACKAGE_CONTACT}>"
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
 SET(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "Raii C library")
-SET(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "An general RAII implementation, c11/c++11 like threads, and memory/heap allocation for C.")
+SET(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "An robust high-level Defer, RAII implementation for C, automatic memory safety, custom malloc, with ultra simple threading, Go like capabilities.")
 
 set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
 set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
