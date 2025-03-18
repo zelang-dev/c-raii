@@ -2958,6 +2958,10 @@ RAII_INLINE signed int coro_err_code(void) {
     return coro_active()->event_err_code;
 }
 
+RAII_INLINE string_t coro_get_name(void) {
+    return coro_active()->name;
+}
+
 RAII_INLINE u32 coro_id(void) {
     return coro_active()->rid;
 }

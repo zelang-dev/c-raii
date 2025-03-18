@@ -322,6 +322,7 @@ extern "C" {
     C_API void coro_info_active(void);
     C_API void coro_yield_info(void);
     C_API signed int coro_err_code(void);
+    C_API string_t coro_get_name(void);
 
     /* Set global coroutine `runtime` stack size, default: 16Kb,
     `coro_main` preset to `128Kb`, `8x 'CORO_STACK_SIZE'`. */
