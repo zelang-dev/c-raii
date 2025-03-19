@@ -614,6 +614,16 @@ string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count) {
     return data;
 }
 
+string str_cat_ex(memory_t *defer, int num_args, ...) {
+    va_list args;
+
+    va_start(args, num_args);
+    string s = str_concat_ex(defer, num_args, args);
+    va_end(args);
+
+    return s;
+}
+
 string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy) {
     size_t strsize = 0;
     int i;
