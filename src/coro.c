@@ -117,6 +117,7 @@ struct routine_s {
     /* Coroutine result of function return/exit. */
     value_t *results;
     raii_func_t func;
+    raii_values_t interrupt_result[1];
     memory_t scope[1];
     routine_t *next;
     routine_t *prev;
@@ -2827,15 +2828,33 @@ RAII_INLINE void coro_interrupt_process(func_t fn, void_t handle) {
 
 RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result) {
     co->halt = true;
-    coro_result_set(co, result);
+    coro_interrupt_result(co, result, 0, false);
     coro_interrupt_switch(co->context);
     coro_scheduler();
 }
 
-RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result,
-                                         func_t cleanup, void_t ptr, bool halt, bool switcher) {
+void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
+    if ((!is_empty(data) && co->rid != RAII_ERR) || is_plain) {
+        u32 id = co->rid;
+        result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
+        atomic_thread_fence(memory_order_seq_cst);
+        if (is_plain)
+            co->interrupt_result->valued.long_long = plain;
+        else
+            co->interrupt_result->valued.object = data;
+
+        results[id]->result = co->interrupt_result;
+        results[id]->result->valued.object = data;
+        co->results = results[id]->result->valued.object;
+        results[id]->is_ready = true;
+        atomic_store_explicit(&gq_result.results, results, memory_order_release);
+    }
+}
+
+RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
+                                         func_t cleanup, void_t ptr, bool halt, bool switcher, bool is_plain) {
     co->halt = halt;
-    coro_result_set(co, result);
+    coro_interrupt_result(co, result, plain, is_plain);
     if (switcher)
         coro_interrupt_switch(co->context);
 
