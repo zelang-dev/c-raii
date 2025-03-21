@@ -295,7 +295,7 @@ extern "C" {
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);
     C_API void coro_interrupt_switch(routine_t *);
-    C_API void coro_interrupt_complete(routine_t *, void_t result);
+    C_API void coro_interrupt_complete(routine_t *, void_t result, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
                                        func_t cleanup, void_t ptr, bool halt, bool switcher, bool is_plain);

@@ -2826,9 +2826,9 @@ RAII_INLINE void coro_interrupt_process(func_t fn, void_t handle) {
     coro_interrupt_event(fn, handle, nullptr);
 }
 
-RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result) {
+RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain) {
     co->halt = true;
-    coro_interrupt_result(co, result, 0, false);
+    coro_interrupt_result(co, result, plain, is_plain);
     coro_interrupt_switch(co->context);
     coro_scheduler();
 }
@@ -2844,7 +2844,6 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
             co->interrupt_result->valued.object = data;
 
         results[id]->result = co->interrupt_result;
-        results[id]->result->valued.object = data;
         co->results = results[id]->result->valued.object;
         results[id]->is_ready = true;
         atomic_store_explicit(&gq_result.results, results, memory_order_release);
