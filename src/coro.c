@@ -439,7 +439,7 @@ static RAII_INLINE bool coro_is_threading(void) {
 }
 
 static RAII_INLINE bool coro_sched_is_assignable(size_t active) {
-    return coro_is_threading() && (active / gq_result.thread_count) >= (gq_result.cpu_count / 2);
+    return coro_is_threading() && (active / gq_result.thread_count) >= 1;
 }
 
 static RAII_INLINE void coro_result_set(routine_t *co, void_t data) {
@@ -1833,8 +1833,7 @@ static void coro_system(void) {
     }
 }
 
-/* Sets the current coroutine's name.*/
-static void coro_name(char *fmt, ...) {
+void coro_name(char *fmt, ...) {
     va_list args;
     routine_t *t = coro()->running;
     va_start(args, fmt);
@@ -2022,6 +2021,10 @@ static RAII_INLINE bool coro_sched_is_sleeping(void) {
 /* Check `global` coroutine active count status is `zero` or less. */
 static RAII_INLINE bool coro_global_is_empty(void) {
     return atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) == 0;
+}
+
+static RAII_INLINE bool coro_queue_is_available(void) {
+    return (atomic_load(&gq_result.queue->local[coro()->thrd_id]->available) > 0);
 }
 
 static void coro_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
@@ -2339,17 +2342,17 @@ static int scheduler(void) {
                 stole = true;
             } else if (!coro()->is_main && (coro_sched_empty() || atomic_flag_load(&gq_result.is_finish)
                                             || !atomic_flag_load(&gq_result.is_errorless))) {
-                if (coro_is_threading() && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
-                    atomic_fetch_sub(&gq_result.active_count, 1);
-                RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
-                /* Wait for global exit signal */
-                while (!atomic_flag_load(&gq_result.is_finish)
-                       && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown)
-                       && atomic_flag_load(&gq_result.is_errorless))
-                    thrd_yield();
+                if (!coro_queue_is_available()) {
+                    RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
+                    /* Wait for global exit signal */
+                    while (!atomic_flag_load(&gq_result.is_finish)
+                           && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown)
+                           && atomic_flag_load(&gq_result.is_errorless))
+                        thrd_yield();
 
-                RAII_INFO("Thrd #%zx exiting, %d runnable coroutines.\033[0K\n", thrd_self(), coro()->used_count);
-                return coro()->exiting;
+                    RAII_INFO("Thrd #%zx exiting, %d runnable coroutines.\033[0K\n", thrd_self(), coro()->used_count);
+                    return coro()->exiting;
+                }
             }
         }
 
@@ -2375,15 +2378,12 @@ static int scheduler(void) {
                 if (coro_is_threading()
                     && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
-
-                if (coro()->used_count < 0)
-                    coro()->used_count++;
             }
-
-            if (coro_is_threading()
-                && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) < 0)
-                atomic_fetch_add(&gq_result.active_count, 1);
-
+/*
+            if (coro_is_threading() && (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_MAIN)) {
+                    RAII_HERE;
+            }
+*/
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
             } else if (t->is_referenced) {

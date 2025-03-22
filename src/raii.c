@@ -46,7 +46,7 @@ RAII_INLINE uint64_t get_timer(void) {
     LARGE_INTEGER count;
 
     if (QueryPerformanceCounter(&count) && &gq_result.timer)
-        lapse = (count.QuadPart * 1000001000) / gq_result.timer.QuadPart ;
+        lapse = (count.QuadPart * 1000001000) / gq_result.timer.QuadPart;
 #endif
 
     if (!lapse) {

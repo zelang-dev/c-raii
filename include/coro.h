@@ -272,6 +272,9 @@ extern "C" {
     C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_info(routine_t *, int pos);
 
+    /* Sets the current coroutine's name.*/
+    C_API void coro_name(char *fmt, ...);
+
     /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
     C_API void coro_stack_check(int);
 
