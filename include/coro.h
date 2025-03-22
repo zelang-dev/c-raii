@@ -301,6 +301,7 @@ extern "C" {
                                        func_t cleanup, void_t ptr, bool halt, bool switcher, bool is_plain);
     C_API void coro_interrupt_setup(call_interrupter_t, call_t, func_t);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
+    C_API void coro_interrupt_waitgroup_destroy(routine_t *);
 
     /* Check for coroutine completetion. */
     C_API bool coro_terminated(routine_t *);

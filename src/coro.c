@@ -2646,6 +2646,8 @@ waitresult_t waitfor(waitgroup_t wg) {
                     } else if (!coro_terminated(co)) {
                         if (!co->interrupt_active && co->status == CORO_NORMAL)
                             coro_enqueue(co);
+                        else if(co->interrupt_active && co->status == CORO_SUSPENDED)
+                            coro_switch(co);
 
                         coro_info(c, 1);
                         coro_yielding_active();
@@ -2861,6 +2863,11 @@ RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t
         cleanup(ptr);
 
     coro_scheduler();
+}
+
+RAII_INLINE void coro_interrupt_waitgroup_destroy(routine_t *co) {
+    if (!is_empty(co) && !is_empty(co->context) && is_type(co->context->wait_group, RAII_HASH))
+        hash_free(co->context->wait_group);
 }
 
 RAII_INLINE void coro_interrupt_switch(routine_t *co) {
