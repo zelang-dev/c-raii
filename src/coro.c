@@ -2855,14 +2855,13 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
 }
 
 RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                         func_t cleanup, void_t ptr, bool halt, bool switcher, bool is_plain) {
-    co->halt = halt;
+                                          bool is_yield, bool halted, bool is_context, bool is_plain) {
+    co->halt = halted;
     coro_interrupt_result(co, result, plain, is_plain);
-    if (switcher)
+    if (is_context)
         coro_interrupt_switch(co->context);
-
-    if (cleanup)
-        cleanup(ptr);
+    else if (is_yield)
+        coro_switch(co);
 
     coro_scheduler();
 }

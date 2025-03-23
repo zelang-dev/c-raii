@@ -301,7 +301,7 @@ extern "C" {
     C_API void coro_interrupt_complete(routine_t *, void_t result, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                       func_t cleanup, void_t ptr, bool halt, bool switcher, bool is_plain);
+                                       bool is_yield, bool halted, bool is_context, bool is_plain);
     C_API void coro_interrupt_setup(call_interrupter_t, call_t, func_t);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);
