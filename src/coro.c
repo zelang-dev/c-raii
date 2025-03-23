@@ -2309,6 +2309,7 @@ static routine_t *deque_random_steal(void) {
 static int scheduler(void) {
     routine_t *t = nullptr;
     bool stole, have_work = false;
+    int active_count;
 
     for (;;) {
         stole = false;
@@ -2380,8 +2381,14 @@ static int scheduler(void) {
                     atomic_fetch_sub(&gq_result.active_count, 1);
             }
 
-            if (coro_is_threading() && coro_interrupt_set && t->run_code == CORO_RUN_MAIN) {
-                atomic_fetch_sub(&gq_result.active_count, 2);
+            if (coro_interrupt_set) {
+                if (t->run_code == CORO_RUN_MAIN
+                    && (active_count = (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed)) > 0) {
+                    atomic_fetch_sub(&gq_result.active_count, active_count);
+                }
+
+                if (coro()->used_count < 0)
+                    coro()->used_count++;
             }
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
@@ -2648,7 +2655,7 @@ waitresult_t waitfor(waitgroup_t wg) {
                             coro_enqueue(co);
                         } else if (co->interrupt_active && co->status == CORO_SUSPENDED) {
                             coro_switch(co);
-                            coro_enqueue(co);
+                            continue;
                         }
 
                         coro_info(c, 1);
