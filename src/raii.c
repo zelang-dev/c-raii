@@ -642,8 +642,8 @@ RAII_INLINE bool is_type(void_t self, raii_type check) {
     return type_of(self) == check;
 }
 
-RAII_INLINE bool is_void(void_t self) {
-    return ((void_t)self == (void_t)0xffffffffffffffff);
+RAII_INLINE bool is_inaccessible(void_t self) {
+    return ((uintptr_t)self | 0x01);
 }
 
 RAII_INLINE bool is_instance_of(void_t self, void_t check) {

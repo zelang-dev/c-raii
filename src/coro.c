@@ -157,8 +157,10 @@ typedef struct {
     /* random seed (for work stealing) */
     u32 seed;
     u32 stolen_count;
+    i32 interrupter_active;
     /* record thread integration code */
     i32 interrupt_code;
+    void_t interrupt_unused;
     void_t interrupt_data;
     /* record thread integration handle */
     void_t interrupt_handle;
@@ -1689,7 +1691,9 @@ RAII_INLINE void coro_stack_check(int n) {
 }
 
 static RAII_INLINE void coro_yielding(routine_t *co) {
-    coro_stack_check(0);
+    if (!coro()->interrupter_active)
+        coro_stack_check(0);
+
     coro_switch(co);
 }
 
@@ -1994,9 +1998,11 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->main_handle = nullptr;
     coro()->current_handle = nullptr;
     coro()->interrupt_code = 0;
+    coro()->interrupter_active = false;
     coro()->interrupt_handle = nullptr;
     coro()->interrupt_args = nullptr;
     coro()->interrupt_data = nullptr;
+    coro()->interrupt_bitset = nullptr;
 }
 
 /* Check `thread` local coroutine use count for zero. */
@@ -2229,8 +2235,11 @@ static void_t coro_thread_main(void_t args) {
 }
 
 static RAII_INLINE void coro_interrupter(void) {
-    if (coro_interrupt_set)
+    if (coro_interrupt_set) {
+        coro()->interrupter_active = true;
         coro_interrupt_loop(coro()->interrupt_handle, INTERRUPT_MODE);
+        coro()->interrupter_active = false;
+    }
 }
 
 static void coro_cleanup(void) {

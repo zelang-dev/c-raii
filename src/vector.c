@@ -293,7 +293,7 @@ RAII_INLINE void array_remove(arrays_t arr, int i) {
 }
 
 RAII_INLINE void array_delete(arrays_t arr) {
-    if (arr) {
+    if (arr && is_array(arr)) {
         void_t p1__ = vector_address(arr);
         func_t destructor__ = vector_destructor(arr);
         if (destructor__) {
