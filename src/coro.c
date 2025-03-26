@@ -4,6 +4,7 @@ static volatile bool thrd_queue_set = false;
 static volatile bool coro_interrupt_set = false;
 static volatile sig_atomic_t can_cleanup = true;
 static call_interrupter_t coro_interrupt_loop = nullptr;
+static call_timer_t coro_interrupt_timer = nullptr;
 static call_t coro_interrupt_init = nullptr;
 static func_t coro_interrupt_shutdown = nullptr;
 static int coro_argc;
@@ -1939,6 +1940,9 @@ static void_t coro_wait_system(void_t v) {
 }
 
 u32 sleepfor(u32 ms) {
+    if (coro_interrupt_set)
+        return coro_interrupt_timer(ms);
+
     size_t when, now;
     routine_t *t;
 
@@ -2871,12 +2875,12 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
 }
 
 RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                          bool is_yield, bool halted, bool is_context, bool is_plain) {
+                                          bool use_yield, bool halted, bool use_context, bool is_plain) {
     co->halt = halted;
     coro_interrupt_result(co, result, plain, is_plain);
-    if (is_context)
+    if (use_context)
         coro_interrupt_switch(co->context);
-    else if (is_yield)
+    else if (use_yield)
         coro_switch(co);
 
     coro_scheduler();
@@ -2892,11 +2896,13 @@ RAII_INLINE void coro_interrupt_switch(routine_t *co) {
         coro_switch(co);
 }
 
-RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc, func_t shutdownfunc) {
-    if (!coro_interrupt_set && loopfunc && perthreadfunc && shutdownfunc) {
+RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
+                                      call_timer_t timerfunc, func_t shutdownfunc) {
+    if (!coro_interrupt_set && loopfunc && perthreadfunc && timerfunc && shutdownfunc) {
         coro_interrupt_set = true;
         coro_interrupt_loop = loopfunc;
         coro_interrupt_init = perthreadfunc;
+        coro_interrupt_timer = timerfunc;
         coro_interrupt_shutdown = shutdownfunc;
     }
 }

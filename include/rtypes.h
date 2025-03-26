@@ -93,6 +93,7 @@ typedef void (*func_args_t)(void_t, ...);
 typedef void_t(*raii_func_args_t)(void_t, ...);
 typedef intptr_t(*raii_callable_t)(intptr_t);
 typedef intptr_t(*call_interrupter_t)(void_t, intptr_t);
+typedef uintptr_t(*call_timer_t)(uintptr_t);
 typedef uintptr_t(*raii_callable_args_t)(uintptr_t, ...);
 typedef uintptr_t *(*raii_callable_const_t)(const char *, ...);
 
