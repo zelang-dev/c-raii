@@ -24,7 +24,7 @@ int main(int argc, char **argv){
         printf("never reached\n");
     } catch_any{
         printf("catch_any: exception %s (%s:%d) caught\n", err, err_file, err_line);
-    } end_trying;
+    } _tried;
 
     return 0;
 }

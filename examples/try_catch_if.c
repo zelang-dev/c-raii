@@ -22,7 +22,7 @@ int main(int argc, char **argv){
             printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
         else
             printf("finally: try succeeded\n");
-    } end_try;
+    } tried;
 
     return 0;
 }

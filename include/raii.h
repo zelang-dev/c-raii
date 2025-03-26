@@ -401,16 +401,16 @@ are only valid between these sections.
 #define catch_any ex_catch_any
 #define catch_if ex_catch_if
 #define catch(e) ex_catch(e)
-#define end_try ex_end_try
+#define tried ex_end_try
 #define finally ex_finally
 #define caught(err) raii_caught(EX_STR(err))
 
 #ifdef _WIN32
     #define finality ex_finality
-    #define end_trying ex_end_trying
+    #define _tried ex_end_trying
 #else
     #define finality catch_any ex_finally
-    #define end_trying ex_end_try
+    #define _tried ex_end_try
 #endif
 
 #define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }

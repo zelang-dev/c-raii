@@ -40,7 +40,7 @@ int test_anon_map_readonly()
         result = munmap(map, 1024);
         if (result != 0)
             printf("munmap (MAP_ANONYMOUS, PROT_READ) returned unexpected error: %d\n", errno);
-    } end_trying;
+    } _tried;
 
     return result;
 }
@@ -314,7 +314,7 @@ int test_map_mprotect() {
     } catch (sig_segv) {
 #endif
         result = 0;
-    } end_trying;
+    } _tried;
 
 #if !defined(__APPLE__) || !defined(__MACH__)
         free(buffer);

@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
             printf("never reached\n");
         } else
             printf("finally: try succeeded\n");
-    } end_try;
+    } tried;
 
     return 0;
 }

@@ -514,7 +514,7 @@ C_API void raii_deferred_clean(void);
 ### Fully automatic memory safety, using `guard/unguarded/guarded` macro
 
 The full potently of **RAII** is encapsulated in the `guard` macro.
-Using `try/catch/catch_any/catch_if/finally/end_try` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
+Using `try/catch/catch_any/catch_if/finally/tried` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
 
 ```c++
 try {
@@ -532,7 +532,7 @@ try {
         printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
     else
         printf("finally: try succeeded\n");
-} end_try;
+} tried;
 ```
 
 The Planned C11 implementation details still holds here, but `defer` not confined to `guard` block, actual function call.

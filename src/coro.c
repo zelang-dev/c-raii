@@ -504,7 +504,7 @@ static void coro_awaitable(void) {
         } else {
             co->status = CORO_NORMAL;
         }
-    } end_try;
+    } tried;
 }
 
 static void coro_func(void) {
