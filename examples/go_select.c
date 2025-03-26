@@ -46,7 +46,7 @@ int fibonacci(channel_t c, channel_t quit) {
             puts("quit");
             return 0;
         _break;
-    } select_end;
+    } selected;
 }
 
 void *func(params_t args) {

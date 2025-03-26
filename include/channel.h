@@ -24,7 +24,7 @@ C_API void channel_free(channel_t);
 C_API void channel_destroy(void);
 
 /* The `for_select` macro sets up a coroutine to wait on multiple channel
-operations. Must be closed out with `select_end`,
+operations. Must be closed out with `selected`,
 and if no `_send(channel, data)`, `_recv(channel, data)`, `_default` provided,
 an infinite loop is created.
 
@@ -36,7 +36,7 @@ This behaves same as GoLang `select {}` statement. */
 
 /* Ends an `for_select` condition block.
 Will `yield` execution, if no target ~channel~ is selected as ready. */
-#define select_end          \
+#define selected          \
   if ($##__FUNCTION__##_fs == false)    \
       yielding();           \
   }
