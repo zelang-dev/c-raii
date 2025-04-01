@@ -334,58 +334,56 @@ are only valid between these sections.
     (_$##__FUNCTION__)->status = RAII_GUARDED_STATUS;   \
     raii_local()->status = (_$##__FUNCTION__)->status;  \
     raii_local()->arena = (void_t)_$##__FUNCTION__;     \
-    ex_try {                                            \
+    try {                                               \
         do {
 
     /* This ends an scoped guard section, it replaces `}`.
     On exit will begin executing deferred functions,
     return given `result` when done, use `NONE` for no return. */
 #define unguarded(result)                                           \
-            } while (false);                                        \
+        } while (false);                                            \
             raii_deferred_free(_$##__FUNCTION__);                   \
-    } ex_catch_if {                                                 \
+    } catch_if {                                                    \
         if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
             raii_deferred_free(_$##__FUNCTION__);                   \
-    } ex_finally {                                                  \
+    } finally {                                                     \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
-    } ex_end_try;                                                   \
+    }  tried;                                                             \
     return result;                                                  \
 }
 
     /* This ends an scoped guard section, it replaces `}`.
     On exit will begin executing deferred functions. */
-#define guarded                                                     \
-        } while (false);                                            \
-        raii_deferred_free(_$##__FUNCTION__);                       \
-    } ex_catch_if {                                                 \
-        raii_deferred_free(_$##__FUNCTION__);                       \
-    } ex_finally {                                                  \
+#define guarded                                 \
+        } while (false);                        \
+        raii_deferred_free(_$##__FUNCTION__);   \
+    } catch_if {                                \
+        raii_deferred_free(_$##__FUNCTION__);   \
+    } finally {                                 \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
-        guard_delete(_$##__FUNCTION__);                             \
-    } ex_end_try;                                                   \
+        guard_delete(_$##__FUNCTION__);         \
+    } tried;                                     \
 }
-
 
     /* This ends an scoped guard section, it replaces `}`.
     On exit will begin executing deferred functions. Will catch and set `error`
     this is an internal macro for `thrd_spawn` and `thrd_async` usage. */
-#define guarded_exception(error)                                    \
-        } while (false);                                            \
-        raii_deferred_free(_$##__FUNCTION__);                       \
-    } ex_catch_if {                                                 \
-        raii_deferred_free(_$##__FUNCTION__);                       \
+#define guarded_exception(error)                \
+        } while (false);                        \
+        raii_deferred_free(_$##__FUNCTION__);   \
+    } ex_catch_if {                             \
+        raii_deferred_free(_$##__FUNCTION__);   \
         if (!_$##__FUNCTION__->is_recovered && raii_is_caught(_$##__FUNCTION__, raii_message_by(_$##__FUNCTION__))) { \
-            ((memory_t *)error)->err = (void_t)ex_err.ex;           \
-            ((memory_t *)error)->panic = ex_err.panic;              \
-            ((memory_t *)error)->backtrace = ex_err.backtrace;      \
-        }                                                           \
-    } ex_finally{\
+            ((memory_t *)error)->err = (void_t)ex_err.ex;       \
+            ((memory_t *)error)->panic = ex_err.panic;          \
+            ((memory_t *)error)->backtrace = ex_err.backtrace;  \
+        }                                       \
+    } finally {                                 \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
-        guard_delete(_$##__FUNCTION__);                             \
-    } ex_end_try;                                                   \
+        guard_delete(_$##__FUNCTION__);         \
+    } tried;                                     \
 }
-
 
 #define block(type, name, ...)          \
     type name(__VA_ARGS__)              \
@@ -397,21 +395,28 @@ are only valid between these sections.
 #define blocked                         \
     guarded
 
-#define try ex_try
-#define catch_any ex_catch_any
-#define catch_if ex_catch_if
-#define catch(e) ex_catch(e)
-#define tried ex_end_try
-#define finally ex_finally
-#define caught(err) raii_caught(EX_STR(err))
-
-#ifdef _WIN32
-    #define finality ex_finality
-    #define _tried ex_end_trying
+#ifdef USE_TRYING
+#define try ex_trying
+#define catch_any ex_catching_any
+#define catch_if ex_catching_if
+#define catch(e) ex_catching(e)
+#define finally ex_finallying
+#define finality ex_finalitying
+#define tried ex_trieding
 #else
-    #define finality catch_any ex_finally
-    #define _tried ex_end_try
+#define try         ex_try
+#define catch_any   ex_catch_any
+#define catch_if    ex_catch_if
+#define catch(e)    ex_catch(e)
+#define finally     ex_finally
+#define tried       ex_tried
+
+#define finality    ex_finality
+#define try_end     ex_try_end
 #endif
+
+#define caught(E) raii_caught(EX_STR(E))
+#define rethrow try_rethrow(&ex_err)
 
 #define time_spec(sec, nsec) &(struct timespec){ .tv_sec = sec ,.tv_nsec = nsec }
 thrd_local_extern(memory_t, raii)

@@ -28,7 +28,7 @@ TEST(thrd_async) {
     try {
         ASSERT_TRUE(thrd_get(fut).boolean);
     } catch (division_by_zero) {
-        ASSERT_STR(err, "division_by_zero");
+        ASSERT_STR(err.name, "division_by_zero");
     } _tried;
 
     return 0;

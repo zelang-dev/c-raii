@@ -18,6 +18,8 @@ EX_EXCEPTION(division_by_zero);
 EX_EXCEPTION(out_of_memory);
 EX_EXCEPTION(panic);
 
+EX_EXCEPTION(_if);
+
 /* Some signal exception */
 EX_EXCEPTION(sig_int);
 EX_EXCEPTION(sig_abrt);
@@ -49,7 +51,6 @@ EX_EXCEPTION(in_page_error);
 EX_EXCEPTION(int_divide_by_zero);
 EX_EXCEPTION(int_overflow);
 EX_EXCEPTION(invalid_disposition);
-EX_EXCEPTION(noncontinuable_exception);
 EX_EXCEPTION(priv_instruction);
 EX_EXCEPTION(single_step);
 EX_EXCEPTION(stack_overflow);
@@ -103,6 +104,14 @@ void ex_unprotected_ptr(ex_ptr_t *const_ptr) {
     }
 }
 
+static RAII_INLINE bool is_except_root(ex_context_t *ctx) {
+#ifdef emulate_tls
+    return ctx == ex_local();
+#else
+    return ctx == &thrd_except_buffer;
+#endif
+}
+
 static void ex_unwind_stack(ex_context_t *ctx) {
     ex_ptr_t *p = ctx->stack;
     void *temp = NULL;
@@ -146,8 +155,6 @@ static void ex_print(ex_context_t *exception, const char *message) {
             fprintf(stderr, "    thrown at %s:%d\n\n", exception->file, exception->line);
         }
     }
-
-    ex_backtrace(exception->backtrace);
 #endif
     fflush(stderr);
 }
@@ -400,11 +407,7 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     ex_unwind_stack(ctx);
     ex_signal_unblock(all);
 
-#ifdef emulate_tls
-    if (ctx == ex_local())
-#else
-    if (ctx == &thrd_except_buffer)
-#endif
+    if (is_except_root(ctx))
         ex_terminate();
 
 #ifdef _WIN32
@@ -421,6 +424,7 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
     int i;
 
     ex_trace_set(ctx, (void_t)ep->ContextRecord);
+    ctx->state = ex_throw_st;
     if (!is_str_eq(ctx->ex, exception) && is_empty((void *)ctx->panic))
         return EXCEPTION_EXECUTE_HANDLER;
     else if (is_empty((void *)ctx->ex) && signaled) {
@@ -435,8 +439,9 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
 
         if (!found)
             return EXCEPTION_EXECUTE_HANDLER;
-    } else if (!is_str_eq(ctx->panic, exception) && !is_str_eq(ctx->ex, exception))
+    } else if (!is_str_eq(ctx->panic, exception) && !is_str_eq(ctx->ex, exception)) {
         return EXCEPTION_EXECUTE_HANDLER;
+    }
 
     for (i = 0; i < max_ex_sig; i++) {
         if (found || ex_sig[i].seh == code
@@ -446,12 +451,10 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
             ctx->state = ex_throw_st;
             ctx->is_rethrown = true;
             if (got_signal || signaled) {
-                if (!found)
+                if (is_str_eq(ctx->ex, exception))
+                    ctx->ex = exception;
+                else if (!found)
                     ctx->ex = ex_sig[i].ex;
-
-                ctx->file = "unknown";
-                ctx->line = 0;
-                ctx->function = NULL;
             }
 
             if (exception_setup_func)
@@ -728,4 +731,119 @@ void ex_signal_default(void) {
 #elif SIG_BUS
     ex_signal_reset(SIG_BUS);
 #endif
+}
+
+RAII_INLINE ex_error_t *try_updating_err(ex_error_t *err) {
+    ex_context_t *ex_err = ex_local();
+#ifdef _WIN32
+    err->name = (!is_empty((void *)ex_err->panic)) ? ex_err->panic : ex_err->ex;
+#else
+    err->name = ex_err->ex;
+#endif
+    err->file = ex_err->file;
+    err->backtrace = ex_err->backtrace;
+    err->line = ex_err->line;
+    err->is_caught = ex_err->state == ex_catch_st;
+    if (coro_is_valid())
+        coro_scope()->err = (void_t)err->name;
+    else if (!is_raii_empty())
+        raii_local()->err = (void_t)err->name;
+
+    return err;
+}
+
+RAII_INLINE void try_rethrow(ex_context_t *ex_err) {
+#ifdef _WIN32
+    if (ex_err->caught > -1 || ex_err->is_rethrown) {
+        ex_err->is_rethrown = false;
+        ex_longjmp(ex_err->buf, ex_err->state | ex_throw_st);
+    }
+#endif
+
+    if (!is_empty(ex_err->backtrace) && is_except_root(ex_err->next))
+        ex_backtrace(ex_err->backtrace);
+
+    ex_throw(ex_err->ex, ex_err->file, ex_err->line, ex_err->function, ex_err->panic, ex_err->backtrace);
+}
+
+ex_jmp_buf *try_start(ex_stage acquire, ex_error_t *err, ex_context_t *ex_err) {
+    if (!exception_signal_set)
+        ex_signal_setup();
+
+    err->stage = acquire;
+    err->is_caught = false;
+    ex_err->next = ex_init();
+    ex_err->stack = 0;
+    ex_err->ex = 0;
+    ex_err->unstack = 0;
+    ex_err->is_rethrown = false;
+    ex_err->is_final = false;
+    /* global context updated */
+    ex_update(ex_err);
+    /* return/save jump location */
+    return &ex_err->buf;
+}
+
+void try_finish(ex_context_t *ex_err) {
+    /* deallocate this block and promote its outer block, global context updated */
+    if (ex_init() == ex_err)
+        ex_update(ex_err->next);
+
+#ifdef _WIN32
+    ex_err->caught = -1;
+    ex_err->is_rethrown = false;
+#endif
+
+    /* deallocate or propagate its exception */
+    if ((ex_err->state & ex_throw_st) != 0)
+        try_rethrow(ex_err);
+}
+
+bool try_next(ex_error_t *err, ex_context_t *ex_err) {
+    /* advance the block to the next stage */
+    err->stage++;
+    const bool uncaught = (ex_err->state & ex_throw_st) != 0;
+
+    /* simple optimization: skip CATCHING stage if no exception thrown */
+    if (err->stage == ex_catch_st && (ex_err->ex == nullptr || !uncaught)) {
+        err->stage++;
+    }
+
+    /* carry on until the block is DONE */
+    if (err->stage < ex_done_st) {
+        return true;
+    }
+
+    try_finish(ex_err);
+
+    /* get out of the loop */
+    return false;
+}
+
+RAII_INLINE bool try_trying(const ex_context_t ex_err) {
+    return ex_err.state == ex_try_st;
+}
+
+bool try_catching(string type, ex_error_t *err, ex_context_t *ex_err) {
+    /* check if this CATCH block can handle current exception */
+    bool status = false;
+    if (ex_err->state == ex_throw_st) {
+        try_updating_err(err);
+        if (is_str_eq("_if", type)) {
+            status = true;
+        } else if (is_empty((void_t)type) || (is_str_eq(err->name, type))) {
+            ex_err->state = ex_catch_st;
+            status = true;
+        }
+    }
+
+    return status;
+}
+
+RAII_INLINE bool try_finallying(ex_error_t *err, ex_context_t *ex_err) {
+    try_updating_err(err);
+    /* global context updated */
+    ex_update(ex_err->next);
+
+    return true;
 }

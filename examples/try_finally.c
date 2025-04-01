@@ -12,10 +12,10 @@ int main(int argc, char **argv) {
         div_err(1, 0);
         printf("never reached\n");
     } catch (out_of_memory) {
-        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+        printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
     } finally {
-        if (err)
-            printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
+        if (err.name)
+            printf("finally: try failed -> %s (%s:%d)\n", err.name, err.file, err.line);
         else
             printf("finally: try succeeded\n");
     } tried;

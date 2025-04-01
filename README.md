@@ -39,9 +39,9 @@ The threading model, _execution context_ provided here is nothing new, the conce
 * Various high level languages have direct compiler support for [Async/Await](https://en.wikipedia.org/wiki/Async/await),
 but don't have [work stealing](https://en.wikipedia.org/wiki/Work_stealing) in that _paradigm_.
 
-The model here mimics [Go concurrency](https://en.wikipedia.org/wiki/Go_(programming_language)#Concurrency) aka [Green thread](https://en.wikipedia.org/wiki/Green_thread) in _execution_ with follows [Cilk](https://en.wikipedia.org/wiki/Cilk) behavior.
+The model here mimics [Go concurrency](https://en.wikipedia.org/wiki/Go_(programming_language)#Concurrency) aka [Green thread](https://en.wikipedia.org/wiki/Green_thread) in _execution_ with follows [Cilk](https://en.wikipedia.org/wiki/Cilk) behavior. There are also [Weave](https://github.com/mratsim/weave) and [Lace](https://github.com/trolando/lace) both compete with **Cilk** behavior. **Weave** using [Nim programming language](https://nim-lang.org/), in which it's origins is `C`, and still compiles down to. **Lace** is `C11` base. In fact **Go** initial origins started as `C`, it's just a _matter of time_ before a [turing-complete](https://en.wikipedia.org/wiki/Turing_completeness) _understanding_ take effect, build _self_ with _self_. **It's amazing how things always come full circle**.
 
-**_Everything that follows at this point is from version `1.x`, noteing [c-coroutine repo](https://zelang-dev.github.io/c-coroutine) will be restructured/refactored for the sole purpose of integrate [libuv](https://github.com/libuv/libuv), the coroutine part to be removed._**
+**_Everything that follows at this point is from version `1.x`, noteing [c-coroutine repo](https://zelang-dev.github.io/c-coroutine) will be restructured/refactored for the sole purpose of integrating [libuv](https://github.com/libuv/libuv), the coroutine part to be removed._**
 
 ---
 
@@ -521,23 +521,55 @@ C_API void raii_deferred_clean(void);
 The full potently of **RAII** is encapsulated in the `guard` macro.
 Using `try/catch/catch_any/catch_if/finally/tried` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
 
-```c++
-try {
-    throw(division_by_zero);
-    printf("never reached\n");
-} catch_if {
-    if (caught(bad_alloc))
-        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
-    else if (caught(division_by_zero))
-        printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+Below is the **recommended pattern** for complete cross platform usage.
+System uses _native_ [Windows SEH](https://learn.microsoft.com/en-us/cpp/cpp/try-except-statement), _multiple_ `catch()` blocks not possible.
 
-    ex_backtrace(err_backtrace);
-} finally {
-    if (err)
-        printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
-    else
-        printf("finally: try succeeded\n");
-} tried;
+> NOTE: Only in **debug builds** _uncaught exceptions_ **backtrace** info is auto displayed.
+
+```c++
+#include "raii.h"
+
+static void pfree(void *p) {
+    printf("freeing protected memory pointed by '%s'\n", (char *)p);
+    free(p);
+}
+
+int main(int argc, char **argv) {
+    try {
+        int a = 1;
+        int b = 0.00000;
+        char *p = 0;
+        p = malloc_full(raii_init(), 3, pfree);
+        strcpy(p, "p");
+
+        *(int *)0 = 0;
+        printf("never reached\n");
+        printf("%d\n", (a / b));
+        raise(SIGINT);
+    } catch_if {
+        if (caught(bad_alloc))
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
+        else if (caught(division_by_zero))
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
+        else if (caught(sig_fpe))
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
+        else if (caught(sig_ill))
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
+        else if (caught(sig_int))
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
+        else if (caught(sig_segv))
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
+    } finally {
+        if (err.is_caught) {
+            printf("finally: try failed, but succeeded to catch -> %s (%s:%d)\n", err.name, err.file, err.line);
+        } else {
+            printf("finally: try failed to `catch()`\n");
+            ex_backtrace(err.backtrace);
+        }
+    } tried;
+
+    return 0;
+}
 ```
 
 The Planned C11 implementation details still holds here, but `defer` not confined to `guard` block, actual function call.

@@ -69,7 +69,7 @@ int test_rethrow_pt2(volatile int *caught_1, volatile int *finally_1) {
         raise(SIGSEGV);
     } catch (sig_segv) {
         *caught_1 = 1;
-        rethrow();
+        rethrow;
     } finally {
         *finally_1 = 1;
     } tried;
@@ -89,7 +89,7 @@ int test_rethrow(void) {
 
     try {
         test_rethrow_pt2(&caught_1, &finally_1);
-    } catch_any{
+    } catch_any {
         caught_2 = 1;
     } finally {
         finally_2 = 1;
@@ -163,20 +163,20 @@ int test_finally(void) {
     try {
     } finality {
         ran_finally = 1;
-    } tried;
+    } try_end;
     ASSERT_EQ(1, ran_finally);
 
     /* If we catch an exception, finally should run */
 
     ran_finally = 0;
-
-    try {
-        raise(SIGILL);
-    } catch (sig_ill) {
-    } finally {
-        ran_finally = 1;
-    } tried;
-
+    {
+        try {
+            raise(SIGILL);
+        } catch (sig_ill) {
+        } finally {
+            ran_finally = 1;
+        } tried;
+    }
     ASSERT_EQ(1, ran_finally);
 
     /* If we have try .. finally with no catch, the finally block
@@ -184,12 +184,13 @@ int test_finally(void) {
 
     my_caught = 0;
     ran_finally = 0;
-
-    try {
-        test_finally_pt2(&ran_finally);
-    } finality {
-        my_caught = 1;
-    } _tried;
+    {
+        try {
+            test_finally_pt2(&ran_finally);
+        } catch (sig_segv) {
+            my_caught = 1;
+        } _tried;
+    }
 
     ASSERT_EQ(true, my_caught && ran_finally);
     return 0;

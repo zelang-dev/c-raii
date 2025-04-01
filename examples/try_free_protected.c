@@ -26,7 +26,7 @@ int main(int argc, char **argv){
         printf("never reached\n");
         (void)ex_protected_p2;
     } catch_any {
-        printf("catch_any: exception %s (%s:%d) caught\n", err, err_file, err_line);
+        printf("catch_any: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
     } _tried;
 
     return 0;

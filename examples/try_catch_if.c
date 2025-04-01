@@ -13,15 +13,15 @@ int main(int argc, char **argv){
         printf("never reached\n");
     } catch_if {
         if (caught(bad_alloc)) {
-            printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
         } else if (caught(division_by_zero)) {
-            printf("catch: exception %s (%s:%d) caught\n", err, err_file, err_line);
+            printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
         }
     } finally {
-        if (err)
-            printf("finally: try failed -> %s (%s:%d)\n", err, err_file, err_line);
+        if (err.name)
+            printf("finally: try succeeded -> %s (%s:%d)\n", err.name, err.file, err.line);
         else
-            printf("finally: try succeeded\n");
+            printf("finally: try failed to `catch()`\n");
     } tried;
 
     return 0;

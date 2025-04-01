@@ -5,6 +5,8 @@ set(TARGET_LIST defer_thread
  throw_no_try
  try_catch_any
  try_catch_if
+ try_catch_if_sigsegv
+ try_catch_raise
  try_catch
  try_double_rethrow
  try_finally
