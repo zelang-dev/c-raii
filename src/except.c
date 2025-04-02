@@ -844,16 +844,13 @@ bool try_catching(string type, ex_error_t *err, ex_context_t *ex_err) {
 }
 
 RAII_INLINE bool try_finallying(ex_error_t *err, ex_context_t *ex_err) {
-#ifdef USE_TRYING
     if (err->stage == ex_final_st) {
-#endif
         try_updating_err(err);
         /* global context updated */
         ex_update(ex_err->next);
 
         return true;
-#ifdef USE_TRYING
     }
+
     return false;
-#endif
 }

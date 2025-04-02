@@ -5,8 +5,6 @@
 #define RAII_VERSION_MINOR 0
 #define RAII_VERSION_PATCH 0
 
-#define USE_TRYING
-
 #include "vector.h"
 #include "cthread.h"
 #include "catomic.h"
