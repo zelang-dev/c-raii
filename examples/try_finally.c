@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
             printf("finally: try failed -> %s (%s:%d)\n", err.name, err.file, err.line);
         else
             printf("finally: try succeeded\n");
-    } tried;
+    }
 
     return 0;
 }

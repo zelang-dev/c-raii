@@ -777,7 +777,6 @@ ex_jmp_buf *try_start(ex_stage acquire, ex_error_t *err, ex_context_t *ex_err) {
     ex_err->ex = 0;
     ex_err->unstack = 0;
     ex_err->is_rethrown = false;
-    ex_err->is_final = false;
     /* global context updated */
     ex_update(ex_err);
     /* return/save jump location */
@@ -802,17 +801,10 @@ void try_finish(ex_context_t *ex_err) {
 bool try_next(ex_error_t *err, ex_context_t *ex_err) {
     /* advance the block to the next stage */
     err->stage++;
-    const bool uncaught = (ex_err->state & ex_throw_st) != 0;
-
-    /* simple optimization: skip CATCHING stage if no exception thrown */
-    if (err->stage == ex_catch_st && (ex_err->ex == nullptr || !uncaught)) {
-        err->stage++;
-    }
 
     /* carry on until the block is DONE */
-    if (err->stage < ex_done_st) {
+    if (err->stage < ex_done_st)
         return true;
-    }
 
     try_finish(ex_err);
 
@@ -841,9 +833,16 @@ bool try_catching(string type, ex_error_t *err, ex_context_t *ex_err) {
 }
 
 RAII_INLINE bool try_finallying(ex_error_t *err, ex_context_t *ex_err) {
-    try_updating_err(err);
-    /* global context updated */
-    ex_update(ex_err->next);
+#ifdef USE_TRYING
+    if (err->stage == ex_final_st) {
+#endif
+        try_updating_err(err);
+        /* global context updated */
+        ex_update(ex_err->next);
 
-    return true;
+        return true;
+#ifdef USE_TRYING
+    }
+    return false;
+#endif
 }

@@ -163,104 +163,51 @@ typedef enum {
 #define EX_EXCEPTION(E) \
         const char EX_NAME(E)[] = EX_STR(E)
 
- /* context savings
+/* context savings
 */
 #if defined(sigsetjmp) || defined(__APPLE__) || defined(__MACH__)
-#define ex_jmp_buf  sigjmp_buf
-#define ex_setjmp(buf)  sigsetjmp(buf,1)
-#define ex_longjmp(buf,st)  siglongjmp(buf,st)
+#   define ex_jmp_buf           sigjmp_buf
+#   define ex_setjmp(buf)       sigsetjmp(buf,1)
+#   define ex_longjmp(buf,st)   siglongjmp(buf,st)
 #else
-#define ex_jmp_buf  jmp_buf
-#define ex_setjmp(buf)  setjmp(buf)
-#define ex_longjmp(buf,st)  longjmp(buf,st)
+#   define ex_jmp_buf           jmp_buf
+#   define ex_setjmp(buf)       setjmp(buf)
+#   define ex_longjmp(buf,st)   longjmp(buf,st)
 #endif
 
-#define ex_throw_loc(E, F, L, C, T)        \
+#define ex_throw_loc(E, F, L, C, T)     \
     do {                                \
         C_API const char EX_NAME(E)[];  \
-        ex_throw(EX_NAME(E), F, L, C, NULL, T);    \
+        ex_throw(EX_NAME(E), F, L, C, NULL, T); \
     } while (0)
 
 /* An macro that stops the ordinary flow of control and begins panicking,
 throws an exception of given message. */
-#define raii_panic(message)                                                     \
-    do {                                                                        \
-        C_API const char EX_NAME(panic)[];                                      \
-        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message), NULL);  \
+#define raii_panic(message)     \
+    do {                        \
+        C_API const char EX_NAME(panic)[];  \
+        ex_throw(EX_NAME(panic), __FILE__, __LINE__, __FUNCTION__, (message), NULL);    \
     } while (0)
 
 #ifdef _WIN32
-#define throw(E) raii_panic(EX_STR(E))
-#define ex_signal_block(ctrl)               \
+#define throw(E)    raii_panic(EX_STR(E))
+#define ex_signal_block(ctrl)   \
     CRITICAL_SECTION ctrl##__FUNCTION__;    \
     InitializeCriticalSection(&ctrl##__FUNCTION__); \
     EnterCriticalSection(&ctrl##__FUNCTION__);
 
-#define ex_signal_unblock(ctrl)                 \
+#define ex_signal_unblock(ctrl) \
     LeaveCriticalSection(&ctrl##__FUNCTION__);  \
     DeleteCriticalSection(&ctrl##__FUNCTION__);
-
-#define ex_try          \
-    /* local context */ \
-    ex_context_t ex_err;\
-    ex_error_t err;     \
-    ex_err.state = ex_setjmp(*try_start(ex_start_st, &err, &ex_err)); \
-    err.stage++;        \
-    if (ex_err.state == ex_try_st) \
-		__try {
-
-#define ex_catch(E)     \
-		} __except(catch_seh(EX_STR(E), GetExceptionCode(), GetExceptionInformation())) {   \
-			if (try_catching(EX_STR(E), &err, &ex_err))
-
-#define ex_finally      \
-		}   if (try_finallying(&err, &ex_err))
-
-#define ex_catch_any    \
-        } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
-			if (try_catching(nullptr, &err, &ex_err))
-
-#define ex_catch_if     \
-        } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
-			if (try_catching("_if", &err, &ex_err))
-
-#define ex_tried    {}  try_finish(&ex_err)
-#define _tried finally tried
-
-#define ex_finality     \
-        } __finally {   \
-            if (try_finallying(&err, &ex_err))
-
-#define ex_try_end  \
-        }   {}  try_finish(&ex_err)
 #else
-#define ex_signal_block(ctrl)                  \
+#define throw(E)    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__, NULL)
+#define ex_signal_block(ctrl)   \
     sigset_t ctrl##__FUNCTION__, ctrl_all##__FUNCTION__; \
-    sigfillset(&ctrl##__FUNCTION__); \
+    sigfillset(&ctrl##__FUNCTION__);    \
     pthread_sigmask(SIG_SETMASK, &ctrl##__FUNCTION__, &ctrl_all##__FUNCTION__);
 
-#define ex_signal_unblock(ctrl)                  \
+#define ex_signal_unblock(ctrl) \
     pthread_sigmask(SIG_SETMASK, &ctrl_all##__FUNCTION__, NULL);
-
-#define throw(E) \
-    ex_throw_loc(E, __FILE__, __LINE__, __FUNCTION__, NULL)
-
-#define ex_try              \
-    /* local context */     \
-    ex_context_t ex_err;    \
-    ex_error_t err;         \
-    ex_err.state = ex_setjmp(*try_start(ex_start_st, &err, &ex_err)); \
-    err.stage++;            \
-    if (ex_err.state == ex_try_st)
-
-#define ex_catch_if     if (try_catching("_if", &err, &ex_err))
-#define ex_catch_any    if (try_catching(nullptr, &err, &ex_err))
-#define ex_catch(E)     if (try_catching(EX_STR(E), &err, &ex_err))
-#define ex_finally      {} if (try_finallying(&err, &ex_err))
-#define ex_finality     ex_finally
-#define ex_tried        {} try_finish(&ex_err)
-#define _tried          tried
-#define ex_try_end      ex_tried
 #endif
 
 /* types
@@ -305,7 +252,6 @@ struct ex_context_s {
     bool is_rethrown;
     bool is_guarded;
     bool is_raii;
-    bool is_final;
     int unstack;
     int volatile caught;
 
@@ -387,58 +333,43 @@ C_API bool try_next(ex_error_t *, ex_context_t *);
     ex_context_t ex_err;    \
     ex_error_t err;         \
     for (ex_err.state = ex_setjmp(*try_start(ex_start_st, &err, &ex_err)); try_next(&err, &ex_err);)   \
-        if (try_trying(ex_err)) {   \
-            __try {
+        if (ex_err.state == ex_try_st && err.stage == ex_try_st)    \
+            __try
 
-#define ex_catching_if         \
-            } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
-                if (try_catching("_if", &err, &ex_err)) {
+#define ex_catching(E)      \
+            __except(catch_seh(EX_STR(E), GetExceptionCode(), GetExceptionInformation())) \
+                { ex_err.state = ex_throw_st; }    \
+                else if (try_catching(EX_STR(E), &err, &ex_err))
 
-#define ex_catching_any        \
-            } __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) {   \
-                if (try_catching(nullptr, &err, &ex_err)) {
+#define ex_catching_if      \
+            __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) \
+                { ex_err.state = ex_throw_st; }  \
+                else if (try_catching("_if", &err, &ex_err))
 
-#define ex_catching(E)         \
-            } __except(catch_seh(EX_STR(E), GetExceptionCode(), GetExceptionInformation())) {   \
-                if (try_catching(EX_STR(E), &err, &ex_err)) {
+#define ex_catching_any     \
+            __except(catch_filter_seh(GetExceptionCode(), GetExceptionInformation())) \
+                { ex_err.state = ex_throw_st; }  \
+                else if (try_catching(nullptr, &err, &ex_err))
 
-#define ex_finallying          \
-                }           \
-            }               \
-        } else if (try_finallying(&err, &ex_err))
+#define ex_finallying       \
+        else if (try_finallying(&err, &ex_err))
 
-#define ex_trieding            \
-                }           \
-            }               \
-        }
-
-#define ex_finalitying         \
-            } __finally { ex_err.state = ex_failed_st; } \
-        } else if (try_finallying(&err, &ex_err))
+#define ex_finalitying      \
+             __finally { err.stage = ex_throw_st; }    \
+        else if (try_finallying(&err, &ex_err))
 #else
-#define ex_trying              \
+#define ex_trying           \
     /* local context */     \
     ex_context_t ex_err;    \
     ex_error_t err;         \
     for (ex_err.state = ex_setjmp(*try_start(ex_start_st, &err, &ex_err)); try_next(&err, &ex_err);)   \
-        if (try_trying(ex_err))
+        if (ex_err.state == ex_try_st && err.stage == ex_try_st)
 
-#define ex_catching_if         \
-        else if (try_catching("_if", &err, &ex_err))
-
-#define ex_catching_any        \
-        else if (try_catching(nullptr, &err, &ex_err))
-
-#define ex_catching(E)         \
-        else if (try_catching(EX_STR(E), &err, &ex_err))
-
-#define ex_finallying          \
-        else if (try_finallying(&err, &ex_err))
-
-#define ex_finalitying  ex_finallying
-
-#define ex_trieding
-
+#define ex_catching_if      else if (try_catching("_if", &err, &ex_err))
+#define ex_catching_any     else if (try_catching(nullptr, &err, &ex_err))
+#define ex_catching(E)      else if (try_catching(EX_STR(E), &err, &ex_err))
+#define ex_finallying       else if (try_finallying(&err, &ex_err))
+#define ex_finalitying      ex_finallying
 #endif
 
 #ifdef __cplusplus

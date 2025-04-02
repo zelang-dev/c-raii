@@ -13,7 +13,7 @@ int main(int argc, char **argv){
         printf("never reached\n");
     } catch (division_by_zero) {
         printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
-    } _tried;
+    } 
 
     return 0;
 }

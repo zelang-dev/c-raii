@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
             printf("\nfinally: try failed, but succeeded to catch -> %s (%s:%d)\n\n", err.name, err.file, err.line);
         else
             printf("\nfinally: try failed to `catch()`\n");
-    } tried;
+    }
 
     return 0;
 }

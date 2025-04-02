@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
             printf("finally: try failed to `catch()`\n");
             ex_backtrace(err.backtrace);
         }
-    } tried;
+    }
 
     return 0;
 }

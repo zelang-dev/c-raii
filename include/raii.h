@@ -5,6 +5,8 @@
 #define RAII_VERSION_MINOR 0
 #define RAII_VERSION_PATCH 0
 
+#define USE_TRYING
+
 #include "vector.h"
 #include "cthread.h"
 #include "catomic.h"
@@ -349,7 +351,7 @@ are only valid between these sections.
     } finally {                                                     \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
-    }  tried;                                                             \
+    }                                                             \
     return result;                                                  \
 }
 
@@ -363,7 +365,7 @@ are only valid between these sections.
     } finally {                                 \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);         \
-    } tried;                                     \
+    }                                     \
 }
 
     /* This ends an scoped guard section, it replaces `}`.
@@ -372,7 +374,7 @@ are only valid between these sections.
 #define guarded_exception(error)                \
         } while (false);                        \
         raii_deferred_free(_$##__FUNCTION__);   \
-    } ex_catch_if {                             \
+    } catch_if {                             \
         raii_deferred_free(_$##__FUNCTION__);   \
         if (!_$##__FUNCTION__->is_recovered && raii_is_caught(_$##__FUNCTION__, raii_message_by(_$##__FUNCTION__))) { \
             ((memory_t *)error)->err = (void_t)ex_err.ex;       \
@@ -382,7 +384,7 @@ are only valid between these sections.
     } finally {                                 \
         guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);         \
-    } tried;                                     \
+    }                                     \
 }
 
 #define block(type, name, ...)          \
@@ -395,25 +397,12 @@ are only valid between these sections.
 #define blocked                         \
     guarded
 
-#ifdef USE_TRYING
-#define try ex_trying
-#define catch_any ex_catching_any
-#define catch_if ex_catching_if
-#define catch(e) ex_catching(e)
-#define finally ex_finallying
-#define finality ex_finalitying
-#define tried ex_trieding
-#else
-#define try         ex_try
-#define catch_any   ex_catch_any
-#define catch_if    ex_catch_if
-#define catch(e)    ex_catch(e)
-#define finally     ex_finally
-#define tried       ex_tried
-
-#define finality    ex_finality
-#define try_end     ex_try_end
-#endif
+#define try         ex_trying
+#define catch_any   ex_catching_any
+#define catch_if    ex_catching_if
+#define catch(e)    ex_catching(e)
+#define finally     ex_finallying
+#define finality    ex_finalitying
 
 #define caught(E) raii_caught(EX_STR(E))
 #define rethrow try_rethrow(&ex_err)

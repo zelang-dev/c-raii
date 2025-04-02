@@ -15,7 +15,7 @@ int main(int argc, char **argv){
         printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
         rethrow;
         printf("never reached\n");
-    } _tried;
+    } 
 
     return 0;
 }

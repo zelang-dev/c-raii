@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
         free(p);
     } catch_any {
         printf("catch: exception %s (%s:%d) caught\n", err.name, err.file, err.line);
-    } _tried;
+    } 
 
     return 0;
 }

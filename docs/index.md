@@ -514,7 +514,7 @@ C_API void raii_deferred_clean(void);
 ### Fully automatic memory safety, using `guard/unguarded/guarded` macro
 
 The full potently of **RAII** is encapsulated in the `guard` macro.
-Using `try/catch/catch_any/catch_if/finally/tried` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
+Using `try/catch/catch_any/catch_if/finally/finality` exception system macros separately will be unnecessary, however see [examples](https://github.com/zelang-dev/c-raii/tree/main/examples) folder for usage.
 
 Below is the **recommended pattern** for complete cross platform usage.
 System uses _native_ [Windows SEH](https://learn.microsoft.com/en-us/cpp/cpp/try-except-statement), _multiple_ `catch()` blocks not possible.
@@ -561,7 +561,7 @@ int main(int argc, char **argv) {
             printf("finally: try failed to `catch()`\n");
             ex_backtrace(err.backtrace);
         }
-    } tried;
+    }
 
     return 0;
 }
