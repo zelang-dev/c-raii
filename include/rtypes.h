@@ -260,6 +260,7 @@ typedef void (*for_func_t)(i64, i64);
 typedef void_t(*result_func_t)(void_t result, size_t id, vectors_t iter);
 typedef void_t(*thrd_func_t)(args_t);
 typedef void (*wait_func)(void);
+typedef void (*final_func_t)(values_type *);
 
 typedef struct {
     values_type value;

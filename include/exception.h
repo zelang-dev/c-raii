@@ -320,12 +320,14 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 C_API void try_rethrow(ex_context_t *);
 C_API ex_error_t *try_updating_err(ex_error_t *);
 C_API ex_jmp_buf *try_start(ex_stage, ex_error_t *, ex_context_t *);
-C_API bool try_trying(const ex_context_t);
 C_API bool try_catching(string, ex_error_t *, ex_context_t *);
 C_API bool try_finallying(ex_error_t *, ex_context_t *);
 C_API void try_finish(ex_context_t *);
-
 C_API bool try_next(ex_error_t *, ex_context_t *);
+
+/* General error handling for any condition, passing callbacks.
+Guaranteed to return `value` as ~union~, similar to https://ziglang.org/documentation/master/#try */
+C_API values_type *trying(void_t with, raii_func_t tryFunc, raii_func_t catchFunc, final_func_t finalFunc);
 
 #ifdef _WIN32
 #define ex_trying           \

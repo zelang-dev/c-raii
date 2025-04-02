@@ -812,8 +812,19 @@ bool try_next(ex_error_t *err, ex_context_t *ex_err) {
     return false;
 }
 
-RAII_INLINE bool try_trying(const ex_context_t ex_err) {
-    return ex_err.state == ex_try_st;
+values_type *trying(void_t with, raii_func_t tryFunc, raii_func_t catchFunc, final_func_t finalFunc) {
+    values_type *value = calloc_local(1, sizeof(values_type));
+    try {
+        value->object = tryFunc(with);
+    } catch_any {
+        if (catchFunc)
+            value->object = catchFunc(with);
+    } finally {
+        if (finalFunc)
+            finalFunc(value);
+    }
+
+    return value;
 }
 
 bool try_catching(string type, ex_error_t *err, ex_context_t *ex_err) {
