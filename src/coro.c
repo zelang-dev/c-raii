@@ -102,6 +102,7 @@ struct routine_s {
     signed int event_err_code;
     size_t alarm_time;
     size_t cycles;
+    u32 interrupt_timers;
     /* unique result id */
     u32 rid;
     /* unique coroutine id */
@@ -1747,6 +1748,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->is_waiting = false;
     co->is_group = false;
     co->is_group_finish = true;
+    co->interrupt_timers = 0;
     co->event_err_code = 0;
     co->cycles = 0;
     co->results = nullptr;
@@ -1940,11 +1942,16 @@ static void_t coro_wait_system(void_t v) {
 }
 
 u32 sleepfor(u32 ms) {
-    if (coro_interrupt_set)
-        return coro_interrupt_timer(ms);
-
     size_t when, now;
     routine_t *t;
+    if (coro_interrupt_set) {
+        coro_active()->interrupt_timers++;
+        now = coro_interrupt_timer(ms);
+        coro_active()->interrupt_timers--;
+        coro()->used_count--;
+        return (u32)now;
+    }
+
 
     if (!coro()->sleep_activated) {
         coro()->sleep_activated = true;
@@ -2156,7 +2163,9 @@ static void coro_transfer(raii_deque_t *queue) {
 
 static RAII_INLINE void coro_group_result_set(routine_t *co) {
     atomic_lock(&gq_result.group_lock);
-    $append_unsigned(gq_result.group_result, co->rid);
+    if (!is_empty(gq_result.group_result))
+        $append_unsigned(gq_result.group_result, co->rid);
+
     atomic_unlock(&gq_result.group_lock);
 }
 
@@ -2184,8 +2193,12 @@ static void coro_thread_waitfor(waitgroup_t wg) {
                 if (co->tid != coro()->thrd_id) {
                     continue;
                 } else if (!coro_terminated(co)) {
-                    if (!co->interrupt_active && co->status == CORO_NORMAL)
+                    if (!co->interrupt_active && co->status == CORO_NORMAL) {
                         coro_enqueue(co);
+                    } else if (co->interrupt_active && co->status == CORO_SUSPENDED) {
+                        coro_switch(co);
+                        continue;
+                    }
 
                     coro_info(c, 1);
                     coro_yielding_active();
@@ -2637,9 +2650,12 @@ waitresult_t waitfor(waitgroup_t wg) {
             atomic_flag_test_and_set(&gq_result.is_waitable);
 
         atomic_lock(&gq_result.group_lock);
-        wgr = array_of(c->scope, 0);
-        array_deferred_set(wgr, c->scope);
-        gq_result.group_result = wgr;
+        if (is_empty(gq_result.group_result)) {
+            wgr = array_of(c->scope, 0);
+            array_deferred_set(wgr, c->scope);
+            gq_result.group_result = wgr;
+        }
+
         atomic_unlock(&gq_result.group_lock);
         yielding();
 
@@ -2704,7 +2720,9 @@ waitresult_t waitfor(waitgroup_t wg) {
         c->wait_group = nullptr;
         atomic_lock(&gq_result.group_lock);
         wgr = gq_result.group_result;
-        gq_result.group_result = nullptr;
+        if (is_zero(c->interrupt_timers))
+            gq_result.group_result = nullptr;
+
         atomic_unlock(&gq_result.group_lock);
         --coro()->used_count;
         hash_free(wg);
@@ -2858,7 +2876,7 @@ RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result, ptrdiff_t
 }
 
 void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
-    if ((!is_empty(data) && co->rid != RAII_ERR) || is_plain) {
+    if (is_plain || (!is_empty(data) && co->rid != RAII_ERR)) {
         u32 id = co->rid;
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
         atomic_thread_fence(memory_order_seq_cst);
@@ -2868,7 +2886,7 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
             co->interrupt_result->valued.object = data;
 
         results[id]->result = co->interrupt_result;
-        co->results = results[id]->result->valued.object;
+        co->results = &results[id]->result->valued;
         results[id]->is_ready = true;
         atomic_store_explicit(&gq_result.results, results, memory_order_release);
     }
