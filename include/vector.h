@@ -90,7 +90,7 @@ C_API arrays_t arrays(void);
 C_API values_type get_arg(void_t);
 
 #define vectorize(vec) vectors_t vec = vector_variant()
-#define vector(vec, count, ...) vectors_t vec = vector_for(nil, count, __VA_ARGS__)
+#define vector(vec, count, ...) vectors_t vec = vector_for(nullptr, count, __VA_ARGS__)
 
 #define $push_back(vec, value) vector_push_back((vectors_t)vec, (void_t)value)
 #define $insert(vec, index, value) vector_insert((vectors_t)vec, index, (void_t)value)

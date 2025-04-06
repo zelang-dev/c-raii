@@ -9,6 +9,7 @@ set(TARGET_LIST
  test-base64
  test-bitset
  test-hashmap
+ test-linked_list
  test-swar
  test-defer
  test-exceptions

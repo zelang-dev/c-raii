@@ -173,6 +173,7 @@ typedef enum {
     RAII_MAP_STRUCT,
     RAII_MAP_ITER,
     RAII_MAP_ARR,
+    RAII_LINKED_ITER,
     RAII_ERR_PTR,
     RAII_ERR_CONTEXT,
     RAII_PROMISE,
@@ -303,7 +304,7 @@ typedef struct {
 #define nullptr NULL
 #endif
 
-#define nil nullptr
+#define nil {0}
 
 #define time_Second 1000
 #define time_Minute 60000

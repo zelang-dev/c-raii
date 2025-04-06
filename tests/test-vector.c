@@ -57,7 +57,7 @@ TEST(vector_variant) {
     ASSERT_STR("le", v[4].char_ptr);
     ASSERT_STR("monde", v[5].char_ptr);
 
-    vectors_t vec = vector_for(nil, 2, "mixed", 123);
+    vectors_t vec = vector_for(nullptr, 2, "mixed", 123);
     ASSERT_STR("mixed", vec[0].char_ptr);
     ASSERT_EQ(123, vec[1].integer);
 
