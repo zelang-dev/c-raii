@@ -5,6 +5,7 @@ static volatile bool coro_interrupt_set = false;
 static volatile sig_atomic_t can_cleanup = true;
 static call_interrupter_t coro_interrupt_loop = nullptr;
 static call_timer_t coro_interrupt_timer = nullptr;
+static call_t coro_interrupt_timer_system = nullptr;
 static call_t coro_interrupt_init = nullptr;
 static func_t coro_interrupt_shutdown = nullptr;
 static func_t coro_interrupt_send = nullptr;
@@ -1920,8 +1921,6 @@ static void coro_system(void) {
         --coro()->used_count;
         coro()->running->tid = coro()->thrd_id;
         coro()->sleep_handle = coro()->running;
-        if (coro_interrupt_set)
-            (void)coro_interrupt_timer(0);
     }
 }
 
@@ -1936,24 +1935,25 @@ static void_t coro_wait_system(void_t v) {
     else
         coro_name("coro_wait_system #%d", (int)coro()->thrd_id);
 
-    for (;;) {
-        if (!atomic_flag_load(&gq_result.is_errorless) || atomic_flag_load(&gq_result.is_finish))
-            return 0;
+    if (coro_interrupt_set && coro_interrupt_timer_system)
+        coro_interrupt_timer_system();
+    else {
+        for (;;) {
+            if (!atomic_flag_load(&gq_result.is_errorless) || atomic_flag_load(&gq_result.is_finish))
+                return 0;
 
-        /* let everyone else run */
-        while (coro_yielding_active() > 0)
-            ;
-        now = get_timer();
-        coro_info(coro_active(), 1);
-        while ((t = coro()->sleep_queue->head) && now >= t->alarm_time) {
-            coro_remove(coro()->sleep_queue, t);
-            if (!t->system && --coro()->sleeping_counted == 0)
-                coro()->used_count--;
+            /* let everyone else run */
+            while (coro_yielding_active() > 0)
+                ;
+            now = get_timer();
+            coro_info(coro_active(), 1);
+            while ((t = coro()->sleep_queue->head) && now >= t->alarm_time) {
+                coro_remove(coro()->sleep_queue, t);
+                if (!t->system && --coro()->sleeping_counted == 0)
+                    coro()->used_count--;
 
-            if (t->interrupt_timers && coro_interrupt_set && coro_interrupt_send && t->user_data)
-                coro_interrupt_send(t->user_data);
-            else
                 coro_enqueue(t);
+            }
         }
     }
 }
@@ -1962,13 +1962,18 @@ u32 sleepfor(u32 ms) {
     size_t when, now;
     routine_t *t;
 
-    if (coro_interrupt_set)
-        (void)coro_interrupt_timer(0);
-
     if (!coro()->sleep_activated) {
         coro()->sleep_activated = true;
-        create_coro(coro_wait_system, nullptr, Kb(18), CORO_RUN_SYSTEM);
+        create_coro(coro_wait_system, nullptr, (coro_interrupt_set ? Kb(64) : Kb(18)), CORO_RUN_SYSTEM);
         coro_stealer();
+    }
+
+    if (coro_interrupt_set && coro_interrupt_timer) {
+        coro_active()->interrupt_timers++;
+        now = coro_interrupt_timer(ms);
+        coro_active()->interrupt_timers--;
+        coro()->used_count--;
+        return (u32)now;
     }
 
     now = get_timer();
@@ -1999,12 +2004,7 @@ u32 sleepfor(u32 ms) {
     if (!t->system && coro()->sleeping_counted++ == 0)
         coro()->used_count++;
 
-    if (coro_interrupt_set)
-        t->interrupt_timers++;
-
     coro_switch(coro_current());
-    if (coro_interrupt_set)
-        t->interrupt_timers--;
 
     return (u32)(get_timer() - now) / 1000000;
 }
@@ -2933,15 +2933,21 @@ RAII_INLINE void coro_interrupt_switch(routine_t *co) {
 }
 
 RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
-                                      call_timer_t timerfunc, func_t shutdownfunc, func_t sendfunc) {
-    if (!coro_interrupt_set && loopfunc && perthreadfunc && timerfunc && shutdownfunc) {
+                                      call_timer_t timerfunc, func_t shutdownfunc,
+                                      func_t sendfunc, call_t systemfunc) {
+    if (!coro_interrupt_set && loopfunc && perthreadfunc && shutdownfunc) {
         coro_interrupt_set = true;
         coro_interrupt_loop = loopfunc;
         coro_interrupt_init = perthreadfunc;
-        coro_interrupt_timer = timerfunc;
         coro_interrupt_shutdown = shutdownfunc;
+        if (timerfunc)
+            coro_interrupt_timer = timerfunc;
+
         if (sendfunc)
             coro_interrupt_send = sendfunc;
+
+        if (systemfunc)
+            coro_interrupt_timer_system = systemfunc;
     }
 }
 

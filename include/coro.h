@@ -304,7 +304,9 @@ extern "C" {
     C_API void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
                                        bool use_yield, bool halted, bool use_context, bool is_plain);
-    C_API void coro_interrupt_setup(call_interrupter_t, call_t, call_timer_t, func_t, func_t);
+    C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
+                                    call_timer_t timerfunc, func_t shutdownfunc,
+                                    func_t sendfunc, call_t systemfunc);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);
 
