@@ -268,6 +268,8 @@ extern "C" {
     C_API void coro_err_set(routine_t *, signed int code);
     C_API void_t get_coro_data(routine_t *);
     C_API void coro_data_set(routine_t *, void_t data);
+    C_API void_t get_coro_timer(routine_t *co);
+    C_API void coro_timer_set(routine_t *co, void_t data);
     C_API value_t *get_coro_result(routine_t *);
     C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_info(routine_t *, int pos);
@@ -302,7 +304,7 @@ extern "C" {
     C_API void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
                                        bool use_yield, bool halted, bool use_context, bool is_plain);
-    C_API void coro_interrupt_setup(call_interrupter_t, call_t, call_timer_t, func_t);
+    C_API void coro_interrupt_setup(call_interrupter_t, call_t, call_timer_t, func_t, func_t);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);
 

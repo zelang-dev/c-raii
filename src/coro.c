@@ -7,6 +7,7 @@ static call_interrupter_t coro_interrupt_loop = nullptr;
 static call_timer_t coro_interrupt_timer = nullptr;
 static call_t coro_interrupt_init = nullptr;
 static func_t coro_interrupt_shutdown = nullptr;
+static func_t coro_interrupt_send = nullptr;
 static int coro_argc;
 static char **coro_argv;
 static void(fastcall *coro_swap)(routine_t *, routine_t *) = 0;
@@ -115,6 +116,7 @@ struct routine_s {
     u32 vg_stack_id;
 #endif
     void_t user_data;
+    void_t timer;
     void_t args;
     /* Coroutine result of function return/exit. */
     value_t *results;
@@ -1631,6 +1633,14 @@ RAII_INLINE void coro_data_set(routine_t *co, void_t data) {
     co->user_data = data;
 }
 
+RAII_INLINE void_t get_coro_timer(routine_t *co) {
+    return co->timer;
+}
+
+RAII_INLINE void coro_timer_set(routine_t *co, void_t data) {
+    co->timer = data;
+}
+
 RAII_INLINE value_t *get_coro_result(routine_t *co) {
     return co->results;
 }
@@ -1753,6 +1763,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->cycles = 0;
     co->results = nullptr;
     co->user_data = nullptr;
+    co->timer = nullptr;
     co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CORO_MAGIC_NUMBER;
@@ -1827,19 +1838,6 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     return id;
 }
 
-/* Mark the current coroutine as a ``system`` coroutine. These are ignored for the
-purposes of deciding the program is done running */
-static void coro_system(void) {
-    if (!coro()->running->system) {
-        coro()->running->system = true;
-        if (coro_is_threading())
-            atomic_fetch_sub(&gq_result.active_count, 1);
-        --coro()->used_count;
-        coro()->running->tid = coro()->thrd_id;
-        coro()->sleep_handle = coro()->running;
-    }
-}
-
 void coro_name(char *fmt, ...) {
     va_list args;
     routine_t *t = coro()->running;
@@ -1911,6 +1909,22 @@ RAII_INLINE void coro_info(routine_t *t, int pos) {
     );
 #endif
 }
+
+/* Mark the current coroutine as a ``system`` coroutine. These are ignored for the
+purposes of deciding the program is done running */
+static void coro_system(void) {
+    if (!coro()->running->system) {
+        coro()->running->system = true;
+        if (coro_is_threading())
+            atomic_fetch_sub(&gq_result.active_count, 1);
+        --coro()->used_count;
+        coro()->running->tid = coro()->thrd_id;
+        coro()->sleep_handle = coro()->running;
+        if (coro_interrupt_set)
+            (void)coro_interrupt_timer(0);
+    }
+}
+
 static void_t coro_wait_system(void_t v) {
     routine_t *t;
     size_t now;
@@ -1936,7 +1950,10 @@ static void_t coro_wait_system(void_t v) {
             if (!t->system && --coro()->sleeping_counted == 0)
                 coro()->used_count--;
 
-            coro_enqueue(t);
+            if (t->interrupt_timers && coro_interrupt_set && coro_interrupt_send && t->user_data)
+                coro_interrupt_send(t->user_data);
+            else
+                coro_enqueue(t);
         }
     }
 }
@@ -1944,14 +1961,9 @@ static void_t coro_wait_system(void_t v) {
 u32 sleepfor(u32 ms) {
     size_t when, now;
     routine_t *t;
-    if (coro_interrupt_set) {
-        coro_active()->interrupt_timers++;
-        now = coro_interrupt_timer(ms);
-        coro_active()->interrupt_timers--;
-        coro()->used_count--;
-        return (u32)now;
-    }
 
+    if (coro_interrupt_set)
+        (void)coro_interrupt_timer(0);
 
     if (!coro()->sleep_activated) {
         coro()->sleep_activated = true;
@@ -1987,7 +1999,12 @@ u32 sleepfor(u32 ms) {
     if (!t->system && coro()->sleeping_counted++ == 0)
         coro()->used_count++;
 
+    if (coro_interrupt_set)
+        t->interrupt_timers++;
+
     coro_switch(coro_current());
+    if (coro_interrupt_set)
+        t->interrupt_timers--;
 
     return (u32)(get_timer() - now) / 1000000;
 }
@@ -2267,7 +2284,8 @@ static void coro_cleanup(void) {
 
         atomic_thread_fence(memory_order_seq_cst);
         can_cleanup = false;
-        while (!coro_global_is_empty() && atomic_flag_load(&gq_result.is_errorless))
+        if (!coro()->exiting)
+            while (!coro_global_is_empty() && atomic_flag_load(&gq_result.is_errorless))
             thrd_yield();
 
         if (!is_empty(coro()->sleep_handle) && coro()->sleep_handle->magic_number == CORO_MAGIC_NUMBER) {
@@ -2347,9 +2365,9 @@ static int scheduler(void) {
                 t = nullptr;
         }
 
-        if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T) {
+        if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T || coro()->exiting) {
             if (coro()->is_main && (atomic_flag_load(&gq_result.is_finish)
-                    || !atomic_flag_load(&gq_result.is_errorless)
+                    || !atomic_flag_load(&gq_result.is_errorless) || coro()->exiting
                     || (coro_global_is_empty() && coro_sched_empty()))) {
                 coro_cleanup();
                 if (coro()->used_count > 0) {
@@ -2915,13 +2933,15 @@ RAII_INLINE void coro_interrupt_switch(routine_t *co) {
 }
 
 RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
-                                      call_timer_t timerfunc, func_t shutdownfunc) {
+                                      call_timer_t timerfunc, func_t shutdownfunc, func_t sendfunc) {
     if (!coro_interrupt_set && loopfunc && perthreadfunc && timerfunc && shutdownfunc) {
         coro_interrupt_set = true;
         coro_interrupt_loop = loopfunc;
         coro_interrupt_init = perthreadfunc;
         coro_interrupt_timer = timerfunc;
         coro_interrupt_shutdown = shutdownfunc;
+        if (sendfunc)
+            coro_interrupt_send = sendfunc;
     }
 }
 
