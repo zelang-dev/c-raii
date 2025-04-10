@@ -1952,7 +1952,10 @@ static void_t coro_wait_system(void_t v) {
                 if (!t->system && --coro()->sleeping_counted == 0)
                     coro()->used_count--;
 
-                coro_enqueue(t);
+                if (t->interrupt_timers && coro_interrupt_set && coro_interrupt_send && t->timer)
+                    coro_interrupt_send(t->timer);
+                else
+                    coro_enqueue(t);
             }
         }
     }
@@ -1966,14 +1969,6 @@ u32 sleepfor(u32 ms) {
         coro()->sleep_activated = true;
         create_coro(coro_wait_system, nullptr, (coro_interrupt_set ? Kb(64) : Kb(18)), CORO_RUN_SYSTEM);
         coro_stealer();
-    }
-
-    if (coro_interrupt_set && coro_interrupt_timer) {
-        coro_active()->interrupt_timers++;
-        now = coro_interrupt_timer(ms);
-        coro_active()->interrupt_timers--;
-        coro()->used_count--;
-        return (u32)now;
     }
 
     now = get_timer();
@@ -2004,7 +1999,16 @@ u32 sleepfor(u32 ms) {
     if (!t->system && coro()->sleeping_counted++ == 0)
         coro()->used_count++;
 
-    coro_switch(coro_current());
+    if (coro_interrupt_set)
+        coro_active()->interrupt_timers++;
+
+    if (coro_interrupt_set && coro_interrupt_timer)
+        coro_interrupt_timer(ms);
+    else
+        coro_switch(coro_current());
+
+    if (coro_interrupt_set)
+        coro_active()->interrupt_timers--;
 
     return (u32)(get_timer() - now) / 1000000;
 }
