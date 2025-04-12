@@ -286,6 +286,10 @@ extern "C" {
     /* Return handle to current coroutine. */
     C_API routine_t *coro_active(void);
 
+    /* Return handle to coroutine selected running in
+    `scheduler` aka ~thread~ before `interrupter`. */
+    C_API routine_t *coro_running(void);
+
     /* Add coroutine to queue. */
     C_API void coro_enqueue(routine_t *t);
 
@@ -306,7 +310,7 @@ extern "C" {
                                        bool use_yield, bool halted, bool use_context, bool is_plain);
     C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
                                     call_timer_t timerfunc, func_t shutdownfunc,
-                                    func_t sendfunc, call_t systemfunc);
+                                    func_t sendfunc, call_t systemfunc, call_t yieldfunc);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);
 
@@ -320,6 +324,7 @@ extern "C" {
     C_API i32 interrupt_code(void);
     C_API bits_t interrupt_bitset(void);
     C_API arrays_t interrupt_args(void);
+    C_API i32 is_interrupting(void);
 
     C_API void set_interrupt_handle(void_t);
     C_API void set_interrupt_data(void_t);

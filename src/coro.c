@@ -6,6 +6,7 @@ static volatile sig_atomic_t can_cleanup = true;
 static call_interrupter_t coro_interrupt_loop = nullptr;
 static call_timer_t coro_interrupt_timer = nullptr;
 static call_t coro_interrupt_timer_system = nullptr;
+static call_t coro_interrupt_yield = nullptr;
 static call_t coro_interrupt_init = nullptr;
 static func_t coro_interrupt_shutdown = nullptr;
 static func_t coro_interrupt_send = nullptr;
@@ -1606,6 +1607,10 @@ RAII_INLINE routine_t *coro_active(void) {
     return coro()->active_handle;
 }
 
+RAII_INLINE routine_t *coro_running(void) {
+    return coro()->running;
+}
+
 RAII_INLINE bool coro_is_valid(void) {
     return !is_coro_empty();
 }
@@ -1952,10 +1957,11 @@ static void_t coro_wait_system(void_t v) {
                 if (!t->system && --coro()->sleeping_counted == 0)
                     coro()->used_count--;
 
-                if (t->interrupt_timers && coro_interrupt_set && coro_interrupt_send && t->timer)
+                if (coro_interrupt_set && t->interrupt_timers && coro_interrupt_send && t->timer) {
                     coro_interrupt_send(t->timer);
-                else
+                } else {
                     coro_enqueue(t);
+                }
             }
         }
     }
@@ -2596,6 +2602,9 @@ void coro_stealer(void) {
 }
 
 RAII_INLINE void yielding(void) {
+    if (coro_interrupt_set && coro_interrupt_yield)
+        coro_interrupt_yield();
+
     coro_stealer();
     coro_enqueue(coro()->running);
     coro_suspend();
@@ -2938,7 +2947,7 @@ RAII_INLINE void coro_interrupt_switch(routine_t *co) {
 
 RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
                                       call_timer_t timerfunc, func_t shutdownfunc,
-                                      func_t sendfunc, call_t systemfunc) {
+                                      func_t sendfunc, call_t systemfunc, call_t yieldfunc) {
     if (!coro_interrupt_set && loopfunc && perthreadfunc && shutdownfunc) {
         coro_interrupt_set = true;
         coro_interrupt_loop = loopfunc;
@@ -2952,6 +2961,9 @@ RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthr
 
         if (systemfunc)
             coro_interrupt_timer_system = systemfunc;
+
+        if (yieldfunc)
+            coro_interrupt_yield = yieldfunc;
     }
 }
 
@@ -2981,6 +2993,10 @@ RAII_INLINE bits_t interrupt_bitset(void) {
 
 RAII_INLINE arrays_t interrupt_args(void) {
     return coro()->interrupt_args;
+}
+
+RAII_INLINE i32 is_interrupting(void) {
+    return coro()->interrupter_active;
 }
 
 RAII_INLINE void set_interrupt_handle(void_t handle) {
