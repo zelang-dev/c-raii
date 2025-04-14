@@ -28,6 +28,7 @@ typedef enum {
 typedef struct routine_s routine_t;
 typedef struct hash_s *waitgroup_t;
 typedef int (*coro_sys_func)(u32, void_t);
+typedef void (*yield_func)(routine_t *);
 typedef struct awaitable_s {
     raii_type type;
     rid_t cid;
@@ -264,12 +265,19 @@ extern "C" {
 
     C_API memory_t *coro_scope(void);
     C_API memory_t *get_coro_scope(routine_t *);
+
     C_API signed int get_coro_err(routine_t *);
     C_API void coro_err_set(routine_t *, signed int code);
+
     C_API void_t get_coro_data(routine_t *);
     C_API void coro_data_set(routine_t *, void_t data);
-    C_API void_t get_coro_timer(routine_t *co);
-    C_API void coro_timer_set(routine_t *co, void_t data);
+
+    C_API void_t get_coro_timer(routine_t *);
+    C_API void coro_timer_set(routine_t *, void_t data);
+
+    C_API void_t get_coro_yielder(routine_t *);
+    C_API void coro_yielder_set(routine_t *, void_t data);
+
     C_API value_t *get_coro_result(routine_t *);
     C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_info(routine_t *, int pos);
@@ -310,7 +318,7 @@ extern "C" {
                                        bool use_yield, bool halted, bool use_context, bool is_plain);
     C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
                                     call_timer_t timerfunc, func_t shutdownfunc,
-                                    func_t sendfunc, call_t systemfunc, call_t yieldfunc);
+                                    func_t sendfunc, call_t systemfunc, yield_func yieldfunc);
     C_API void coro_interrupt_event(func_t, void_t, func_t);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);
 
