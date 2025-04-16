@@ -1665,6 +1665,10 @@ RAII_INLINE routine_t *get_coro_context(routine_t *co) {
     return co->context;
 }
 
+RAII_INLINE void coro_context_set(routine_t *co, routine_t *t) {
+    co->context = t;
+}
+
 /* Return handle to previous coroutine. */
 static RAII_INLINE routine_t *coro_current(void) {
     return coro()->current_handle;
