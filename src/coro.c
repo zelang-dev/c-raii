@@ -565,8 +565,9 @@ static void coro_atomic_enqueue(routine_t *t) {
 
 RAII_INLINE void coro_enqueue(routine_t *t) {
     t->ready = true;
-    /* Don't add initial coroutine representing main/child thread to local `deque` run queue. */
-    if (coro_is_threading()
+    /* Don't add initial coroutine representing main/child thread to local `deque` run queue.
+    Also when flagged, a coroutine being added while system in interruption state. */
+    if (t->flagged || coro_is_threading()
         && ((coro()->is_main
              && t->run_code == CORO_RUN_MAIN && !atomic_flag_load(&gq_result.is_started))
             || (!coro()->is_main
@@ -1826,12 +1827,15 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
         else if (is_thread)
             t->tid = coro()->thrd_id;
 
+        if (is_interrupting() && t->run_code == CORO_RUN_NORMAL)
+            t->flagged = true;
+
         atomic_fetch_add(&gq_result.active_count, 1);
     } else if (t->run_code == CORO_RUN_NORMAL) {
         coro()->used_count++;
     }
 
-    if (t->run_code != CORO_RUN_NORMAL) {
+    if (t->run_code != CORO_RUN_NORMAL || t->flagged) {
         t->taken = true;
         coro()->used_count++;
     }
@@ -1854,7 +1858,7 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
         t->context = c;
     }
 
-    if (!is_group || !coro_is_threading())
+    if (!is_group || !coro_is_threading() || t->flagged)
         coro_enqueue(t);
     else
         t->ready = true;
@@ -2616,8 +2620,9 @@ void coro_stealer(void) {
 RAII_INLINE void yielding(void) {
     coro_stealer();
     if (coro_interrupt_set && coro_interrupt_yield)
-        coro_interrupt_yield(coro_active());
+        coro_interrupt_yield(coro()->running);
 
+    coro()->running->flagged = coro()->running->interrupt_active && is_interrupting();
     coro_enqueue(coro()->running);
     coro_suspend();
 }
