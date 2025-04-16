@@ -1674,11 +1674,6 @@ static RAII_INLINE routine_t *coro_current(void) {
     return coro()->current_handle;
 }
 
-/* Return coroutine executing for scheduler */
-static RAII_INLINE routine_t *coro_coroutine(void) {
-    return coro()->running;
-}
-
 static RAII_INLINE void coro_scheduler(void) {
     coro_switch(coro()->main_handle);
 }
@@ -3065,7 +3060,7 @@ RAII_INLINE void coro_unref(routine_t *t) {
 }
 
 RAII_INLINE routine_t *coro_ref_current(void) {
-    routine_t *t = coro_coroutine();
+    routine_t *t = coro_running();
     coro_ref(t);
 
     return t;
