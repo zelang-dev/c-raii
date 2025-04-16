@@ -427,6 +427,14 @@ static void coro_transfer(raii_deque_t *queue);
 static void coro_destroy(void);
 static void coro_scheduler(void);
 
+static RAII_INLINE void coro_interrupter(void) {
+    if (coro_interrupt_set) {
+        coro()->interrupter_active++;
+        coro_interrupt_loop(coro()->interrupt_handle, INTERRUPT_MODE);
+        coro()->interrupter_active--;
+    }
+}
+
 static RAII_INLINE string __itoa(int64_t number) {
     return simd_itoa(number, coro_active()->scrape);
 }
@@ -2284,14 +2292,6 @@ static void_t coro_thread_main(void_t args) {
     }
 
     return 0;
-}
-
-static RAII_INLINE void coro_interrupter(void) {
-    if (coro_interrupt_set) {
-        coro()->interrupter_active++;
-        coro_interrupt_loop(coro()->interrupt_handle, INTERRUPT_MODE);
-        coro()->interrupter_active--;
-    }
 }
 
 static void coro_cleanup(void) {
