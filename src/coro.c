@@ -529,7 +529,14 @@ static void coro_func(void) {
 
 /* Add coroutine to scheduler queue, appending. */
 static void coro_add(scheduler_t *l, routine_t *t) {
-    if (l->tail) {
+    routine_t *head = nullptr;
+    if (t->flagged && is_interrupting()) {
+        if (l->head)
+            head = l->head;
+
+        l->head = t;
+        t->next = head;
+    } else if (l->tail) {
         l->tail->next = t;
         t->prev = l->tail;
     } else {
@@ -538,7 +545,8 @@ static void coro_add(scheduler_t *l, routine_t *t) {
     }
 
     l->tail = t;
-    t->next = nullptr;
+    if (!head)
+        t->next = nullptr;
 }
 
 /* Remove coroutine from scheduler queue. */
@@ -1697,7 +1705,7 @@ static void coro_delete(routine_t *co) {
                  || co->status == CORO_EVENT_DEAD)
                && !co->exiting
                ) {
-        co->flagged = true;
+        co->event_err_code = -CORO_ERRED;
     } else {
 #ifdef USE_VALGRIND
         if (co->vg_stack_id != 0) {
@@ -2063,6 +2071,8 @@ static void coro_sched_init(bool is_main, u32 thread_id) {
     coro()->interrupt_args = nullptr;
     coro()->interrupt_data = nullptr;
     coro()->interrupt_bitset = nullptr;
+    coro()->run_queue->type = RAII_SCHED;
+    coro()->sleep_queue->type = RAII_SCHED;
 }
 
 /* Check `thread` local coroutine use count for zero. */
@@ -2503,7 +2513,14 @@ static void_t main_main(void_t v) {
         ? coro_main_func(coro_argc, coro_argv) : coro_main(coro_argc, coro_argv);
 
     if (is_interrupting()) {
-        coro()->used_count -= (coro()->interrupter_active + (atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) == 0 && coro()->sleeping_counted == 0));
+        int count = (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed);
+        if (!coro()->exiting && coro()->used_count > count) {
+            coro()->used_count -= is_interrupting();
+            coro()->used_count -= coro()->sleeping_counted == 0;
+            atomic_fetch_sub(&gq_result.active_count, coro()->used_count);
+            if (coro()->used_count && coro()->used_count == count)
+                coro()->used_count -= count;
+        }
     }
 
     return 0;
@@ -2622,7 +2639,7 @@ RAII_INLINE void yielding(void) {
     if (coro_interrupt_set && coro_interrupt_yield)
         coro_interrupt_yield(coro()->running);
 
-    coro()->running->flagged = coro()->running->interrupt_active && is_interrupting();
+    //coro()->running->flagged = coro()->running->interrupt_active && is_interrupting();
     coro_enqueue(coro()->running);
     coro_suspend();
 }
