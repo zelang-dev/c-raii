@@ -639,7 +639,7 @@ RAII_INLINE bool is_guard(void_t self) {
 }
 
 RAII_INLINE bool is_type(void_t self, raii_type check) {
-    return type_of(self) == check;
+    return !is_empty(self) && type_of(self) == check;
 }
 
 RAII_INLINE bool is_inaccessible(void_t self) {

@@ -257,6 +257,9 @@ extern "C" {
     /* Check ~ptr~ and `free` using it's matching `type_of` ~cleanup~ function. */
     C_API void delete(void_t ptr);
 
+    C_API bool is_coroutine(void_t ptr);
+    C_API void coro_flag_set(routine_t *co);
+
     /* Collect coroutines with references preventing immediate cleanup. */
     C_API void coro_gc(routine_t *);
     C_API routine_t *coro_ref_current(void);
@@ -309,7 +312,6 @@ extern "C" {
     to start there execution, and assign coroutines. */
     C_API void coro_stealer(void);
 
-    C_API value_t coro_await(callable_t, size_t, ...);
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);
     C_API void coro_interrupt_switch(routine_t *);
@@ -318,9 +320,10 @@ extern "C" {
     C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
                                        bool use_yield, bool halted, bool use_context, bool is_plain);
     C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
-                                    call_timer_t timerfunc, func_t shutdownfunc,
-                                    func_t sendfunc, call_t systemfunc, yield_func yieldfunc);
-    C_API void coro_interrupt_event(func_t, void_t, func_t);
+                                    func_t shutdownfunc, call_timer_t timerfunc,
+                                    yield_func yieldfunc, call_t systemfunc);
+    C_API routine_t *coro_interrupt_event(func_t, void_t, func_t);
+    C_API routine_t *coro_interrupt_process(func_t fn, void_t handle);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);
 
     /* Check for coroutine completetion. */
@@ -335,11 +338,11 @@ extern "C" {
     C_API arrays_t interrupt_args(void);
     C_API i32 is_interrupting(void);
 
-    C_API void set_interrupt_handle(void_t);
-    C_API void set_interrupt_data(void_t);
-    C_API void set_interrupt_code(i32);
-    C_API void set_interrupt_bitset(bits_t);
-    C_API void set_interrupt_args(arrays_t);
+    C_API void interrupt_handle_set(void_t);
+    C_API void interrupt_data_set(void_t);
+    C_API void interrupt_code_set(i32);
+    C_API void interrupt_bitset_set(bits_t);
+    C_API void interrupt_args_set(arrays_t);
 
     /* Print `current` coroutine internal data state, only active in `debug` builds. */
     C_API void coro_info_active(void);

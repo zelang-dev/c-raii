@@ -23,8 +23,8 @@ struct linked_s {
     raii_type item_type;
     doubly_t prev;
     doubly_t next;
-    doubly_t first;
-    doubly_t last;
+    doubly_t head;
+    doubly_t tail;
     size_t count;
     value_t value[1];
 };
