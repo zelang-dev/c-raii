@@ -2007,16 +2007,15 @@ static void_t coro_wait_system(void_t v) {
     }
 }
 
-u32 add_timeout(routine_t *running, routine_t *co, u32 ms) {
+u32 add_timeout(routine_t *running, routine_t *context, u32 ms) {
     size_t when, now;
-    routine_t *t, *context;
+    routine_t *t;
 
     now = get_timer();
     when = now + (size_t)ms * 1000000;
     for (t = coro()->sleep_queue->head; !is_empty(t) && t->alarm_time < when; t = t->next)
         ;
 
-    context = (running != co) ? co : running;
     if (t) {
         context->prev = t->prev;
         context->next = t;
