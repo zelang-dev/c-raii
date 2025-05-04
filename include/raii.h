@@ -112,6 +112,7 @@ struct raii_results_s {
     atomic_flag is_finish;
     atomic_flag is_started;
     atomic_flag is_waitable;
+    atomic_flag is_disabled;
 
     /* track the number of global coroutines active/available */
     atomic_size_t active_count;

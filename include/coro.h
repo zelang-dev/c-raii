@@ -22,6 +22,7 @@ typedef enum {
     CORO_RUN_THRD,
     CORO_RUN_SYSTEM,
     CORO_RUN_EVENT,
+    CORO_RUN_INTERRUPT,
     CORO_RUN_ASYNC,
 } run_mode;
 
@@ -302,6 +303,8 @@ extern "C" {
     `scheduler` aka ~thread~ before `interrupter`. */
     C_API routine_t *coro_running(void);
 
+    C_API routine_t *coro_sleeping(void);
+
     /* Add coroutine to queue. */
     C_API void coro_enqueue(routine_t *t);
 
@@ -331,6 +334,7 @@ extern "C" {
     C_API void coro_halt_set(routine_t *);
     C_API void coro_halt_clear(routine_t *);
 
+    C_API void interrupt_launch(callable_t fn, u64 num_of_args, ...);
     C_API void_t interrupt_handle(void);
     C_API void_t interrupt_data(void);
     C_API i32 interrupt_code(void);

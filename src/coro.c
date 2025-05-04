@@ -132,7 +132,6 @@ struct routine_s {
     waitgroup_t event_group;
     routine_t *context;
     char name[64];
-    char state[64];
     char scrape[SCRAPE_SIZE];
 };
 
@@ -532,17 +531,14 @@ static void coro_before(scheduler_t *l, routine_t *head, routine_t *t) {
         routine_t *prev = head->prev;
         t->prev = prev;
         prev->next = t;
-        l->head = t;
     } else {
-        if (l->tail) {
+        if (l->tail)
             l->tail->next = t;
-            t->prev = l->tail;
-        } else {
-            t->prev = nullptr;
-        }
-        l->head = t;
+
+        t->prev = l->tail;
     }
 
+    l->head = t;
     l->tail = t;
 }
 
@@ -1653,6 +1649,10 @@ RAII_INLINE routine_t *coro_running(void) {
     return coro()->running;
 }
 
+RAII_INLINE routine_t *coro_sleeping(void) {
+    return coro()->sleep_handle;
+}
+
 RAII_INLINE bool coro_is_valid(void) {
     return !is_coro_empty();
 }
@@ -1833,7 +1833,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
 and startup type: `CORO_RUN_NORMAL`, `CORO_RUN_MAIN`, `CORO_RUN_SYSTEM`, `CORO_RUN_EVENT`. */
 static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     u32 id;
-    bool is_assigning, is_thread, is_group;
+    bool is_assigning, is_thread, is_group, not_resultable;
     routine_t *t = coro_create(stack, fn, arg);
     routine_t *c = coro_active();
 
@@ -1842,7 +1842,9 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     else
         t->run_code = code;
 
-    if (t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_SYSTEM)
+    not_resultable = t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_SYSTEM
+        || t->run_code == CORO_RUN_INTERRUPT;
+    if (not_resultable)
         t->rid = RAII_ERR;
     else
         t->rid = (u32)raii_result_create()->id;
@@ -1852,7 +1854,7 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     is_group = c->wait_active && !is_empty(c->wait_group) && !c->is_group_finish;
     if (coro_is_threading()) {
         is_assigning = coro_sched_is_assignable(atomic_load_explicit(&gq_result.active_count, memory_order_relaxed));
-        is_thread = t->run_code == CORO_RUN_THRD || t->run_code == CORO_RUN_SYSTEM || t->run_code == CORO_RUN_MAIN;
+        is_thread = not_resultable || t->run_code == CORO_RUN_MAIN;
         if ((is_group || is_assigning) && !is_thread)
             t->tid = atomic_fetch_add(&gq_result.queue->cpu_id_count, 1) % gq_result.thread_count;
         else if (is_thread)
@@ -1905,23 +1907,12 @@ void coro_name(char *fmt, ...) {
     va_end(args);
 }
 
-/* Sets the current coroutine's state name.*/
-static void coro_set_state(char *fmt, ...) {
-    va_list args;
-    routine_t *t = coro()->running;
-    va_start(args, fmt);
-    vsnprintf(t->state, sizeof t->name, fmt, args);
-    va_end(args);
-}
-
 /* The current coroutine will be scheduled again once all the
 other currently-ready coroutines have a chance to run. Returns
 the number of other tasks that ran while the current task was waiting. */
 static int coro_yielding_active(void) {
     int n = coro()->num_others_ran;
-    coro_set_state("yielded");
     yielding();
-    coro_set_state("running");
     return coro()->num_others_ran - n - 1;
 }
 
@@ -2016,30 +2007,25 @@ static void_t coro_wait_system(void_t v) {
     }
 }
 
-u32 sleepfor(u32 ms) {
+u32 add_timeout(routine_t *running, routine_t *co, u32 ms) {
     size_t when, now;
-    routine_t *t;
-
-    if (!coro()->sleep_activated) {
-        coro()->sleep_activated = true;
-        create_coro(coro_wait_system, nullptr, (coro_interrupt_set ? Kb(64) : Kb(18)), CORO_RUN_SYSTEM);
-        coro_stealer();
-    }
+    routine_t *t, *context;
 
     now = get_timer();
     when = now + (size_t)ms * 1000000;
     for (t = coro()->sleep_queue->head; !is_empty(t) && t->alarm_time < when; t = t->next)
         ;
 
+    context = (running != co) ? co : running;
     if (t) {
-        coro()->running->prev = t->prev;
-        coro()->running->next = t;
+        context->prev = t->prev;
+        context->next = t;
     } else {
-        coro()->running->prev = coro()->sleep_queue->tail;
-        coro()->running->next = nullptr;
+        context->prev = coro()->sleep_queue->tail;
+        context->next = nullptr;
     }
 
-    t = coro()->running;
+    t = context;
     t->alarm_time = when;
     if (t->prev)
         t->prev->next = t;
@@ -2051,8 +2037,26 @@ u32 sleepfor(u32 ms) {
     else
         coro()->sleep_queue->tail = t;
 
-    if (!t->system && coro()->sleeping_counted++ == 0)
+    if (!running->system && coro()->sleeping_counted++ == 0)
         coro()->used_count++;
+
+    return now;
+}
+
+u32 sleepfor(u32 ms) {
+    size_t when, now;
+    routine_t *t;
+
+    if (!coro()->sleep_activated) {
+        coro()->sleep_activated = true;
+        create_coro(coro_wait_system, nullptr, Kb(18), CORO_RUN_SYSTEM);
+        coro_stealer();
+    }
+
+    if (coro_interrupt_set && is_interrupting())
+        now = add_timeout(coro()->running, coro_active(), ms);
+    else
+        now = add_timeout(coro()->running, coro()->running, ms);
 
     if (coro_interrupt_set)
         coro_active()->interrupt_timers++;
@@ -2236,6 +2240,8 @@ static void coro_transfer(raii_deque_t *queue) {
                 }
             }
         }
+
+        atomic_flag_test_and_set(&gq_result.is_disabled);
     }
 }
 
@@ -2571,6 +2577,7 @@ static void coro_initialize(void) {
         atomic_flag_clear(&gq_result.is_finish);
         atomic_flag_clear(&gq_result.is_started);
         atomic_flag_clear(&gq_result.is_waitable);
+        atomic_flag_clear(&gq_result.is_disabled);
         atomic_flag_test_and_set(&gq_result.is_errorless);
 #if defined(_WIN32)
         QueryPerformanceFrequency(&gq_result.timer);
@@ -2654,8 +2661,9 @@ RAII_INLINE void yielding(void) {
     coro_stealer();
     if (coro_interrupt_set && coro_interrupt_yield)
         coro_interrupt_yield(coro()->running);
+    else
+        coro_enqueue(coro()->running);
 
-    coro_enqueue(coro()->running);
     coro_suspend();
 }
 
@@ -2999,6 +3007,17 @@ RAII_INLINE void coro_halt_set(routine_t *co) {
 
 RAII_INLINE void coro_halt_clear(routine_t *co) {
     co->halt = false;
+}
+
+void interrupt_launch(callable_t fn, u64 num_of_args, ...) {
+    va_list ap;
+
+    va_start(ap, num_of_args);
+    params_t params = array_ex(coro_scope(), num_of_args, ap);
+    va_end(ap);
+
+    create_coro((raii_func_t)fn, params, CORO_STACK_SIZE, CORO_RUN_INTERRUPT);
+    yielding();
 }
 
 RAII_INLINE void_t interrupt_handle(void) {
