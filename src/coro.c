@@ -2936,11 +2936,13 @@ RAII_INLINE routine_t *coro_interrupt_process(func_t fn, void_t handle) {
     return coro_interrupt_event(fn, handle, nullptr);
 }
 
-RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain) {
+RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain, bool is_returning) {
     co->halt = true;
     coro_interrupt_result(co, result, plain, is_plain);
     coro_interrupt_switch(co->context);
-    coro_scheduler();
+
+    if (is_returning)
+        coro_scheduler();
 }
 
 void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
@@ -2961,7 +2963,8 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
 }
 
 RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                          bool use_yield, bool halted, bool use_context, bool is_plain) {
+                                         bool use_yield, bool halted, bool use_context,
+                                         bool is_plain, bool is_returning) {
     co->halt = halted;
     coro_interrupt_result(co, result, plain, is_plain);
     if (use_context)
@@ -2969,7 +2972,8 @@ RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t
     else if (use_yield)
         coro_switch(co);
 
-    coro_scheduler();
+    if (is_returning)
+        coro_scheduler();
 }
 
 RAII_INLINE void coro_interrupt_waitgroup_destroy(routine_t *co) {
@@ -3016,7 +3020,7 @@ void interrupt_launch(callable_t fn, u64 num_of_args, ...) {
     params_t params = array_ex(coro_scope(), num_of_args, ap);
     va_end(ap);
 
-    create_coro((raii_func_t)fn, params, CORO_STACK_SIZE, CORO_RUN_INTERRUPT);
+    create_coro((raii_func_t)fn, params, Kb(16), CORO_RUN_INTERRUPT);
     yielding();
 }
 

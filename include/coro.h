@@ -318,10 +318,12 @@ extern "C" {
     C_API value_t coro_interrupt(callable_t, size_t, ...);
     C_API void_t coro_interrupt_erred(routine_t *, int);
     C_API void coro_interrupt_switch(routine_t *);
-    C_API void coro_interrupt_complete(routine_t *, void_t result, ptrdiff_t plain, bool is_plain);
+    C_API void coro_interrupt_complete(routine_t *, void_t result, ptrdiff_t plain,
+                                       bool is_plain, bool is_returning);
     C_API void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain);
     C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                       bool use_yield, bool halted, bool use_context, bool is_plain);
+                                       bool use_yield, bool halted, bool use_context,
+                                       bool is_plain, bool is_returning);
     C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
                                     func_t shutdownfunc, call_timer_t timerfunc,
                                     yield_func yieldfunc, call_t systemfunc);
