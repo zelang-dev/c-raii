@@ -2052,10 +2052,12 @@ u32 sleepfor(u32 ms) {
         coro_stealer();
     }
 
-    if (coro_interrupt_set && is_interrupting())
-        now = add_timeout(coro()->running, coro_active(), ms);
-    else
-        now = add_timeout(coro()->running, coro()->running, ms);
+    if (!coro_interrupt_timer_system) {
+        if (coro_interrupt_set && is_interrupting())
+            now = add_timeout(coro()->running, coro_active(), ms);
+        else
+            now = add_timeout(coro()->running, coro()->running, ms);
+    }
 
     if (coro_interrupt_set)
         coro_active()->interrupt_timers++;
