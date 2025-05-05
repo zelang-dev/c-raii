@@ -1860,7 +1860,7 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
         else if (is_thread)
             t->tid = coro()->thrd_id;
 
-        if (is_interrupting() && t->run_code == CORO_RUN_NORMAL)
+        if (t->run_code == CORO_RUN_NORMAL && coro_interrupt_set && coro_interrupt_yield)
             t->flagged = true;
 
         atomic_fetch_add(&gq_result.active_count, 1);
