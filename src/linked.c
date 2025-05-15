@@ -10,35 +10,35 @@ RAII_INLINE doubly_t doubly_create(void) {
     return (doubly_t)calloc_local(1, sizeof(linked_t));
 }
 
-RAII_INLINE void link_insert_after(linked_t *list, doubly_t existing_node, doubly_t new_node) {
-    new_node->prev = existing_node;
-    if (existing_node->next) {
-        doubly_t next_node = existing_node->next;
+RAII_INLINE void link_insert_after(linked_t *list, doubly_t existing, doubly_t new) {
+    new->prev = existing;
+    if (existing->next) {
+        doubly_t next = existing->next;
         // Intermediate node.
-        new_node->next = next_node;
-        next_node->prev = new_node;
+        new->next = next;
+        next->prev = new;
     } else {
         // Last element of the list.
-        new_node->next = nullptr;
-        list->tail = new_node;
+        new->next = nullptr;
+        list->tail = new;
     }
-    existing_node->next = new_node;
+    existing->next = new;
     list->count++;
 }
 
-RAII_INLINE void link_insert_before(linked_t *list, doubly_t existing_node, doubly_t new_node) {
-    new_node->next = existing_node;
-    if (existing_node->prev) {
-        doubly_t prev_node = existing_node->prev;
+RAII_INLINE void link_insert_before(linked_t *list, doubly_t existing, doubly_t new) {
+    new->next = existing;
+    if (existing->prev) {
+        doubly_t prev = existing->prev;
         // Intermediate node.
-        new_node->prev = prev_node;
-        prev_node->next = new_node;
+        new->prev = prev;
+        prev->next = new;
     } else {
         // First element of the list.
-        new_node->prev = nullptr;
-        list->head = new_node;
+        new->prev = nullptr;
+        list->head = new;
     }
-    existing_node->prev = new_node;
+    existing->prev = new;
     list->count++;
 }
 
@@ -64,46 +64,46 @@ RAII_INLINE void link_concat(linked_t *list1, linked_t *list2) {
     list2->count = 0;
 }
 
-RAII_INLINE void link_prepend(linked_t *list, doubly_t new_node) {
+RAII_INLINE void link_prepend(linked_t *list, doubly_t new) {
     if (list->head) {
         linked_t *head = list->head;
         // Insert before head.
-        link_insert_before(list, head, new_node);
+        link_insert_before(list, head, new);
     } else {
         // Empty list.
-        list->head = new_node;
-        list->tail = new_node;
-        new_node->prev = nullptr;
-        new_node->next = nullptr;
+        list->head = new;
+        list->tail = new;
+        new->prev = nullptr;
+        new->next = nullptr;
         list->count++;
     }
 }
 
-RAII_INLINE void link_append(linked_t *list, doubly_t new_node) {
+RAII_INLINE void link_append(linked_t *list, doubly_t new) {
     if (list->tail) {
         linked_t *tail = list->tail;
         // Insert after tail.
-        link_insert_after(list, tail, new_node);
+        link_insert_after(list, tail, new);
     } else {
         // Empty list.
-       link_prepend(list, new_node);
+       link_prepend(list, new);
     }
 }
 
 RAII_INLINE void link_remove(linked_t *list, doubly_t node) {
     if (node->prev) {
-        linked_t *prev_node = node->prev;
+        linked_t *prev = node->prev;
         // Intermediate node.
-        prev_node->next = node->next;
+        prev->next = node->next;
     } else {
         // First element of the list.
         list->head = node->next;
     }
 
     if (node->next) {
-        linked_t *next_node = node->next;
+        linked_t *next = node->next;
         // Intermediate node.
-        next_node->prev = node->prev;
+        next->prev = node->prev;
     } else {
         // Last element of the list.
         list->tail = node->prev;

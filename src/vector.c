@@ -319,6 +319,18 @@ RAII_INLINE void array_append(arrays_t arr, void_t value) {
     vector_set_size(arr, vector_length(arr) + 1);
 }
 
+RAII_INLINE value_t array_pop(arrays_t arr) {
+    size_t sz = vector_length(arr);
+    if (sz > 0) {
+        value_t val = arr[sz - 1];
+        array_remove(arr, sz - 1);
+
+        return val;
+    }
+
+    return raii_values_empty->valued;
+}
+
 void array_append_item(arrays_t arr, ...) {
     va_list ap;
     raii_type n = RAII_ERR;

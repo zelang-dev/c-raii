@@ -30,8 +30,8 @@ struct linked_s {
 };
 
 C_API doubly_t doubly_create(void);
-C_API void link_insert_after(linked_t *list, doubly_t existing_node, doubly_t new_node);
-C_API void link_insert_before(linked_t *list, doubly_t existing_node, doubly_t new_node);
+C_API void link_insert_after(linked_t *list, doubly_t, doubly_t);
+C_API void link_insert_before(linked_t *list, doubly_t, doubly_t);
 
 // Concatenate list2 onto the end of list1, removing all entries from the former.
 //
@@ -43,20 +43,20 @@ C_API void link_concat(linked_t *list1, linked_t *list2);
 // Insert a new node at the beginning of the list.
 //
 // Arguments:
-//     new_node: Pointer to the new node to insert.
-C_API void link_prepend(linked_t *list, doubly_t new_node);
+//     new: Pointer to the new node to insert.
+C_API void link_prepend(linked_t *list, doubly_t);
 
 // Insert a new node at the end of the list.
 //
 // Arguments:
-//     new_node: Pointer to the new node to insert.
-C_API void link_append(linked_t *list, doubly_t new_node);
+//     new: Pointer to the new node to insert.
+C_API void link_append(linked_t *list, doubly_t);
 
 // Remove a node from the list.
 //
 // Arguments:
 //     node: Pointer to the node to be removed.
-C_API void link_remove(linked_t *list, doubly_t node);
+C_API void link_remove(linked_t *list, doubly_t);
 
 // Remove and return the last node in the list.
 //

@@ -727,3 +727,11 @@ bool is_equal_ex(void_t mem, void_t mem2) {
     }
     return memcmp(mem, mem2, len) == 0;
 }
+
+RAII_INLINE bool raii_is_exiting(void) {
+    return !atomic_flag_load(&gq_result.is_errorless) || atomic_flag_load(&gq_result.is_finish);
+}
+
+RAII_INLINE bool raii_is_running(void) {
+    return atomic_flag_load(&gq_result.is_errorless) && !atomic_flag_load(&gq_result.is_finish);
+}

@@ -4,7 +4,6 @@ static volatile bool thrd_queue_set = false;
 static volatile bool coro_interrupt_set = false;
 static volatile bool coro_threading_enabled = true;
 static volatile sig_atomic_t can_cleanup = true;
-static yield_func coro_interrupt_yield = nullptr;
 static call_interrupter_t coro_interrupt_loop = nullptr;
 static call_timer_t coro_interrupt_timer = nullptr;
 static call_t coro_interrupt_timer_system = nullptr;
@@ -119,7 +118,6 @@ struct routine_s {
 #endif
     void_t user_data;
     void_t timer;
-    void_t yielder;
     void_t args;
     /* Coroutine result of function return/exit. */
     value_t *results;
@@ -524,30 +522,48 @@ static void coro_func(void) {
     coro_done(); /* called only if coroutine function returns */
 }
 
-/* Add coroutine to scheduler queue, prepending. */
-static void coro_before(scheduler_t *l, routine_t *head, routine_t *t) {
-    t->next = head;
-    if (!is_empty(head) && head->prev) {
-        routine_t *prev = head->prev;
-        t->prev = prev;
-        prev->next = t;
+/* Add coroutine to scheduler queue, try prepending. */
+static void coro_insert(scheduler_t *l, routine_t *t) {
+    routine_t *head = l->head, *tail = l->tail;
+    if (head) {
+        t->next = head;
+        if (head->prev) {
+            routine_t *prev = head->prev;
+            t->prev = prev;
+            prev->next = t;
+        } else {
+            if (tail->next) {
+                routine_t *next = tail->next;
+                t->prev = next;
+                next->prev = t;
+                l->tail = t;
+            }
+            l->head = t;
+        }
+        head->prev = t;
+    } else if (tail) {
+        t->prev = tail;
+        if (tail->next) {
+            routine_t *next = tail->next;
+            t->next = next;
+            next->prev = t;
+        } else {
+            l->tail = t;
+        }
+        tail->next = t;
     } else {
-        if (l->tail)
-            l->tail->next = t;
-
-        t->prev = l->tail;
+        t->next = head;
+        t->prev = tail;
+        l->head = t;
+        l->tail = t;
     }
-
-    l->head = t;
-    l->tail = t;
 }
 
 /* Add coroutine to scheduler queue, appending. */
 static void coro_add(scheduler_t *l, routine_t *t) {
-    bool flagged = false;
-    if ((t->flagged && is_interrupting()) || t->timer) {
-        flagged = true;
-        coro_before(l, l->head, t);
+    if (t->flagged && is_interrupting()) {
+        coro_insert(l, t);
+        return;
     } else if (l->tail) {
         l->tail->next = t;
         t->prev = l->tail;
@@ -556,10 +572,8 @@ static void coro_add(scheduler_t *l, routine_t *t) {
         t->prev = nullptr;
     }
 
-    if (!flagged) {
-        l->tail = t;
-        t->next = nullptr;
-    }
+    l->tail = t;
+    t->next = nullptr;
 }
 
 /* Remove coroutine from scheduler queue. */
@@ -588,7 +602,7 @@ RAII_INLINE void coro_enqueue(routine_t *t) {
     t->ready = true;
     /* Don't add initial coroutine representing main/child thread to local `deque` run queue.
     Also when flagged, a coroutine being added while system in interruption state. */
-    if (t->timer || t->flagged || !coro_is_threading() || coro_is_threading()
+    if (t->flagged || !coro_is_threading() || coro_is_threading()
         && ((coro()->is_main
              && t->run_code == CORO_RUN_MAIN && !atomic_flag_load(&gq_result.is_started))
             || (!coro()->is_main
@@ -1689,14 +1703,6 @@ RAII_INLINE void coro_timer_set(routine_t *co, void_t data) {
     co->timer = data;
 }
 
-RAII_INLINE void_t get_coro_yielder(routine_t *co) {
-    return co->yielder;
-}
-
-RAII_INLINE void coro_yielder_set(routine_t *co, void_t data) {
-    co->yielder = data;
-}
-
 RAII_INLINE value_t *get_coro_result(routine_t *co) {
     return co->results;
 }
@@ -1819,7 +1825,6 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->results = nullptr;
     co->user_data = nullptr;
     co->timer = nullptr;
-    co->yielder = nullptr;
     co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CORO_MAGIC_NUMBER;
@@ -1860,7 +1865,7 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
         else if (is_thread)
             t->tid = coro()->thrd_id;
 
-        if (t->run_code == CORO_RUN_NORMAL && coro_interrupt_set && coro_interrupt_yield)
+        if (t->run_code == CORO_RUN_NORMAL && is_interrupting())
             t->flagged = true;
 
         atomic_fetch_add(&gq_result.active_count, 1);
@@ -1984,13 +1989,10 @@ static void_t coro_wait_system(void_t v) {
     else
         coro_name("coro_wait_system #%d", (int)coro()->thrd_id);
 
-    if (coro_interrupt_set && coro_interrupt_timer_system)
+    if (coro_interrupt_set && coro_interrupt_timer_system) {
         coro_interrupt_timer_system();
-    else {
-        for (;;) {
-            if (!atomic_flag_load(&gq_result.is_errorless) || atomic_flag_load(&gq_result.is_finish))
-                return 0;
-
+    } else {
+        while (raii_is_running()) {
             /* let everyone else run */
             while (coro_yielding_active() > 0)
                 ;
@@ -2005,6 +2007,8 @@ static void_t coro_wait_system(void_t v) {
             }
         }
     }
+
+    return 0;
 }
 
 u32 add_timeout(routine_t *running, routine_t *context, u32 ms) {
@@ -2036,15 +2040,14 @@ u32 add_timeout(routine_t *running, routine_t *context, u32 ms) {
     else
         coro()->sleep_queue->tail = t;
 
-    if (!running->system && coro()->sleeping_counted++ == 0)
+    if ((!running->system || !context->system) && coro()->sleeping_counted++ == 0)
         coro()->used_count++;
 
     return now;
 }
 
 u32 sleepfor(u32 ms) {
-    size_t when, now;
-    routine_t *t;
+    size_t now;
 
     if (!coro()->sleep_activated) {
         coro()->sleep_activated = true;
@@ -2053,10 +2056,7 @@ u32 sleepfor(u32 ms) {
     }
 
     if (!coro_interrupt_timer_system) {
-        if (coro_interrupt_set && is_interrupting())
-            now = add_timeout(coro()->running, coro_active(), ms);
-        else
-            now = add_timeout(coro()->running, coro()->running, ms);
+        now = add_timeout(coro()->running, (is_interrupting() ? coro_active() : coro()->running), ms);
     }
 
     if (coro_interrupt_set)
@@ -2190,7 +2190,7 @@ and transfer all to main/process thread.
 This is done at initial startup, only if not enough useful work available for threading. */
 static void coro_transfer(raii_deque_t *queue) {
     routine_t *t = nullptr;
-    kv_pair_t *pair = nullptr;
+    hash_pair_t *pair = nullptr;
     raii_deque_t *q = nullptr;
     waitgroup_t wg = coro_active()->wait_group;
     size_t available, i, cap, count = 0;
@@ -2198,10 +2198,7 @@ static void coro_transfer(raii_deque_t *queue) {
         if (!is_empty(wg)) {
             cap = hash_capacity(wg);
             for (i = 0; i < cap; i++) {
-                pair = hash_buckets(wg, i);
-                if (!is_empty(pair) && !is_empty(pair->extended)
-                    && !is_empty(pair->extended->object)) {
-                    t = (routine_t *)pair->extended->object;
+                if (t = ((routine_t *)hash_pair_value(pair = hash_buckets(wg, i)).object)) {
                     if (t->system) {
                         t->taken = true;
                         coro()->sleep_handle = t;
@@ -2256,8 +2253,8 @@ static RAII_INLINE void coro_group_result_set(routine_t *co) {
 
 static void coro_thread_waitfor(waitgroup_t wg) {
     routine_t *co, *c = coro_active();
-    kv_pair_t *pair = nullptr;
-    void_t key = nullptr;
+    hash_pair_t *pair = nullptr;
+    string_t key = nullptr;
     u32 cap, i, group_capacity = coro()->group_count;
     coro()->group_count = 0;
     bool has_completed = false;
@@ -2270,11 +2267,8 @@ static void coro_thread_waitfor(waitgroup_t wg) {
                 break;
             }
 
-            pair = hash_buckets(wg, i);
-            if (!is_empty(pair) && !is_empty(pair->extended)
-                && !is_empty(pair->extended->object)) {
-                co = (routine_t *)pair->extended->object;
-                key = pair->key;
+            if (co = ((routine_t *)hash_pair_value(pair = hash_buckets(wg, i)).object)) {
+                key = hash_pair_key(pair);
                 if (co->tid != coro()->thrd_id) {
                     continue;
                 } else if (!coro_terminated(co)) {
@@ -2319,7 +2313,7 @@ static void_t coro_thread_main(void_t args) {
     if (atomic_flag_load(&gq_result.is_waitable) && !atomic_flag_load(&queue->taken))
         coro_take(queue, true);
 
-    while (!coro_sched_empty() && atomic_flag_load(&gq_result.is_errorless) && !atomic_flag_load(&gq_result.is_finish)) {
+    while (!coro_sched_empty() && raii_is_running()) {
         if (!is_empty(queue->grouped) && coro()->group_count > 0) {
             grouped = queue->grouped;
             queue->grouped = nullptr;
@@ -2423,8 +2417,7 @@ static int scheduler(void) {
         }
 
         if (coro_sched_empty() || !coro_sched_active() || t == RAII_EMPTY_T || coro()->exiting) {
-            if (coro()->is_main && (atomic_flag_load(&gq_result.is_finish)
-                    || !atomic_flag_load(&gq_result.is_errorless) || coro()->exiting
+            if (coro()->is_main && (raii_is_exiting() || coro()->exiting
                                     || t == RAII_EMPTY_T || (coro_global_is_empty() && coro_sched_empty()))) {
                 coro_cleanup();
                 if (coro()->used_count > 0) {
@@ -2442,15 +2435,13 @@ static int scheduler(void) {
                     continue;
 
                 stole = true;
-            } else if (!coro()->is_main && (coro_sched_empty() || atomic_flag_load(&gq_result.is_finish)
-                                            || !atomic_flag_load(&gq_result.is_errorless))) {
+            } else if (!coro()->is_main && (coro_sched_empty() || raii_is_exiting())) {
                 if (coro_is_threading() && (int)atomic_load_explicit(&gq_result.active_count, memory_order_relaxed) > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
                 RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
                 /* Wait for global exit signal */
-                while (!atomic_flag_load(&gq_result.is_finish)
-                       && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown)
-                       && atomic_flag_load(&gq_result.is_errorless))
+                while (raii_is_running()
+                       && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown))
                     thrd_yield();
 
                 RAII_INFO("Thrd #%zx exiting, %d runnable coroutines.\033[0K\n", thrd_self(), coro()->used_count);
@@ -2604,17 +2595,16 @@ int raii_main(int argc, char **argv) {
     return coro()->exiting;
 }
 
-/* Transfer tasks from `global` run queue to current thread's `local` run queue. */
+/* Transfer tasks from `global` run queue to thread's `local` run queue. */
 static RAII_INLINE void coro_post_available(void) {
+    routine_t *t = nullptr;
+    hash_pair_t *pair = nullptr;
     hash_t *wg = coro_active()->wait_group;
     size_t count = 0, i, cap = hash_capacity(wg);
     atomic_thread_fence(memory_order_seq_cst);
     gq_result.is_takeable++;
     for (i = 0; i < cap; i++) {
-        kv_pair_t *pair = hash_buckets(wg, i);
-        if (!is_empty(pair) && !is_empty(pair->extended)
-            && !is_empty(pair->extended->object)) {
-            routine_t *t = (routine_t *)pair->extended->object;
+        if (t = ((routine_t *)hash_pair_value(pair = hash_buckets(wg, i)).object)) {
             coro_atomic_enqueue(t);
             if (++count == hash_count(wg))
                 break;
@@ -2660,11 +2650,7 @@ void coro_stealer(void) {
 
 RAII_INLINE void yielding(void) {
     coro_stealer();
-    if (coro_interrupt_set && coro_interrupt_yield)
-        coro_interrupt_yield(coro()->running);
-    else
-        coro_enqueue(coro()->running);
-
+    coro_enqueue(coro()->running);
     coro_suspend();
 }
 
@@ -2728,8 +2714,9 @@ RAII_INLINE waitgroup_t waitgroup(void) {
 
 waitresult_t waitfor(waitgroup_t wg) {
     routine_t *co, *c = coro_active();
-    void_t key = nullptr;
+    string_t key = nullptr;
     waitresult_t wgr = nullptr;
+    hash_pair_t *pair = nullptr;
     u32 group_capacity, cap, i;
     bool is_wait = false, has_completed = false;
 
@@ -2756,11 +2743,8 @@ waitresult_t waitfor(waitgroup_t wg) {
         while (hash_count(wg) && !has_completed) {
             cap = (u32)hash_capacity(wg);
             for (i = 0; i < cap; i++) {
-                kv_pair_t *pair = hash_buckets(wg, i);
-                if (!is_empty(pair) && !is_empty(pair->extended)
-                    && !is_empty(pair->extended->object)) {
-                    co = (routine_t *)pair->extended->object;
-                    key = pair->key;
+                if (co = ((routine_t *)hash_pair_value(pair = hash_buckets(wg, i)).object)) {
+                    key = hash_pair_key(pair);
                     if (is_wait && group_capacity == 0) {
                         has_completed = true;
                         break;
@@ -2770,8 +2754,8 @@ waitresult_t waitfor(waitgroup_t wg) {
                         if (!co->interrupt_active && co->status == CORO_NORMAL) {
                             coro_enqueue(co);
                         } else if (co->interrupt_active && co->status == CORO_SUSPENDED) {
-                            coro_switch(co);
-                            continue;
+                            coro_flag_set(co);
+                            coro_enqueue(co);
                         }
 
                         coro_info(c, 1);
@@ -2989,7 +2973,7 @@ RAII_INLINE void coro_interrupt_switch(routine_t *co) {
 
 RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
                                       func_t shutdownfunc, call_timer_t timerfunc,
-                                      yield_func yieldfunc, call_t systemfunc) {
+                                      call_t systemfunc) {
     if (!coro_interrupt_set && loopfunc && perthreadfunc && shutdownfunc) {
         coro_interrupt_set = true;
         coro_interrupt_loop = loopfunc;
@@ -3000,9 +2984,6 @@ RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthr
 
         if (systemfunc)
             coro_interrupt_timer_system = systemfunc;
-
-        if (yieldfunc)
-            coro_interrupt_yield = yieldfunc;
     }
 }
 

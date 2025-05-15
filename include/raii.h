@@ -255,6 +255,9 @@ C_API bool is_guard(void_t self);
 C_API bool is_equal(void_t, void_t);
 C_API bool is_equal_ex(void_t, void_t);
 
+C_API bool raii_is_exiting(void);
+C_API bool raii_is_running(void);
+
 /* Tries to query the system for current time using `MONOTONIC` clock,
  or whatever method ~system/platform~ provides for `REALTIME`. */
 C_API uint64_t get_timer(void);

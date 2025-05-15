@@ -218,6 +218,7 @@ typedef struct raii_deque_s raii_deque_t;
 typedef struct _future *future;
 typedef struct future_pool *future_t;
 typedef struct hash_s hash_t;
+typedef struct hash_pair_s hash_pair_t;
 typedef struct map_s _map_t;
 typedef struct map_item_s map_item_t;
 typedef struct map_iterator_s map_iter_t;

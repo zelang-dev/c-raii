@@ -4,7 +4,7 @@
 
 struct map_item_s {
     raii_type type;
-    values_type *value;
+    values_type value;
     u32 indic;
     string_t key;
     map_item_t *prev;
@@ -32,7 +32,7 @@ struct map_iterator_s {
     map_item_t *item;
 };
 
-static void map_add_pair(map_t hash, kv_pair_t *kv) {
+static void map_add_pair(map_t hash, hash_pair_t *kv) {
     map_item_t *item;
     item = (map_item_t *)try_calloc(1, sizeof(map_item_t));
     if (hash->item_type == RAII_MAP_ARR)
@@ -40,11 +40,11 @@ static void map_add_pair(map_t hash, kv_pair_t *kv) {
     else
         item->indic = hash->indices++;
 
-    item->key = kv->key;
-    item->value = kv->extended;
+    item->key = hash_pair_key(kv);
+    item->value = hash_pair_value(kv);
     item->prev = hash->tail;
     item->next = nullptr;
-    item->type = kv->type;
+    item->type = hash_pair_type(kv);
 
     hash->tail = item;
     hash->length++;
@@ -59,7 +59,7 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
     va_list ap;
     raii_type n = RAII_ERR;
     map_item_t *item;
-    kv_pair_t *kv;
+    hash_pair_t *kv;
     void_t has;
     string k;
     u32 i;
@@ -92,16 +92,16 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
                 } else if (n == RAII_STRING) {
                     kv = insert_string(hash->dict, k, va_arg(ap, string));
                 } else {
-                    kv = (kv_pair_t *)hash_put(hash->dict, k, va_arg(ap, void_t));
+                    kv = (hash_pair_t *)hash_put(hash->dict, k, va_arg(ap, void_t));
                 }
 
                 map_add_pair(hash, kv);
             } else {
                 for (item = hash->head; item; item = item->next) {
-                    if (item->value->char_ptr == ((values_type *)has)->char_ptr) {
-                        kv = (kv_pair_t *)hash_replace(hash->dict, k, va_arg(ap, void_t));
-                        item->value = kv->extended;
-                        item->type = kv->type;
+                    if (item->value.char_ptr == ((values_type *)has)->char_ptr) {
+                        kv = (hash_pair_t *)hash_replace(hash->dict, k, va_arg(ap, void_t));
+                        item->value = hash_pair_value(kv);
+                        item->type = hash_pair_type(kv);
                         break;
                     }
                 }
@@ -137,15 +137,15 @@ static void slice_free(slice_t array) {
     ZE_FREE(array->slice);
 }
 
-static void slice_set(slice_t array, kv_pair_t *kv, int64_t index) {
+static void slice_set(slice_t array, hash_pair_t *kv, int64_t index) {
     if (!is_empty(kv)) {
         struct map_item_s *item = (struct map_item_s *)try_calloc(1, sizeof(struct map_item_s));
         item->indic = index;
-        item->key = kv->key;
-        item->value = kv->extended;
+        item->key = hash_pair_key(kv);
+        item->value = hash_pair_value(kv);
         item->prev = array->tail;
         item->next = nullptr;
-        item->type = kv->type;
+        item->type = hash_pair_type(kv);
 
         array->tail = item;
         array->length++;
@@ -239,7 +239,7 @@ map_t map_for(u32 num_of_pairs, ...) {
 
 static void map_append(map_array_t hash, array_type type, void_t value) {
     char k[SCRAPE_SIZE] = {0};
-    kv_pair_t *kv;
+    hash_pair_t *kv;
 
     if (!hash->started) {
         hash->started = true;
@@ -266,7 +266,7 @@ static void map_append(map_array_t hash, array_type type, void_t value) {
     } else if (type == RAII_STRING) {
         kv = insert_string(hash->dict, k, (string)value);
     } else {
-        kv = (kv_pair_t *)hash_put(hash->dict, k, value);
+        kv = (hash_pair_t *)hash_put(hash->dict, k, value);
     }
 
     map_add_pair(hash, kv);
@@ -311,7 +311,7 @@ void map_free(map_t hash) {
 
 void map_push(map_t hash, void_t value) {
     char hash_key[SCRAPE_SIZE] = {0};
-    kv_pair_t *kv;
+    hash_pair_t *kv;
 
     if (!hash->started) {
         hash->started = true;
@@ -321,7 +321,7 @@ void map_push(map_t hash, void_t value) {
     }
 
     simd_itoa(hash->indices, hash_key);
-    kv = (kv_pair_t *)hash_put(hash->dict, hash_key, value);
+    kv = (hash_pair_t *)hash_put(hash->dict, hash_key, value);
     map_add_pair(hash, kv);
 }
 
@@ -339,7 +339,7 @@ values_type map_pop(map_t hash) {
     if (hash->length == 0)
         hash->head = nullptr;
 
-    value = *item->value;
+    value = item->value;
     ZE_FREE(item);
 
     return value;
@@ -348,7 +348,7 @@ values_type map_pop(map_t hash) {
 u32 map_shift(map_t hash, void_t value) {
     char hash_key[SCRAPE_SIZE] = {0};
     map_item_t *item;
-    kv_pair_t *kv;
+    hash_pair_t *kv;
 
     if (!hash)
         return;
@@ -371,10 +371,10 @@ u32 map_shift(map_t hash, void_t value) {
         item->next->prev = item;
 
     simd_itoa(item->indic, hash_key);
-    kv = (kv_pair_t *)hash_put(hash->dict, hash_key, value);
-    item->key = kv->key;
-    item->value = kv->extended;
-    item->type = kv->type;
+    kv = (hash_pair_t *)hash_put(hash->dict, hash_key, value);
+    item->key = hash_pair_key(kv);
+    item->value = hash_pair_value(kv);
+    item->type = hash_pair_type(kv);
 
     return item->indic;
 }
@@ -393,7 +393,7 @@ values_type map_unshift(map_t hash) {
     if (hash->length == 0)
         hash->tail = nullptr;
 
-    value = *item->value;
+    value = item->value;
     ZE_FREE(item);
 
     return value;
@@ -413,7 +413,7 @@ void_t map_remove(map_t hash, void_t value) {
         return nullptr;
 
     for (item = hash->head; item != nullptr; item = item->next) {
-        if (is_equal(item->value->object, value)) {
+        if (is_equal(item->value.object, value)) {
             hash_delete(hash->dict, item->key);
             if (item->prev)
                 item->prev->next = item->next;
@@ -448,17 +448,17 @@ RAII_INLINE values_type map_get(map_t hash, string_t key) {
 
 RAII_INLINE void map_put(map_t hash, string_t key, void_t value) {
     map_item_t *item;
-    kv_pair_t *kv;
+    hash_pair_t *kv;
     void_t has = hash_get(hash->dict, key);
     if (is_empty(has)) {
-        kv = (kv_pair_t *)hash_put(hash->dict, key, value);
+        kv = (hash_pair_t *)hash_put(hash->dict, key, value);
         map_add_pair(hash, kv);
     } else {
         for (item = hash->head; item; item = item->next) {
-            if (item->value->char_ptr == ((values_type *)has)->char_ptr) {
-                kv = (kv_pair_t *)hash_replace(hash->dict, key, value);
-                item->value = kv->extended;
-                item->type = kv->type;
+            if (item->value.char_ptr == ((values_type *)has)->char_ptr) {
+                kv = (hash_pair_t *)hash_replace(hash->dict, key, value);
+                item->value = hash_pair_value(kv);
+                item->type = hash_pair_type(kv);
                 break;
             }
         }
@@ -509,7 +509,7 @@ map_iter_t *iter_next(map_iter_t *iterator) {
 
 RAII_INLINE values_type iter_value(map_iter_t *iterator) {
     if (iterator)
-        return *iterator->item->value;
+        return iterator->item->value;
 
     return raii_values_empty->value;
 }
@@ -566,7 +566,7 @@ map_iter_t *iter_remove(map_iter_t *iterator) {
 }
 
 reflect_func(map_item_t,
-             (UNION, values_type *, value),
+             (UNION, values_type, value),
              (UINT, u32, indic),
              (CONST_CHAR, string_t, key),
              (STRUCT, map_item_t *, prev),

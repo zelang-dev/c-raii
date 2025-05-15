@@ -29,7 +29,6 @@ typedef enum {
 typedef struct routine_s routine_t;
 typedef struct hash_s *waitgroup_t;
 typedef int (*coro_sys_func)(u32, void_t);
-typedef void (*yield_func)(routine_t *);
 typedef struct awaitable_s {
     raii_type type;
     rid_t cid;
@@ -279,9 +278,6 @@ extern "C" {
     C_API void_t get_coro_timer(routine_t *);
     C_API void coro_timer_set(routine_t *, void_t data);
 
-    C_API void_t get_coro_yielder(routine_t *);
-    C_API void coro_yielder_set(routine_t *, void_t data);
-
     C_API value_t *get_coro_result(routine_t *);
     C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_context_set(routine_t *, routine_t *);
@@ -325,8 +321,7 @@ extern "C" {
                                        bool use_yield, bool halted, bool use_context,
                                        bool is_plain, bool is_returning);
     C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
-                                    func_t shutdownfunc, call_timer_t timerfunc,
-                                    yield_func yieldfunc, call_t systemfunc);
+                                    func_t shutdownfunc, call_timer_t timerfunc, call_t systemfunc);
     C_API routine_t *coro_interrupt_event(func_t, void_t, func_t);
     C_API routine_t *coro_interrupt_process(func_t fn, void_t handle);
     C_API void coro_interrupt_waitgroup_destroy(routine_t *);

@@ -24,14 +24,6 @@ typedef struct val_ops_s {
     void_t arg;
 } val_ops_t;
 
-typedef struct kv_pair_s {
-    raii_type type;
-    uint32_t hash;
-    void_t key;
-    void_t value;
-    values_type *extended;
-} kv_pair_t;
-
 typedef void_t(*hash_iter_func)(void_t variable, string_t key, const_t value);
 typedef void (*probe_func)(hash_t *htable, size_t *from_idx);
 typedef void (*print_key)(const_t k);
@@ -54,22 +46,26 @@ C_API void_t hash_put(hash_t *, const_t key, const_t value);
 C_API void_t hash_put_str(hash_t *htable, const_t key, string value);
 C_API void_t hash_put_obj(hash_t *htable, const_t key, const_t value);
 
-C_API kv_pair_t *insert_func(hash_t *htable, const_t key, raii_func_args_t value);
-C_API kv_pair_t *insert_unsigned(hash_t *htable, const_t key, size_t value);
-C_API kv_pair_t *insert_signed(hash_t *htable, const_t key, int64_t value);
-C_API kv_pair_t *insert_double(hash_t *htable, const_t key, double value);
-C_API kv_pair_t *insert_string(hash_t *htable, const_t key, string value);
-C_API kv_pair_t *insert_bool(hash_t *htable, const_t key, bool value);
-C_API kv_pair_t *insert_char(hash_t *htable, const_t key, char value);
-C_API kv_pair_t *insert_short(hash_t *htable, const_t key, short value);
+C_API hash_pair_t *insert_func(hash_t *htable, const_t key, raii_func_args_t value);
+C_API hash_pair_t *insert_unsigned(hash_t *htable, const_t key, size_t value);
+C_API hash_pair_t *insert_signed(hash_t *htable, const_t key, int64_t value);
+C_API hash_pair_t *insert_double(hash_t *htable, const_t key, double value);
+C_API hash_pair_t *insert_string(hash_t *htable, const_t key, string value);
+C_API hash_pair_t *insert_bool(hash_t *htable, const_t key, bool value);
+C_API hash_pair_t *insert_char(hash_t *htable, const_t key, char value);
+C_API hash_pair_t *insert_short(hash_t *htable, const_t key, short value);
 
-C_API kv_pair_t *hash_get_pair(hash_t *, const_t key);
+C_API hash_pair_t *hash_get_pair(hash_t *, const_t key);
 C_API void_t hash_get(hash_t *, const_t key);
 C_API void_t hash_iter(hash_t *, void_t variable, hash_iter_func func);
 C_API void_t hash_replace(hash_t *, const_t key, const_t value);
 C_API size_t hash_count(hash_t *);
 C_API size_t hash_capacity(hash_t *);
-C_API kv_pair_t *hash_buckets(hash_t *, u32 index);
+C_API hash_pair_t *hash_buckets(hash_t *, u32 index);
+C_API values_type hash_pair_value(hash_pair_t *);
+C_API string_t hash_pair_key(hash_pair_t *);
+C_API raii_type hash_pair_type(hash_pair_t *);
+C_API bool hash_pair_is_null(hash_pair_t *);
 C_API bool hash_has(hash_t *, const_t key);
 C_API void hash_free(hash_t *);
 C_API void hash_set_capacity(u32 buckets);
