@@ -532,30 +532,14 @@ static void coro_insert(scheduler_t *l, routine_t *t) {
             t->prev = prev;
             prev->next = t;
         } else {
-            if (tail->next) {
-                routine_t *next = tail->next;
-                t->prev = next;
-                next->prev = t;
-                l->tail = t;
-            }
             l->head = t;
         }
         head->prev = t;
-    } else if (tail) {
-        t->prev = tail;
-        if (tail->next) {
-            routine_t *next = tail->next;
-            t->next = next;
-            next->prev = t;
-        } else {
-            l->tail = t;
-        }
-        tail->next = t;
     } else {
-        t->next = head;
-        t->prev = tail;
         l->head = t;
         l->tail = t;
+        t->next = head;
+        t->prev = tail;
     }
 }
 
@@ -2275,8 +2259,8 @@ static void coro_thread_waitfor(waitgroup_t wg) {
                     if (!co->interrupt_active && co->status == CORO_NORMAL) {
                         coro_enqueue(co);
                     } else if (co->interrupt_active && co->status == CORO_SUSPENDED) {
-                        coro_switch(co);
-                        continue;
+                        coro_flag_set(co);
+                        coro_enqueue(co);
                     }
 
                     coro_info(c, 1);
@@ -2781,7 +2765,8 @@ waitresult_t waitfor(waitgroup_t wg) {
         }
 
         while (is_wait && hash_count(wg)) {
-            yielding();}
+            yielding();
+        }
 
         c->wait_active = false;
         c->wait_group = nullptr;
