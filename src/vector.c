@@ -293,7 +293,7 @@ RAII_INLINE void array_remove(arrays_t arr, int i) {
 }
 
 RAII_INLINE void array_delete(arrays_t arr) {
-    if (arr && is_array(arr)) {
+    if (arr) {
         void_t p1__ = vector_address(arr);
         func_t destructor__ = vector_destructor(arr);
         if (destructor__) {
@@ -331,12 +331,24 @@ RAII_INLINE value_t array_pop(arrays_t arr) {
     return raii_values_empty->valued;
 }
 
+RAII_INLINE value_t array_shift(arrays_t arr) {
+    size_t sz = vector_length(arr);
+    if (sz > 0) {
+        value_t val = arr[0];
+        array_remove(arr, 0);
+
+        return val;
+    }
+
+    return raii_values_empty->valued;
+}
+
 void array_append_item(arrays_t arr, ...) {
     va_list ap;
     raii_type n = RAII_ERR;
-    size_t size, cv_cap__ = vector_cap(arr);
+    size_t size, cv_cap__ = vector_cap(arr), index = vector_length(arr);
     memory_t *scope = vector_context(arr);
-    if (cv_cap__ <= vector_length(arr)) {
+    if (cv_cap__ <= index) {
         size = cv_cap__ << 1;
         vector_grow(arr, size, scope);
     }
@@ -344,26 +356,26 @@ void array_append_item(arrays_t arr, ...) {
     va_start(ap, arr);
     n = va_arg(ap, raii_type);
     if (n == RAII_DOUBLE) {
-        arr[vector_length(arr)].precision = va_arg(ap, double);
+        arr[index].precision = va_arg(ap, double);
     } else if (n == RAII_LLONG) {
-        arr[vector_length(arr)].long_long = va_arg(ap, int64_t);
+        arr[index].long_long = va_arg(ap, int64_t);
     } else if (n == RAII_MAXSIZE) {
-        arr[vector_length(arr)].max_size = va_arg(ap, size_t);
+        arr[index].max_size = va_arg(ap, size_t);
     } else if (n == RAII_FUNC) {
-        arr[vector_length(arr)].func = (raii_func_t)va_arg(ap, raii_func_args_t);
+        arr[index].func = (raii_func_t)va_arg(ap, raii_func_args_t);
     } else if (n == RAII_SHORT) {
-        arr[vector_length(arr)].s_short = (short)va_arg(ap, int);
+        arr[index].s_short = (short)va_arg(ap, int);
     } else if (n == RAII_BOOL) {
-        arr[vector_length(arr)].boolean = (bool)va_arg(ap, int);
+        arr[index].boolean = (bool)va_arg(ap, int);
     } else if (n == RAII_CHAR) {
-        arr[vector_length(arr)].schar = (char)va_arg(ap, int);
+        arr[index].schar = (char)va_arg(ap, int);
     } else if (n == RAII_STRING) {
-        arr[vector_length(arr)].char_ptr = (string)va_arg(ap, string);
+        arr[index].char_ptr = (string)va_arg(ap, string);
     } else {
-        arr[vector_length(arr)].object = va_arg(ap, void_t);
+        arr[index].object = va_arg(ap, void_t);
     }
     va_end(ap);
-    vector_set_size(arr, vector_length(arr) + 1);
+    vector_set_size(arr, index + 1);
 }
 
 arrays_t array_of(memory_t *scope, size_t count, ...) {

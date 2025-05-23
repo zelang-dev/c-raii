@@ -318,7 +318,7 @@ If `ptr` is not null, `func(ptr)` will be invoked during stack unwinding. */
 #define unprotected(p) (ex_local()->stack = EX_PNAME(p).next)
 
 C_API void try_rethrow(ex_context_t *);
-C_API ex_error_t *try_updating_err(ex_error_t *);
+C_API ex_error_t *try_updating_err(ex_error_t *, ex_context_t *);
 C_API ex_jmp_buf *try_start(ex_stage, ex_error_t *, ex_context_t *);
 C_API bool try_catching(string, ex_error_t *, ex_context_t *);
 C_API bool try_finallying(ex_error_t *, ex_context_t *);

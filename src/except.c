@@ -733,8 +733,7 @@ void ex_signal_default(void) {
 #endif
 }
 
-RAII_INLINE ex_error_t *try_updating_err(ex_error_t *err) {
-    ex_context_t *ex_err = ex_local();
+RAII_INLINE ex_error_t *try_updating_err(ex_error_t *err, ex_context_t *ex_err) {
 #ifdef _WIN32
     err->name = (!is_empty((void *)ex_err->panic)) ? ex_err->panic : ex_err->ex;
 #else
@@ -831,7 +830,7 @@ bool try_catching(string type, ex_error_t *err, ex_context_t *ex_err) {
     /* check if this CATCH block can handle current exception */
     bool status = false;
     if (ex_err->state == ex_throw_st) {
-        try_updating_err(err);
+        try_updating_err(err, ex_err);
         if (is_str_eq("_if", type)) {
             status = true;
         } else if (is_empty((void_t)type) || (is_str_eq(err->name, type))) {
@@ -845,7 +844,7 @@ bool try_catching(string type, ex_error_t *err, ex_context_t *ex_err) {
 
 RAII_INLINE bool try_finallying(ex_error_t *err, ex_context_t *ex_err) {
     if (err->stage == ex_final_st) {
-        try_updating_err(err);
+        try_updating_err(err, ex_err);
         /* global context updated */
         ex_update(ex_err->next);
 

@@ -33,17 +33,11 @@
 #endif
 
 static raii_type scheme_type(string scheme) {
-    if (is_str_eq(scheme, "https")
-        || is_str_eq(scheme, "tls")
-        || is_str_eq(scheme, "ssl")
-        || is_str_eq(scheme, "wss")
-        || is_str_eq(scheme, "ftps")) {
-        return RAII_SCHEME_TLS;
-    } else if(is_str_eq(scheme, "http")
-        || is_str_eq(scheme, "tcp")
-        || is_str_eq(scheme, "ftp")) {
+    if (is_str_in("http,tcp,ws,ftp", scheme)) {
         return RAII_SCHEME_TCP;
-    } else if (is_str_eq(scheme, "file") || is_str_eq(scheme, "unix")) {
+    } else if (is_str_in("https,tls,ssl,wss,ftps", scheme)) {
+        return RAII_SCHEME_TLS;
+    } else if (is_str_in("file,unix", scheme)) {
         return RAII_SCHEME_PIPE;
     } else if (is_str_eq(scheme, "udp")) {
         return RAII_SCHEME_UDP;

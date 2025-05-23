@@ -58,6 +58,7 @@ C_API arrays_t array_copy(arrays_t des, arrays_t src);
 C_API void array_deferred_set(arrays_t, memory_t *);
 C_API void array_append(arrays_t, void_t);
 C_API value_t array_pop(arrays_t arr);
+C_API value_t array_shift(arrays_t arr);
 C_API void array_append_item(arrays_t arr, ...);
 C_API void array_delete(arrays_t);
 C_API void array_remove(arrays_t, int);
@@ -88,6 +89,7 @@ C_API arrays_t arrays(void);
 #define $append_short(arr, value) array_append_item((arrays_t)arr, RAII_SHORT, (short)value)
 #define $remove(arr, index) array_remove((arrays_t)arr, index)
 #define $pop(arr) array_pop((arrays_t)arr)
+#define $shift(arr) array_shift((arrays_t)arr)
 
 C_API values_type get_arg(void_t);
 
