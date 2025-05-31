@@ -506,7 +506,7 @@ static void coro_func(void) {
 /* Add coroutine to scheduler queue, try prepending. */
 static void coro_insert(scheduler_t *l, routine_t *t) {
     routine_t *other = nullptr, *head = l->head, *tail = l->tail;
-    if (head && is_interrupting()) {
+    if (head) {
         t->next = head;
         if (head->prev) {
             other = head->prev;
@@ -533,7 +533,7 @@ static void coro_insert(scheduler_t *l, routine_t *t) {
 
 /* Add coroutine to scheduler queue, appending. */
 static void coro_add(scheduler_t *l, routine_t *t) {
-    if (t->flagged) {
+    if (t->flagged && is_interrupting()) {
         coro_insert(l, t);
         return;
     } else if (l->tail) {
@@ -1837,9 +1837,6 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
         else if (is_thread)
             t->tid = coro()->thrd_id;
 
-        if (t->run_code == CORO_RUN_NORMAL && is_interrupting())
-            t->flagged = true;
-
         atomic_fetch_add(&gq_result.active_count, 1);
     } else if (t->run_code == CORO_RUN_NORMAL) {
         coro()->used_count++;
@@ -1866,7 +1863,6 @@ static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
         c->interrupt_active = false;
         t->interrupt_active = true;
         t->timer = c->timer;
-        c->timer = nullptr;
         t->context = c;
         if (t->timer) {
             t->context = coro_running();
@@ -1981,7 +1977,13 @@ static void_t coro_wait_system(void_t v) {
                 if (!t->system && --coro()->sleeping_counted == 0)
                     coro()->used_count--;
 
-                coro_enqueue(t);
+                if (coro_interrupt_set && t->timer && t->context->timer) {
+                    coro_timer_set(t->context, nullptr);
+                    if (!t->context->halt)
+                        coro_enqueue(t->context);
+                } else if (!t->halt && !t->timer) {
+                    coro_enqueue(t);
+                }
             }
         }
     }
@@ -1989,11 +1991,10 @@ static void_t coro_wait_system(void_t v) {
     return 0;
 }
 
-static u32 add_timeout(routine_t *running, routine_t *context, u32 ms) {
-    size_t when, now;
+static void add_timeout(routine_t *running, routine_t *context, u32 ms, size_t now) {
+    size_t when;
     routine_t *t;
 
-    now = get_timer();
     when = now + (size_t)ms * 1000000;
     for (t = coro()->sleep_queue->head; !is_empty(t) && t->alarm_time < when; t = t->next)
         ;
@@ -2020,8 +2021,6 @@ static u32 add_timeout(routine_t *running, routine_t *context, u32 ms) {
 
     if ((!running->system || !context->system) && coro()->sleeping_counted++ == 0)
         coro()->used_count++;
-
-    return now;
 }
 
 u32 sleepfor(u32 ms) {
@@ -2035,10 +2034,9 @@ u32 sleepfor(u32 ms) {
             yielding();
     }
 
+    now = get_timer();
     if (!coro_interrupt_timer_system) {
-        now = add_timeout(coro()->running, (is_interrupting() && coro_interrupt_timer ? coro_active() : coro()->running), ms);
-    } else {
-        now = get_timer();
+        add_timeout(coro()->running, coro()->running, ms, now);
     }
 
     if (coro_interrupt_set)
@@ -2107,7 +2105,7 @@ static RAII_INLINE bool coro_global_is_empty(void) {
 }
 
 static RAII_INLINE bool coro_queue_is_available(void) {
-    return (atomic_load(&gq_result.queue->local[coro()->thrd_id]->available) > 0);
+    return (atomic_load_explicit(&gq_result.queue->local[coro()->thrd_id]->available, memory_order_relaxed) > 0);
 }
 
 static void coro_unwind_setup(ex_context_t *ctx, const char *ex, const char *message) {
@@ -2933,12 +2931,14 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
 RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
                                          bool use_yield, bool halted, bool use_context,
                                          bool is_plain, bool is_returning) {
-    co->halt = halted;
-    coro_interrupt_result(co, result, plain, is_plain);
-    if (use_context)
-        coro_interrupt_switch(co->context);
-    else if (use_yield)
-        coro_switch(co);
+    if (!is_empty(co)) {
+        co->halt = halted;
+        coro_interrupt_result(co, result, plain, is_plain);
+        if (use_context)
+            coro_interrupt_switch(co->context);
+        else if (use_yield)
+            coro_switch(co);
+    }
 
     if (is_returning)
         coro_scheduler();
