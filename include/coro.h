@@ -269,6 +269,9 @@ extern "C" {
     C_API memory_t *coro_scope(void);
     C_API memory_t *get_coro_scope(routine_t *);
 
+    C_API waitgroup_t coro_waitgroup(void);
+    C_API waitgroup_t get_coro_waitgroup(routine_t *);
+
     C_API signed int get_coro_err(routine_t *);
     C_API void coro_err_set(routine_t *, signed int code);
 
@@ -336,14 +339,14 @@ extern "C" {
     C_API void_t interrupt_data(void);
     C_API i32 interrupt_code(void);
     C_API bits_t interrupt_bitset(void);
-    C_API arrays_t interrupt_args(void);
+    C_API arrays_t interrupt_array(void);
     C_API i32 is_interrupting(void);
 
     C_API void interrupt_handle_set(void_t);
     C_API void interrupt_data_set(void_t);
     C_API void interrupt_code_set(i32);
     C_API void interrupt_bitset_set(bits_t);
-    C_API void interrupt_args_set(arrays_t);
+    C_API void interrupt_array_set(arrays_t);
 
     /* Print `current` coroutine internal data state, only active in `debug` builds. */
     C_API void coro_info_active(void);
