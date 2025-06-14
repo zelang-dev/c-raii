@@ -11,21 +11,26 @@
     #include "compat/sys/time.h"
     #include <excpt.h>
     #ifndef SYS_CONSOLE
-        /* O.S. physical ~input/output~ console `DEVICE`. */
+        /* O.S. platform ~input/output~ console `DEVICE`. */
         #define SYS_CONSOLE "\\\\?\\CON"
-        /* O.S. physical ~null~ `DEVICE`. */
+        /* O.S. platform ~null~ `DEVICE`. */
         #define SYS_NULL "\\\\?\\NUL"
-        /* O.S. physical ~pipe~ prefix, add `string name` including trailing slash. */
+        /* O.S. platform ~pipe~ prefix. */
         #define SYS_PIPE "\\\\.\\pipe\\"
     #endif
 #else
     #ifndef SYS_CONSOLE
-        /* O.S. physical ~input/output~ console `DEVICE`. */
+        /* O.S. platform ~input/output~ console `DEVICE`. */
         #define SYS_CONSOLE "/dev/tty"
-        /* O.S. physical ~null~ `DEVICE`. */
+        /* O.S. platform ~null~ `DEVICE`. */
         #define SYS_NULL "/dev/null"
-        /* O.S. physical ~pipe~ prefix, add `string name` including trailing slash. */
-        #define SYS_PIPE "./"
+        #ifdef __ANDROID__
+            /* O.S. platform ~pipe~ prefix. */
+            #define SYS_PIPE "/data/local/tmp/"
+        #else
+            /* O.S. platform ~pipe~ prefix. */
+            #define SYS_PIPE "/tmp/"
+        #endif
     #endif
     #include <libgen.h>
 #endif
