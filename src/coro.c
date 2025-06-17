@@ -1982,7 +1982,7 @@ static void_t coro_wait_system(void_t v) {
                 ;
             now = get_timer();
             coro_info(coro_active(), 1);
-            while ((t = coro()->sleep_queue->head) && now >= t->alarm_time) {
+            while ((t = coro()->sleep_queue->head) && now >= t->alarm_time || (t && coro_interrupt_set && t->halt)) {
                 coro_remove(coro()->sleep_queue, t);
                 if (!t->system && --coro()->sleeping_counted == 0)
                     coro()->used_count--;
