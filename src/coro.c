@@ -2464,10 +2464,10 @@ static int scheduler(void) {
                         atomic_fetch_sub(&gq_result.active_count, 1);
 
                     if (coro_queue_is_empty()) {
-                        if (coro()->sleeping_counted == 0 && coro()->used_count > 0)
-                            coro()->used_count--;
-                        else if (coro()->used_count && interrupt_code())
+                        if (coro()->used_count && interrupt_code())
                             coro()->used_count -= coro()->used_count;
+                        else if (coro()->sleeping_counted >= 0 && coro()->used_count > 0)
+                            coro()->used_count--;
                     }
                 }
 
