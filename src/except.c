@@ -124,8 +124,10 @@ static void ex_unwind_stack(ex_context_t *ctx) {
         raii_deferred_clean();
     } else {
         while (p && p->type == ex_protected_st) {
-            if ((got_uncaught_exception = (temp == *p->ptr) || is_inaccessible(*p->ptr)))
+            if ((got_uncaught_exception = (temp == *p->ptr) || is_inaccessible(*p->ptr))) {
+                atomic_flag_clear(&gq_result.is_errorless);
                 break;
+            }
 
             if (*p->ptr) {
                 p->type = RAII_ERR;
