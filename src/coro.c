@@ -537,10 +537,7 @@ static void coro_insert(scheduler_t *l, routine_t *t) {
 
 /* Add coroutine to scheduler queue, appending. */
 static void coro_add(scheduler_t *l, routine_t *t) {
-    if (t->flagged && is_interrupting()) {
-        coro_insert(l, t);
-        return;
-    } else if (l->tail) {
+    if (l->tail) {
         l->tail->next = t;
         t->prev = l->tail;
     } else {
@@ -2519,16 +2516,6 @@ static void_t main_main(void_t v) {
     coro_name("coro_main");
     coro()->exiting = coro_sys_set && coro_main_func
         ? coro_main_func(coro_argc, coro_argv) : coro_main(coro_argc, coro_argv);
-
-    if (is_interrupting()) {
-        int count = coro_queue_active_count();
-        if (count < 0)
-            atomic_fetch_add(&gq_result.active_count, 1);
-
-        if (!coro()->exiting && coro()->used_count > count) {
-            coro()->used_count -= is_interrupting();
-        }
-    }
 
     return 0;
 }
