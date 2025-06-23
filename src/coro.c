@@ -2474,10 +2474,10 @@ static int scheduler(void) {
 
             if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
                 coro_delete(t);
-            } else if (t->is_referenced) {
+            } else if (t->is_referenced || t->is_event_err) {
+                if (coro_interrupt_set)
+                    coro_interrupt_shutdown(t);
                 coro_gc(t);
-            } else if (coro_interrupt_set && t->is_event_err && coro_sched_empty()) {
-                coro_interrupt_shutdown(t);
             }
         }
     }
