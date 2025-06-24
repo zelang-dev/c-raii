@@ -38,7 +38,7 @@ This behaves same as GoLang `select {}` statement. */
 Will `yield` execution, if no target ~channel~ is selected as ready. */
 #define selected          \
   if ($##__FUNCTION__##_fs == false)    \
-      yielding();           \
+      yield();           \
   }
 
 /* Will send `data` and execute block, only if `ch` is target and ready.

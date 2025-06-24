@@ -1898,7 +1898,7 @@ other currently-ready coroutines have a chance to run. Returns
 the number of other tasks that ran while the current task was waiting. */
 static int coro_yielding_active(void) {
     int n = coro()->num_others_ran;
-    yielding();
+    yield();
     return coro()->num_others_ran - n - 1;
 }
 
@@ -2035,7 +2035,7 @@ u32 sleepfor(u32 ms) {
         create_coro(coro_wait_system, nullptr, Kb(18), CORO_RUN_SYSTEM);
         coro_stealer();
         if (coro_interrupt_set && coro_interrupt_timer)
-            yielding();
+            yield();
     }
 
     now = get_timer();
@@ -2303,7 +2303,7 @@ static void_t coro_thread_main(void_t args) {
             queue->grouped = nullptr;
             coro_thread_waitfor(grouped);
         } else if (coro()->used_count > 1) {
-            yielding();
+            yield();
         } else {
             break;
         }
@@ -2628,7 +2628,7 @@ void coro_stealer(void) {
     }
 }
 
-RAII_INLINE void yielding(void) {
+RAII_INLINE void yield(void) {
     coro_stealer();
     coro_enqueue(coro()->running);
     coro_suspend();
@@ -2714,7 +2714,7 @@ waitresult_t waitfor(waitgroup_t wg) {
         }
         atomic_unlock(&gq_result.group_lock);
 
-        yielding();
+        yield();
         if (is_wait = atomic_flag_load(&gq_result.is_waitable)) {
             group_capacity = coro()->group_count;
             coro()->group_count = 0;
@@ -2762,7 +2762,7 @@ waitresult_t waitfor(waitgroup_t wg) {
         }
 
         while (is_wait && hash_count(wg)) {
-            yielding();
+            yield();
         }
 
         c->wait_active = false;
@@ -2800,7 +2800,7 @@ void launch(func_t fn, u64 num_of_args, ...) {
     va_end(ap);
 
     create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
-    yielding();
+    yield();
 }
 
 awaitable_t async(callable_t fn, u64 num_of_args, ...) {
@@ -2987,7 +2987,7 @@ void interrupt_launch(callable_t fn, u64 num_of_args, ...) {
     va_end(ap);
 
     create_coro((raii_func_t)fn, params, Kb(16), CORO_RUN_INTERRUPT);
-    yielding();
+    yield();
 }
 
 RAII_INLINE void_t interrupt_handle(void) {
@@ -3103,7 +3103,7 @@ RAII_INLINE void coro_info_active(void) {
 
 RAII_INLINE void coro_yield_info(void) {
     coro_info(coro_active(), 1);
-    yielding();
+    yield();
 }
 
 RAII_INLINE void coro_stacksize_set(u32 size) {

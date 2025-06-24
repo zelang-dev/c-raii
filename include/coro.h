@@ -217,7 +217,7 @@ extern "C" {
     C_API void launch(func_t, u64, ...);
 
     /* Yield execution to another coroutine and reschedule current. */
-    C_API void yielding(void);
+    C_API void yield(void);
 
     /* Defer execution `LIFO` of given function with argument,
     to when current coroutine exits/returns. */
