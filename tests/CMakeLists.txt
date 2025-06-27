@@ -29,6 +29,7 @@ set(TARGET_LIST
  test-json
  test-json_parser
  test-slice
+ test-yielding
 )
 
 foreach (TARGET ${TARGET_LIST})

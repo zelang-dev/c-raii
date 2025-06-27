@@ -28,6 +28,8 @@ typedef enum {
 
 typedef struct routine_s routine_t;
 typedef struct hash_s *waitgroup_t;
+typedef struct generator_s _generator_t;
+typedef _generator_t *generator_t;
 typedef int (*coro_sys_func)(u32, void_t);
 typedef struct awaitable_s {
     raii_type type;
@@ -218,6 +220,20 @@ extern "C" {
 
     /* Yield execution to another coroutine and reschedule current. */
     C_API void yield(void);
+
+    /* Suspends the execution of current `Generator/Coroutine`, and passing data.
+    WILL PANIC if not an ~Generator~ created function called in. */
+    C_API void yielding(void_t);
+
+    /* Creates an `Generator/Coroutine` of given function with arguments,
+    MUST use `yielding` to pass data, and `yield_for` to get data. */
+    C_API generator_t generator(callable_t, u64, ...);
+
+    /* Resume specified ~coroutine/generator~, returning data from `yielding`. */
+    C_API value_t yield_for(generator_t);
+
+    /* Return `generator id` in scope for last `yield_for` execution. */
+    C_API rid_t yield_id(void);
 
     /* Defer execution `LIFO` of given function with argument,
     to when current coroutine exits/returns. */

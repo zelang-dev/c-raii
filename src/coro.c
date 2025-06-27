@@ -101,12 +101,15 @@ struct routine_s {
     bool is_group;
     bool is_referenced;
     bool flagged;
+    bool is_generator;
     signed int event_err_code;
     size_t alarm_time;
     size_t cycles;
     u32 interrupt_timers;
     /* unique result id */
     rid_t rid;
+    /* current generator id */
+    rid_t gen_id;
     /* unique coroutine id */
     u32 cid;
     /* thread id assigned in `deque_init()` */
@@ -126,11 +129,20 @@ struct routine_s {
     memory_t scope[1];
     routine_t *next;
     routine_t *prev;
+    generator_t yield;
     waitgroup_t wait_group;
     waitgroup_t event_group;
     routine_t *context;
     char name[64];
     char scrape[SCRAPE_SIZE];
+};
+
+struct generator_s {
+    raii_type type;
+    rid_t rid;
+    bool is_ready;
+    value_t values[1];
+    routine_t *context;
 };
 
 /* scheduler queue struct */
@@ -443,13 +455,13 @@ static RAII_INLINE bool coro_sched_is_assignable(size_t active) {
 
 static RAII_INLINE void coro_result_set(routine_t *co, void_t data) {
     if (!is_empty(data) && co->rid != RAII_ERR) {
-        u32 id = co->rid;
+        rid_t id = co->rid;
         raii_values_t *result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), RAII_FREE);
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
         atomic_thread_fence(memory_order_seq_cst);
         results[id]->result = result;
         results[id]->result->valued.object = data;
-        co->results = results[id]->result->valued.object;
+        co->results = &results[id]->result->valued;
         results[id]->is_ready = true;
         atomic_store_explicit(&gq_result.results, results, memory_order_release);
     }
@@ -1799,6 +1811,8 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->is_event_err = false;
     co->is_waiting = false;
     co->is_group = false;
+    co->is_generator = false;
+    co->gen_id = RAII_ERR;
     co->is_group_finish = true;
     co->interrupt_timers = 0;
     co->event_err_code = 0;
@@ -1806,6 +1820,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->results = nullptr;
     co->user_data = nullptr;
     co->timer = nullptr;
+    co->yield = nullptr;
     co->scope->is_protected = false;
     co->stack_base = (unsigned char *)(co + 1);
     co->magic_number = CORO_MAGIC_NUMBER;
@@ -1817,8 +1832,8 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
 
 /* Create a new coroutine running func(arg) with stack size
 and startup type: `CORO_RUN_NORMAL`, `CORO_RUN_MAIN`, `CORO_RUN_SYSTEM`, `CORO_RUN_EVENT`. */
-static u32 create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
-    u32 id;
+static rid_t create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
+    rid_t id;
     bool is_assigning, is_thread, is_group, not_resultable;
     routine_t *t = coro_create(stack, fn, arg);
     routine_t *c = coro_active();
@@ -2837,6 +2852,71 @@ value_t await(awaitable_t task) {
     return raii_values_empty->valued;
 }
 
+RAII_INLINE rid_t yield_id(void) {
+    return coro_active()->gen_id;
+}
+
+generator_t generator(callable_t fn, u64 num_of, ...) {
+    generator_t gen = nullptr;
+    routine_t *t, *c = coro_active();
+    waitgroup_t wg = waitgroup_ex(2);
+    va_list ap;
+
+    va_start(ap, num_of);
+    params_t params = array_ex(c->scope, num_of, ap);
+    va_end(ap);
+
+    rid_t rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
+    t = (routine_t *)((values_type *)hash_get(wg, __itoa(rid)))->object;
+    if (!snprintf(t->name, sizeof(t->name), "Generator #%d", (int)rid))
+        RAII_LOG("Invalid generator");
+
+    gen = calloc_full(t->scope, 1, sizeof(_generator_t), RAII_FREE);
+    gen->rid = rid;
+    gen->is_ready = false;
+    gen->context = t;
+    gen->type = RAII_YIELD;
+
+    t->yield = gen;
+    t->is_generator = true;
+    t->is_waiting = false;
+
+    c->wait_group = nullptr;
+    c->wait_active = false;
+    c->is_group_finish = true;
+    hash_free(wg);
+    return gen;
+}
+
+RAII_INLINE void yielding(void_t data) {
+    routine_t *co = coro_active();
+    if (!co->is_generator)
+        throw(logic_error);
+
+    co->yield->values->object = data;
+    co->yield->is_ready = true;
+    coro_yielding_active();
+}
+
+RAII_INLINE value_t yield_for(generator_t gen) {
+    if (!is_type(gen, RAII_YIELD))
+        return raii_values_empty->valued;
+
+    while (!gen->is_ready && !gen->context->halt) {
+        if (gen->context->status == CORO_SUSPENDED)
+            coro_enqueue(gen->context);
+
+        coro_yield_info();
+    }
+
+    if (gen->context->halt)
+        return raii_values_empty->valued;
+
+    coro_active()->gen_id = gen->rid;
+    gen->is_ready = false;
+    return *gen->values;
+}
+
 void delete(void_t ptr) {
     match(ptr) {
         and (RAII_CHANNEL)
@@ -2880,7 +2960,7 @@ routine_t *coro_interrupt_event(func_t fn, void_t handle, func_t dtor) {
     co->event_group = eg;
     co->event_active = true;
 
-    u32 cid = go((callable_t)fn, 1, handle);
+    rid_t cid = go((callable_t)fn, 1, handle);
     routine_t *c = (routine_t *)((values_type *)hash_get(eg, __itoa(cid)))->object;
     if (!is_empty(dtor)) {
         raii_deferred(c->scope, dtor, handle);
@@ -2914,7 +2994,7 @@ RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result, ptrdiff_t
 
 void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
     if (is_plain || (!is_empty(data) && co->rid != RAII_ERR)) {
-        u32 id = co->rid;
+        rid_t id = co->rid;
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
         atomic_thread_fence(memory_order_seq_cst);
         if (is_plain)

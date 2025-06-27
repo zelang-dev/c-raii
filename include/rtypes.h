@@ -194,6 +194,7 @@ typedef enum {
     RAII_VALUE,
     RAII_ARENA,
     RAII_THREAD,
+    RAII_YIELD,
     RAII_QUEUE,
     RAII_SPAWN,
     RAII_POOL,
