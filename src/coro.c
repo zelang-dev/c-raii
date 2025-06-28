@@ -2290,9 +2290,12 @@ static void coro_thread_waitfor(waitgroup_t wg) {
                         if (coro_queue_active_count() > 0)
                             atomic_fetch_sub(&gq_result.active_count, 1);
                         coro_deferred_free(co);
+                        co->magic_number = RAII_ERR;
+                        RAII_FREE(co);
+                    } else {
+                        coro_delete(co);
                     }
 
-                    coro_delete(co);
                     hash_delete(wg, key);
                 }
             }
@@ -2767,9 +2770,12 @@ waitresult_t waitfor(waitgroup_t wg) {
                             if (coro_queue_active_count() > 0)
                                 atomic_fetch_sub(&gq_result.active_count, 1);
                             coro_deferred_free(co);
+                            co->magic_number = RAII_ERR;
+                            RAII_FREE(co);
+                        } else {
+                            coro_delete(co);
                         }
 
-                        coro_delete(co);
                         hash_delete(wg, key);
                     }
                 }
