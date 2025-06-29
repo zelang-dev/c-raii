@@ -2481,7 +2481,7 @@ static int scheduler(void) {
                     if (coro_queue_is_empty()) {
                         if (coro()->used_count && interrupt_code())
                             coro()->used_count -= coro()->used_count;
-                        else if (coro()->sleeping_counted >= 0 && coro()->used_count > 0)
+                        else if (coro_sched_is_sleeping() && coro()->used_count > 0)
                             coro()->used_count--;
                     }
                 }
