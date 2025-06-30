@@ -2490,11 +2490,11 @@ static int scheduler(void) {
                     coro()->used_count++;
             }
 
-            if (!t->is_waiting && !t->is_referenced && !t->is_event_err) {
-                coro_delete(t);
-            } else if (t->is_referenced || t->is_event_err) {
-                if (coro_interrupt_set)
+            if (!t->is_waiting && !t->is_referenced) {
+                if (coro_interrupt_set && t->is_event_err)
                     coro_interrupt_shutdown(t);
+                coro_delete(t);
+            } else if (t->is_referenced) {
                 coro_gc(t);
             }
         }
