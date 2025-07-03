@@ -94,7 +94,7 @@ struct routine_s {
     bool wait_active;
     bool interrupt_active;
     bool event_active;
-    bool process_active;
+    bool event_system;
     bool is_event_err;
     bool is_waiting;
     bool is_group_finish;
@@ -1807,7 +1807,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->event_group = nullptr;
     co->interrupt_active = false;
     co->event_active = false;
-    co->process_active = false;
+    co->event_system = false;
     co->is_event_err = false;
     co->is_waiting = false;
     co->is_group = false;
@@ -1851,7 +1851,8 @@ static rid_t create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
 
     t->cid = (u32)atomic_fetch_add(&gq_result.id_generate, 1) + 1;
     t->tid = coro()->thrd_id;
-    is_group = c->wait_active && !is_empty(c->wait_group) && !c->is_group_finish;
+    is_group = c->wait_active && !is_empty(c->wait_group) && !c->is_group_finish
+        && is_empty(c->event_group);
     if (coro_is_threading()) {
         is_assigning = coro_sched_is_assignable(coro_queue_active_count());
         is_thread = not_resultable || t->run_code == CORO_RUN_MAIN
@@ -1870,12 +1871,12 @@ static rid_t create_coro(raii_func_t fn, void_t arg, u32 stack, run_mode code) {
     }
 
     id = t->rid;
-    if (c->event_active && !is_empty(c->event_group)) {
+    if (c->event_active && !is_empty(c->event_group) && id != RAII_ERR) {
         t->event_active = true;
         t->is_waiting = true;
         hash_put(c->event_group, __itoa(id), t);
         c->event_active = false;
-    } else if (is_group) {
+    } else if (is_group && id != RAII_ERR) {
         t->is_waiting = true;
         t->is_group = true;
         hash_put(c->wait_group, __itoa(id), t);
@@ -2467,7 +2468,7 @@ static int scheduler(void) {
 
         coro()->running = nullptr;
         if (t->halt || t->exiting) {
-            if (!t->system) {
+            if (!t->system && !t->event_system) {
                 --coro()->used_count;
                 if (coro_is_threading() && coro_queue_active_count() > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
@@ -2942,7 +2943,7 @@ void delete(void_t ptr) {
     }
 }
 
-value_t coro_interrupt(callable_t fn, size_t num_of_args, ...) {
+value_t coro_await(callable_t fn, size_t num_of_args, ...) {
     va_list ap;
     waitgroup_t wg = waitgroup_ex(2);
     coro_active()->interrupt_active = true;
@@ -2959,46 +2960,55 @@ value_t coro_interrupt(callable_t fn, size_t num_of_args, ...) {
     return raii_values_empty->valued;
 }
 
-routine_t *coro_interrupt_event(func_t fn, void_t handle, func_t dtor) {
-    int r;
+void coro_launch(callable_t fn, u64 num_of_args, ...) {
+    va_list ap;
+
+    va_start(ap, num_of_args);
+    params_t params = array_ex(coro_scope(), num_of_args, ap);
+    va_end(ap);
+
+    create_coro((raii_func_t)fn, params, Kb(16), CORO_RUN_INTERRUPT);
+    yield();
+}
+
+void coro_mark(void) {
     routine_t *co = coro_active();
     waitgroup_t eg = waitgroup_ex(2);
     co->event_group = eg;
     co->event_active = true;
+}
 
-    rid_t cid = go((callable_t)fn, 1, handle);
-    routine_t *c = (routine_t *)((values_type *)hash_get(eg, __itoa(cid)))->object;
-    if (!is_empty(dtor)) {
-        raii_deferred(c->scope, dtor, handle);
-        r = snprintf(c->name, sizeof(c->name), "event #%d", (int)cid);
-    } else {
-        c->process_active = true;
-        r = snprintf(c->name, sizeof(c->name), "process #%d", (int)cid);
+routine_t *coro_unmark(rid_t id, string_t name) {
+    routine_t *c = nullptr, *co = coro_active();
+    if (!is_empty(co->event_group)) {
+        waitgroup_t eg = co->event_group;
+        c = (routine_t *)((values_type *)hash_get(eg, __itoa(id)))->object;
+        c->is_waiting = false;
+        if (!snprintf(c->name, sizeof(c->name), "%s #%d", name, (int)c->cid))
+            RAII_LOG("Invalid unmarking");
+
+        co->event_group = nullptr;
+        co->is_group_finish = true;
+        hash_free(eg);
     }
-
-    if (r == 0)
-        RAII_LOG("Invalid interrupt");
-
-    co->event_group = NULL;
-    hash_free(eg);
 
     return c;
 }
 
-RAII_INLINE routine_t *coro_interrupt_process(func_t fn, void_t handle) {
-    return coro_interrupt_event(fn, handle, nullptr);
+void coro_detached(routine_t *co) {
+    if (!is_empty(co) && coro_interrupt_set && !co->event_system && co->event_active) {
+        co->event_system = true;
+        --coro()->used_count;
+        atomic_fetch_sub(&gq_result.active_count, 1);
+        if (!is_empty(co->context->event_group)){
+            waitgroup_t eg = co->context->event_group = nullptr;
+            co->context->event_group = nullptr;
+            hash_free(eg);
+        }
+    }
 }
 
-RAII_INLINE void coro_interrupt_complete(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain, bool is_returning) {
-    co->halt = true;
-    coro_interrupt_result(co, result, plain, is_plain);
-    coro_interrupt_switch(co->context);
-
-    if (is_returning)
-        coro_scheduler();
-}
-
-void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
+static void coro_await_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
     if (is_plain || (!is_empty(data) && co->rid != RAII_ERR)) {
         rid_t id = co->rid;
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
@@ -3015,30 +3025,39 @@ void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_
     }
 }
 
-RAII_INLINE void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                         bool use_yield, bool halted, bool use_context,
-                                         bool is_plain, bool is_returning) {
-    if (!is_empty(co)) {
-        co->halt = halted;
-        coro_interrupt_result(co, result, plain, is_plain);
-        if (use_context)
-            coro_interrupt_switch(co->context);
-        else if (use_yield)
-            coro_switch(co);
-    }
-
-    if (is_returning)
-        coro_scheduler();
-}
-
-RAII_INLINE void coro_interrupt_waitgroup_destroy(routine_t *co) {
-    if (!is_empty(co) && !is_empty(co->context) && is_type(co->context->wait_group, RAII_HASH))
-        hash_free(co->context->wait_group);
-}
-
-RAII_INLINE void coro_interrupt_switch(routine_t *co) {
+static RAII_INLINE void coro_await_switch(routine_t *co) {
     if (!coro_terminated(co))
         coro_switch(co);
+}
+
+RAII_INLINE void coro_await_upgrade(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain,
+                                    bool halted, bool switching) {
+    co->halt = halted;
+    coro_await_result(co, result, plain, is_plain);
+    if (switching)
+        coro_await_switch(co->context);
+}
+
+RAII_INLINE void coro_await_finish(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain) {
+    coro_await_upgrade(co, result, plain, is_plain, true, true);
+}
+
+RAII_INLINE void coro_await_exit(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain) {
+    if (!is_empty(co)) {
+        co->halt = true;
+        coro_await_result(co, result, plain, is_plain);
+        coro_switch(co);
+        if (!is_empty(co->context))
+            coro_await_switch(co->context);
+    }
+
+    coro_scheduler();
+}
+
+RAII_INLINE void coro_await_canceled(routine_t *co, signed int code) {
+    coro_await_erred(co, code);
+    coro_err_set(co->context, code);
+    coro_await_switch(co->context);
 }
 
 RAII_INLINE void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
@@ -3063,17 +3082,6 @@ RAII_INLINE void coro_halt_set(routine_t *co) {
 
 RAII_INLINE void coro_halt_clear(routine_t *co) {
     co->halt = false;
-}
-
-void interrupt_launch(callable_t fn, u64 num_of_args, ...) {
-    va_list ap;
-
-    va_start(ap, num_of_args);
-    params_t params = array_ex(coro_scope(), num_of_args, ap);
-    va_end(ap);
-
-    create_coro((raii_func_t)fn, params, Kb(16), CORO_RUN_INTERRUPT);
-    yield();
 }
 
 RAII_INLINE void_t interrupt_handle(void) {
@@ -3160,7 +3168,7 @@ RAII_INLINE routine_t *coro_ref_current(void) {
     return t;
 }
 
-RAII_INLINE void_t coro_interrupt_erred(routine_t *co, int code) {
+RAII_INLINE void_t coro_await_erred(routine_t *co, int code) {
     co->is_event_err = true;
     co->event_err_code = code;
     co->status = CORO_ERRED;

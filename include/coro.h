@@ -320,9 +320,6 @@ extern "C" {
 
     C_API routine_t *coro_sleeping(void);
 
-    /* Add coroutine to queue. */
-    C_API void coro_enqueue(routine_t *t);
-
     /* Multithreading checker for available coroutines in `waitgroup`, if any,
     transfer from `global` run queue, to current thread `local` run queue.
 
@@ -330,27 +327,85 @@ extern "C" {
     to start there execution, and assign coroutines. */
     C_API void coro_stealer(void);
 
-    C_API value_t coro_interrupt(callable_t, size_t, ...);
-    C_API void_t coro_interrupt_erred(routine_t *, int);
-    C_API void coro_interrupt_switch(routine_t *);
-    C_API void coro_interrupt_complete(routine_t *, void_t result, ptrdiff_t plain,
-                                       bool is_plain, bool is_returning);
-    C_API void coro_interrupt_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain);
-    C_API void coro_interrupt_finisher(routine_t *co, void_t result, ptrdiff_t plain,
-                                       bool use_yield, bool halted, bool use_context,
-                                       bool is_plain, bool is_returning);
-    C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
-                                    func_t shutdownfunc, call_timer_t timerfunc, call_t systemfunc);
-    C_API routine_t *coro_interrupt_event(func_t, void_t, func_t);
-    C_API routine_t *coro_interrupt_process(func_t fn, void_t handle);
-    C_API void coro_interrupt_waitgroup_destroy(routine_t *);
+    /* Prepare/mark next `Go/coroutine` as `interrupt` event to be ~detached~. */
+    C_API void coro_mark(void);
+
+    /* Set name on `Go` result `id`, and finish an previous `coro_mark` ~interrupt~ setup. */
+    C_API routine_t *coro_unmark(rid_t cid, string_t name);
+
+    /* Detach an `interrupt` coroutine that was `coro_mark`, will not prevent system from shuting down. */
+    C_API void coro_detached(routine_t *);
+
+    /* This function forms the basics for `integrating` with an `callback/event loop` like system.
+    Internally referenced as an `interrupt`.
+
+    The function provided and arguments will be launch in separate coroutine,
+    there should be an `preset` callback having either:
+
+    - `coro_await_finish(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain)`
+    - `coro_await_exit`
+    - `coro_await_upgrade`
+
+    These functions are designed to break the `waitfor` loop, set `result`, and `return` to ~caller~.
+    The launched coroutine should first call `coro_active()` and store the `required` context. */
+    C_API value_t coro_await(callable_t, size_t, ...);
+
+    /* Create an coroutine and immediately execute, intended to be used to launch
+    another coroutine like `coro_await` to create an background `interrupt` coroutine. */
+    C_API void coro_launch(callable_t fn, u64 num_of_args, ...);
+
+    /* Same as `coro_await_finish`, but adding conditionals to either `stop` or `switch`.
+    Should be used to control `waitfor` loop, can `continue` after returning some `temporay data/result`.
+
+    Meant for `special` network connection handling. */
+    C_API void coro_await_upgrade(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain,
+                                  bool halted, bool switching);
+
+    /* Should be used inside an `preset` callback, this function:
+    - signal `coroutine` in `waitfor` loop to `stop`.
+    - set `result`, either `pointer` or `non-pointer` return type.
+    - then `switch` to stored `coroutine context` to return to `caller`.
+
+    Any `resource` release `routines` should be placed after this function. */
+    C_API void coro_await_finish(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain);
+
+    /* Similar to `coro_await_finish`, but should be used for exiting some
+     `background running coroutine` to perform cleanup. */
+    C_API void coro_await_exit(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain);
+
+    /* Should be used as part of `coro_await` initialization function to
+    indicate an `error` condition, where the `preset` callback WILL NOT be called.
+    - This will `set` coroutine to `error state` then `switch` to stored `coroutine context`
+    to return to `caller`. */
+    C_API void coro_await_canceled(routine_t *, signed int code);
+
+    /* Should be used as part of an `preset` ~interrupt~ callback
+    to `record/indicate` an `error` condition. */
+    C_API void_t coro_await_erred(routine_t *, int);
 
     /* Check for coroutine completetion. */
     C_API bool coro_terminated(routine_t *);
     C_API void coro_halt_set(routine_t *);
     C_API void coro_halt_clear(routine_t *);
 
-    C_API void interrupt_launch(callable_t fn, u64 num_of_args, ...);
+    /* Setup callback handlers to integrate into coroutine `scheduler`, and other routines.
+
+    - `loopfunc` - is executed before any coroutine `switch`, the `interrupter`.
+     ** Coroutine `scheduler` will use `perthreadfunc` handle to make `interrupter` call.
+
+    - `perthreadfunc` - will create each thread's own `loopfunc` handle.
+     ** `interrupt_handle()` will return `perthreadfunc` handle, use `interrupt_handle_set()` will set.
+
+    - `shutdownfunc` - shutdown routine to call to cleanup `loopfunc` and `perthreadfunc` processing.
+     ** The `shutdownfunc` will be called at exit, before any `scheduler` cleanup routines.
+
+    - `timerfunc` - `timer/sleep` routine to replace current `sleepfor` handling.
+    - `systemfunc` - custom `timefunc` system handling.
+
+    NOTE: `loopfunc`, `perthreadfunc`, and `shutdownfunc` are required for proper integration. */
+    C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
+                                    func_t shutdownfunc, call_timer_t timerfunc, call_t systemfunc);
+
     C_API void_t interrupt_handle(void);
     C_API void_t interrupt_data(void);
     C_API i32 interrupt_code(void);
