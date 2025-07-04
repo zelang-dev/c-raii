@@ -418,7 +418,10 @@ C_API const raii_values_t raii_values_empty[1];
 #define and(ENUM) case ENUM:
 #define or(ENUM) break; case ENUM:
 #define otherwise break; default:
-#define casting(X) (void_t)((ptrdiff_t)(X))
+
+/* `Cast` ~val~, a `non-pointer` to `pointer` like value,
+makes reference if variable. */
+#define casting(val) (void_t)((ptrdiff_t)(val))
 
 #ifndef va_copy
 # ifdef __va_copy

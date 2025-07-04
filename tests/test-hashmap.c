@@ -26,7 +26,7 @@ TEST(map_for) {
     ASSERT_PTR(&index4, map_get(list, "4").object);
     ASSERT_UEQ(4, map_count(list));
 
-    map_put(list, "3", $$$(3));
+    map_put(list, "3", casting(3));
     ASSERT_EQ(3, map_get(list, "3").integer);
     ASSERT_UEQ(4, map_count(list));
 
