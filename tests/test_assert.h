@@ -55,7 +55,7 @@ inline void assert_expected(long res, long expected, const char *file, unsigned 
 	PRINT_ERR(" %s %d:\n   * %s != %s\n   * Expected: " print_op	\
           "\n   * Actual: " print_op "\n", __FILE__, __LINE__, \
           #expected, #actual, expected, actual); \
-    return $$$(1); \
+    return casting(1); \
       } \
     PRINT_OK(" %s == %s\033[0K\n", #expected, #actual); \
   } while (0)

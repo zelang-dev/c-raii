@@ -16,8 +16,8 @@ static void(fastcall *coro_swap)(routine_t *, routine_t *) = 0;
 coro_sys_func coro_main_func = nullptr;
 bool coro_sys_set = false;
 
-/* Coroutine context structure. */
-struct routine_s {
+/* Base coroutine context. */
+typedef struct {
 #if defined(_WIN32) && defined(_M_IX86) && !defined(USE_UCONTEXT)
     void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
     void_t xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
@@ -77,6 +77,11 @@ struct routine_s {
     mcontext_t uc_mcontext;
     __sigset_t uc_sigmask;
 #endif
+} coro_t;
+
+/* Coroutine extended context. */
+struct routine_s {
+    coro_t type[1];
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void_t stack_base;
 #if defined(_WIN32) && (defined(_M_X64) || defined(_M_IX86))

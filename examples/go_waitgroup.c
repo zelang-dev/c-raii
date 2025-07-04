@@ -40,7 +40,7 @@ func main() {
 
 void *worker(params_t args) {
     int wid = args[0].integer + 1;
-    int id = coro_id();
+    int r = 32, id = coro_id();
 
     printf("Worker %d starting\n", wid);
     coro_info_active();
@@ -49,7 +49,7 @@ void *worker(params_t args) {
     coro_info_active();
 
     if (id == 4)
-        return $$$(32);
+        return casting(r);
     else if (id == 3)
         return "hello world";
 

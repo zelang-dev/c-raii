@@ -101,9 +101,6 @@ typedef struct awaitable_s {
     int coro_main(__VA_ARGS__)
 #endif
 
-/* Cast `val` to generic union value_t storage type */
-#define $$$(val) ((value_t *)(val))
-
 #ifndef CORO_STACK_SIZE
 /* Stack size when creating a coroutine. */
 #   define CORO_STACK_SIZE (16 * 1024)
