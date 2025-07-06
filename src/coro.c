@@ -2905,6 +2905,10 @@ RAII_INLINE void yielding(void_t data) {
     if (!co->is_generator)
         throw(logic_error);
 
+    while (co->yield->is_ready) {
+        yield();
+    }
+
     co->yield->values->object = data;
     co->yield->is_ready = true;
     coro_yielding_active();

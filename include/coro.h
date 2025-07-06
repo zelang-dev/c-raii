@@ -218,8 +218,9 @@ extern "C" {
     /* Yield execution to another coroutine and reschedule current. */
     C_API void yield(void);
 
-    /* Suspends the execution of current `Generator/Coroutine`, and passing data.
-    WILL PANIC if not an ~Generator~ created function called in. */
+    /* Suspends the execution of current `Generator/Coroutine`, and passing ~data~.
+    WILL PANIC if not an ~Generator~ function called in.
+    WILL `yield` until ~data~ is retrived using `yield_for`. */
     C_API void yielding(void_t);
 
     /* Creates an `Generator/Coroutine` of given function with arguments,
