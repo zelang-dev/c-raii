@@ -2925,7 +2925,7 @@ RAII_INLINE value_t yield_for(generator_t gen) {
         coro_yield_info();
     }
 
-    if (gen->context->halt)
+    if (gen->context->halt && !gen->is_ready)
         return raii_values_empty->valued;
 
     coro_active()->gen_id = gen->rid;
