@@ -298,6 +298,11 @@ extern "C" {
     C_API value_t *get_coro_result(routine_t *);
     C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_context_set(routine_t *, routine_t *);
+
+    C_API generator_t coro_generator(void);
+    C_API generator_t get_coro_generator(routine_t *co);
+    C_API void coro_generator_set(routine_t *co, generator_t gen);
+
     C_API void coro_info(routine_t *, int pos);
 
     /* Sets the current coroutine's name.*/

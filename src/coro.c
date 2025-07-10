@@ -1713,6 +1713,18 @@ RAII_INLINE void coro_context_set(routine_t *co, routine_t *t) {
     co->context = t;
 }
 
+RAII_INLINE generator_t coro_generator(void) {
+    return coro_active()->yield;
+}
+
+RAII_INLINE generator_t get_coro_generator(routine_t *co) {
+    return co->yield;
+}
+
+RAII_INLINE void coro_generator_set(routine_t *co, generator_t gen) {
+    co->yield = gen;
+}
+
 /* Return handle to previous coroutine. */
 static RAII_INLINE routine_t *coro_current(void) {
     return coro()->current_handle;
