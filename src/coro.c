@@ -3021,8 +3021,8 @@ void coro_detached(routine_t *co) {
         co->event_system = true;
         --coro()->used_count;
         atomic_fetch_sub(&gq_result.active_count, 1);
-        if (!is_empty(co->context->event_group)){
-            waitgroup_t eg = co->context->event_group = nullptr;
+        if (co->context && !is_empty(co->context->event_group)) {
+            waitgroup_t eg = co->context->event_group;
             co->context->event_group = nullptr;
             hash_free(eg);
         }
