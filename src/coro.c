@@ -3212,6 +3212,10 @@ RAII_INLINE u32 coro_active_id(void) {
     return coro_active()->cid;
 }
 
+RAII_INLINE u32 coro_thrd_id(void) {
+    return coro_active()->tid;
+}
+
 RAII_INLINE void coro_info_active(void) {
     coro_info(nullptr, 0);
 }
