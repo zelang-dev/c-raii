@@ -289,11 +289,9 @@ extern "C" {
     C_API signed int get_coro_err(routine_t *);
     C_API void coro_err_set(routine_t *, signed int code);
 
+    C_API void_t coro_data(void);
     C_API void_t get_coro_data(routine_t *);
     C_API void coro_data_set(routine_t *, void_t data);
-
-    C_API void_t get_coro_timer(routine_t *);
-    C_API void coro_timer_set(routine_t *, void_t data);
 
     C_API value_t *get_coro_result(routine_t *);
     C_API routine_t *get_coro_context(routine_t *);
@@ -402,12 +400,8 @@ extern "C" {
     - `shutdownfunc` - shutdown routine to call to cleanup `loopfunc` and `perthreadfunc` processing.
      ** The `shutdownfunc` will be called at exit, before any `scheduler` cleanup routines.
 
-    - `timerfunc` - `timer/sleep` routine to replace current `sleepfor` handling.
-    - `systemfunc` - custom `timefunc` system handling.
-
     NOTE: `loopfunc`, `perthreadfunc`, and `shutdownfunc` are required for proper integration. */
-    C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc,
-                                    func_t shutdownfunc, call_timer_t timerfunc, call_t systemfunc);
+    C_API void coro_interrupt_setup(call_interrupter_t loopfunc, call_t perthreadfunc, func_t shutdownfunc);
 
     C_API void_t interrupt_handle(void);
     C_API void_t interrupt_data(void);
