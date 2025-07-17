@@ -2888,6 +2888,7 @@ generator_t generator(callable_t fn, u64 num_of, ...) {
     t->yield = gen;
     t->is_generator = true;
     t->is_waiting = false;
+    t->context = c;
 
     c->wait_group = nullptr;
     c->wait_active = false;
@@ -3039,6 +3040,13 @@ RAII_INLINE void coro_await_upgrade(routine_t *co, void_t result, ptrdiff_t plai
                                     bool halted, bool switching) {
     co->halt = halted;
     coro_await_result(co, result, plain, is_plain);
+    if (switching)
+        coro_await_switch(co->context);
+}
+
+RAII_INLINE void coro_await_yield(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain, bool switching) {
+    coro_await_result(co, result, plain, is_plain);
+    coro_await_switch(co);
     if (switching)
         coro_await_switch(co->context);
 }

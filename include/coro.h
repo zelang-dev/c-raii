@@ -362,6 +362,11 @@ extern "C" {
     C_API void coro_await_upgrade(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain,
                                   bool halted, bool switching);
 
+    /* Similar to `coro_await_upgrade`, but does not ~halt/exit~,
+    should be used for `Generator` callback handling.
+    WILL switch to `generator` function `called` then ~conditionally~ back to `caller`. */
+    C_API void coro_await_yield(routine_t *co, void_t result, ptrdiff_t plain, bool is_plain, bool switching);
+
     /* Should be used inside an `preset` callback, this function:
     - signal `coroutine` in `waitfor` loop to `stop`.
     - set `result`, either `pointer` or `non-pointer` return type.
