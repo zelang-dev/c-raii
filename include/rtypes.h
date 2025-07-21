@@ -346,7 +346,10 @@ s\
 
 #define trace Statement(printf("%s:%d: Trace\n", FILE_NAME, __LINE__);)
 #define unreachable Statement(printf("How did we get here? In %s on line %d\n", FILE_NAME, __LINE__);)
-#define PATH_MAX 4096
+
+#ifndef PATH_MAX
+#   define PATH_MAX 1024
+#endif
 
 #define Gb(count) (u64) (count * 1024 * 1024 * 1024)
 #define Mb(count) (u64) (count * 1024 * 1024)
