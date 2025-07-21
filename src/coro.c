@@ -521,34 +521,6 @@ static void coro_func(void) {
     coro_done(); /* called only if coroutine function returns */
 }
 
-/* Add coroutine to scheduler queue, try prepending. */
-static void coro_insert(scheduler_t *l, routine_t *t) {
-    routine_t *other = nullptr, *head = l->head, *tail = l->tail;
-    if (head) {
-        t->next = head;
-        if (head->prev) {
-            other = head->prev;
-            t->prev = other;
-            other->next = t;
-        } else {
-            t->prev = other;
-            l->head = t;
-        }
-        head->prev = t;
-    } else {
-        t->prev = tail;
-        if (tail->next) {
-            other = tail->next;
-            t->next = other;
-            other->prev = t;
-        } else {
-            t->next = other;
-            l->tail = t;
-        }
-        tail->next = t;
-    }
-}
-
 /* Add coroutine to scheduler queue, appending. */
 static void coro_add(scheduler_t *l, routine_t *t) {
     if (l->tail) {
@@ -1235,7 +1207,7 @@ __asm__(
 
 routine_t *coro_derive(void_t memory, size_t size) {
     uint8_t *sp;
-    routine_t *context = (routine_t *)memory;
+    coro_t *context = (coro_t *)memory;
     if (!coro_swap) {
         coro_swap = (void (*)(routine_t *, routine_t *))swap_context;
     }
@@ -1260,10 +1232,10 @@ routine_t *coro_derive(void_t memory, size_t size) {
     context->lr = (uint64_t)coro_func;
 
 #ifdef USE_VALGRIND
-    size_t stack_addr = _coro_align_forward((size_t)context + sizeof(routine_t), 16);
-    context->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+    size_t stack_addr = _coro_align_forward((size_t)memory + sizeof(routine_t), 16);
+    ((routine_t *)memory)->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
-    return context;
+    return (routine_t *)memory;
 }
 
 #elif defined(__ARM_EABI__)
@@ -1298,7 +1270,7 @@ __asm__(
 static void coro_init(void) {}
 
 routine_t *coro_derive(void_t memory, size_t size) {
-    routine_t *ctx = (routine_t *)memory;
+    coro_t *ctx = (coro_t *)memory;
     if (!coro_swap) {
         coro_swap = (void (*)(routine_t *, routine_t *))swap_context;
     }
@@ -1310,10 +1282,10 @@ routine_t *coro_derive(void_t memory, size_t size) {
     ctx->sp = (void *)((size_t)memory + size);
 #ifdef USE_VALGRIND
     size_t stack_addr = _coro_align_forward((size_t)memory + sizeof(routine_t), 16);
-    ctx->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+    ((routine_t *)memory)->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
-    return ctx;
+    return (routine_t *)memory;
 }
 
 #elif defined(__riscv)
@@ -1482,7 +1454,7 @@ __asm__(
 static void coro_init(void) {}
 
 routine_t *coro_derive(void_t memory, size_t size) {
-    routine_t *ctx = (routine_t *)memory;
+    coro_t *ctx = (coro_t *)memory;
     if (!coro_swap) {
         coro_swap = (void (*)(routine_t *, routine_t *))swap_context;
     }
@@ -1494,10 +1466,10 @@ routine_t *coro_derive(void_t memory, size_t size) {
     ctx->sp = (void *)((size_t)memory + size);
 #ifdef USE_VALGRIND
     size_t stack_addr = _coro_align_forward((size_t)memory + sizeof(routine_t), 16);
-    ctx->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
+    ((routine_t *)memory)->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
 #endif
 
-    return ctx;
+    return (routine_t *)memory;
 }
 /*
 #if __riscv_xlen == 32

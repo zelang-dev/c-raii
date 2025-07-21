@@ -308,6 +308,7 @@ extern "C" {
 
     /* Check for at least `n` bytes left on the stack. If not present, panic/abort. */
     C_API void coro_stack_check(int);
+    C_API void coro_enqueue(routine_t *);
 
     /* Suspends the execution of current coroutine, switch to scheduler. */
     C_API void coro_suspend(void);
