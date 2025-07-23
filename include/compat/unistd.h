@@ -47,6 +47,13 @@
 #define ssize_t long
 #endif
 
+#ifdef _MSC_VER
+static inline unsigned int sleep(unsigned int seconds) {
+    Sleep(seconds * 1000);
+    return seconds;
+}
+#endif
+
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
