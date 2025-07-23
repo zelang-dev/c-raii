@@ -37,7 +37,6 @@ jobs:
         with:
           source: ./docs
           destination: ./_site
-          token: $GITHUB_TOKEN
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
