@@ -244,10 +244,6 @@ work_t *done_task(work_t *w) {
 }
 
 int main(int argc, char **argv) {
-    /* Check that top and bottom are 64-bit so they never overflow */
-    static_assert(sizeof(atomic_size_t) == 8,
-                  "Assume atomic_size_t is 8 byte wide");
-
     pthread_t threads[N_THREADS];
     int i, j, tids[N_THREADS];
     thread_queues = malloc(N_THREADS * sizeof(deque_t));

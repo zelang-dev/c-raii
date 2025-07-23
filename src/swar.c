@@ -39,7 +39,11 @@ RAII_INLINE uintptr_t extend(char c) {
 RAII_INLINE int countr_zero(uintptr_t mask) {
 #ifdef _WIN32
     unsigned long result;
+#ifdef _X86_
+    _BitScanForward(&result, mask);
+#else
     _BitScanForward64(&result, mask);
+#endif
     return (int)result;
 #else
     return __builtin_ctzll(mask);
@@ -49,7 +53,11 @@ RAII_INLINE int countr_zero(uintptr_t mask) {
 RAII_INLINE int countl_zero(uintptr_t mask) {
 #ifdef _WIN32
     unsigned long result;
+#ifdef _X86_
+    _BitScanReverse(&result, mask);
+#else
     _BitScanReverse64(&result, mask);
+#endif
     return (int)result;
 #else
     return __builtin_clzll(mask);
