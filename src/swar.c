@@ -46,7 +46,11 @@ RAII_INLINE int countr_zero(uintptr_t mask) {
 #endif
     return (int)result;
 #else
+#if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+    return __builtin_ctzl(mask);
+#else
     return __builtin_ctzll(mask);
+#endif
 #endif
 }
 
@@ -60,7 +64,11 @@ RAII_INLINE int countl_zero(uintptr_t mask) {
 #endif
     return (int)result;
 #else
+#if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+    return __builtin_clzl(mask);
+#else
     return __builtin_clzll(mask);
+#endif
 #endif
 }
 
@@ -79,6 +87,19 @@ RAII_INLINE bool hasbyte(uint64_t x, uint8_t c) {
 }
 
 RAII_INLINE uint32_t _memchr8(bool Printable, bool Exists, bool Reverse, string_t s, uint8_t c) {
+#if defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+    // int 32 of all c's
+    uint32_t m = extend(c);
+
+    // int 32 of s
+    uint32_t x = cast(s);
+
+    // remove c's from string
+    // so now we have to find first zero byte
+    x ^= m;
+
+    uint32_t a = 0x7f7f7f7ful;
+#else
     // int 64 of all c's
     uint64_t m = extend(c);
 
@@ -90,6 +111,7 @@ RAII_INLINE uint32_t _memchr8(bool Printable, bool Exists, bool Reverse, string_
     x ^= m;
 
     uint64_t a = 0x7f7f7f7f7f7f7f7full;
+#endif
 
     // set the high bit in non-zero bytes
     if (Printable) {
@@ -167,9 +189,17 @@ static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, string_t s, uint
     string_t end = s + len;
 
     // If shorter than 8 bytes, we have to mask away c bytes past len
+
+
+#if defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+    uint16_t partLen = (len & 3) ? (len & 3) : 4;
+    uint32_t partMask = len < 4 ? ~0ul >> (32 - partLen * 4) : 0ul;
+    uint32_t first = cast(p) & ~(partMask & extend(c));
+#else
     uint32_t partLen = (len & 7) ? (len & 7) : 8;
     uint64_t partMask = len < 8 ? ~0ull >> (64 - partLen * 8) : 0ull;
     uint64_t first = cast(p) & ~(partMask & extend(c));
+#endif
 
     // Check first 8 bytes
     if (hasbyte(first, c))
@@ -443,6 +473,10 @@ RAII_INLINE size_t simd_strlen(string_t str) {
 }
 
 RAII_INLINE string simd_memchr(string_t s, uint8_t c, uint32_t len) {
+#if defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+    string ptr = (string)s;
+    return (string)memchr(ptr, c, simd_strlen(s));
+#endif
     return (string)s + _memchr(false, false, s, len, c);
 }
 
