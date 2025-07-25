@@ -481,7 +481,7 @@ RAII_INLINE string simd_memchr(string_t s, uint8_t c, uint32_t len) {
 }
 
 RAII_INLINE string simd_memrchr(string_t s, uint8_t c, uint32_t len) {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
     return (string)str_memrchr((const_t)s, (int)c, (size_t)len);
 #else
     return (string)s + _memrchr(false, false, s, len, c);
