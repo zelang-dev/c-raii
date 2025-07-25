@@ -9,9 +9,9 @@ extern "C" {
 
 C_API vectors_t vector_variant(void);
 C_API vectors_t vector_for(vectors_t, size_t, ...);
-C_API void vector_insert(vectors_t, int, void_t);
+C_API void vector_insert(vectors_t, size_t, void_t);
 C_API void vector_clear(vectors_t);
-C_API void vector_erase(vectors_t, int);
+C_API void vector_erase(vectors_t, size_t);
 C_API size_t vector_size(vectors_t);
 C_API size_t vector_capacity(vectors_t);
 C_API memory_t *vector_scope(vectors_t);
@@ -61,7 +61,8 @@ C_API value_t array_pop(arrays_t arr);
 C_API value_t array_shift(arrays_t arr);
 C_API void array_append_item(arrays_t arr, ...);
 C_API void array_delete(arrays_t);
-C_API void array_remove(arrays_t, int);
+C_API void array_remove(arrays_t, size_t);
+C_API void array_reset(arrays_t);
 C_API bool is_array(void_t);
 
 /* Returns a sequence of numbers, in a given range, this is same as `arrays_of`,
@@ -90,6 +91,7 @@ C_API arrays_t arrays(void);
 #define $remove(arr, index) array_remove((arrays_t)arr, index)
 #define $pop(arr) array_pop((arrays_t)arr)
 #define $shift(arr) array_shift((arrays_t)arr)
+#define $reset(arr) array_reset((arrays_t)arr)
 
 C_API values_type get_arg(void_t);
 
@@ -107,10 +109,10 @@ C_API values_type get_arg(void_t);
 #define in ,
 #define foreach_xp(X, A) X A
 #define foreach_in(X, S) values_type X; int i##X;  \
-    for (i##X = 0; i##X < $size(S); i##X++)      \
+    for (i##X = 0; i##X < (int)$size(S); i##X++)      \
         if ((X.object = S[i##X].object) || X.object == nullptr)
 #define foreach_in_back(X, S) values_type X; int i##X; \
-    for (i##X = $size(S) - 1; i##X >= 0; i##X--)     \
+    for (i##X = (int)$size(S) - 1; i##X >= 0; i##X--)     \
         if ((X.object = S[i##X].object) || X.object == nullptr)
 
 /* The `foreach(`item `in` vector/array`)` macro, similar to `C#`,

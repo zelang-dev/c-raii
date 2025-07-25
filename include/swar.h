@@ -34,6 +34,12 @@
 #include "rtypes.h"
 #include "exception.h"
 
+typedef enum {
+    STR_PAD_LEFT = RAII_COUNTER,
+    STR_PAD_RIGHT,
+    STR_PAD_BOTH
+} str_pad_type;
+
 // Cast char* to T using memcpy. memcpy is optimized away on x86
 C_API uintptr_t cast(string_t src);
 C_API uintptr_t cast8(string_t s, uint32_t len);
@@ -162,6 +168,9 @@ C_API bool is_base64(u_string_t src);
 C_API int strpos(string_t text, string pattern);
 C_API const_t str_memrchr(const_t s, int c, size_t n);
 
+C_API arrays_t str_explode(string_t s, string_t delim);
+C_API string str_repeat(string str, int mult);
+C_API string str_pad(string str, int length, string pad, str_pad_type pad_type);
 C_API string str_trim(string_t str, size_t length);
 C_API string str_dup(string_t str);
 C_API string str_replace(string_t haystack, string_t needle, string_t replace);

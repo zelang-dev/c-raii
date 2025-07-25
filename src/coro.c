@@ -383,7 +383,7 @@ static void deque_destroy(void) {
     if (is_type(gq_result.queue, RAII_POOL)) {
         raii_deque_t *queue = gq_result.queue;
         memory_t *scope = queue->scope;
-        int i;
+        size_t i;
         queue->type = RAII_ERR;
         if (!is_empty(queue->local)) {
             for (i = 1; i < gq_result.thread_count; i++) {

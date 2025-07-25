@@ -70,7 +70,7 @@ static RAII_INLINE void vector_delete(vectors_t vec) {
     }
 }
 
-RAII_INLINE void vector_insert(vectors_t vec, int pos, void_t val) {
+RAII_INLINE void vector_insert(vectors_t vec, size_t pos, void_t val) {
     size_t size, cv_cap__ = vector_cap(vec);
     memory_t *scope = vector_context(vec);
     if (cv_cap__ <= vector_length(vec)) {
@@ -86,7 +86,7 @@ RAII_INLINE void vector_insert(vectors_t vec, int pos, void_t val) {
     vector_set_size((vec), vector_length(vec) + 1);
 }
 
-void vector_erase(vectors_t vec, int i) {
+void vector_erase(vectors_t vec, size_t i) {
     if (vec) {
         const size_t cv_sz__ = vector_length(vec);
         if ((i) < cv_sz__) {
@@ -268,7 +268,7 @@ ranges_t range_char(string_t text) {
     ranges_t array = arrays();
     memory_t *scope = vector_context(array);
     size_t len = simd_strlen(text);
-    int i;
+    size_t i;
     vector_grow((array), (len + 1), scope);
     for (i = 0; i < len; i++)
         $append(array, (uintptr_t)*text++);
@@ -277,7 +277,7 @@ ranges_t range_char(string_t text) {
     return array;
 }
 
-RAII_INLINE void array_remove(arrays_t arr, int i) {
+RAII_INLINE void array_remove(arrays_t arr, size_t i) {
     if (arr) {
         const size_t cv_sz__ = vector_length(arr);
         if ((i) < cv_sz__) {
@@ -376,6 +376,10 @@ void array_append_item(arrays_t arr, ...) {
     }
     va_end(ap);
     vector_set_size(arr, index + 1);
+}
+
+RAII_INLINE void array_reset(arrays_t arr) {
+    vector_clear((vectors_t)arr);
 }
 
 arrays_t array_of(memory_t *scope, size_t count, ...) {

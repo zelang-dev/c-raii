@@ -33,7 +33,7 @@ int showDetails(reflect_type_t *i, interface j) {
 
     printf("\nThe values in the first argument are :\n");
     if (strcmp(reflect_kind(i), "struct") == 0) {
-        size_t numberOfFields = reflect_num_fields(i);
+        int numberOfFields = (int)reflect_num_fields(i);
         for (index = 0; index < numberOfFields; index++) {
             reflect_get_field(i, index, value);
             if (index == 3 || index == 0)

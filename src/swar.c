@@ -768,6 +768,147 @@ RAII_INLINE string str_replace(string_t haystack, string_t needle, string_t repl
     return str_replace_ex(get_scope(), haystack, needle, replace);
 }
 
+RAII_INLINE arrays_t str_explode(string_t s, string_t delim) {
+    if (is_str_eq(s, ""))
+        return nullptr;
+
+    if (is_empty((void_t)delim))
+        delim = " ";
+
+    arrays_t data = arrays();
+    string first = nullptr, _s = (string)s;
+    string_t *ptrs;
+    bool is_first = true;
+    size_t ptrsSize, nbWords = 0, sLen = simd_strlen(s), delimLen = simd_strlen(delim);
+
+    while ((_s = strstr(_s, delim))) {
+        _s += delimLen;
+        nbWords++;
+    }
+
+    if (nbWords > 0) {
+        ptrsSize = nbWords * sizeof(string);
+        ptrs = calloc_full(get_scope(), 1, ptrsSize + sLen + 1, RAII_FREE);
+        first = _s = str_copy((string)ptrs, s, sLen);
+        while ((_s = strstr(_s, delim))) {
+            *_s = '\0';
+            if (is_first) {
+                is_first = false;
+                $append_string(data, first);
+            }
+
+            _s += delimLen;
+            $append_string(data, _s);
+        }
+    }
+
+    return data;
+}
+
+string str_repeat(string str, int mult) {
+    string result;
+    size_t result_len, len = simd_strlen(str);
+
+    if (mult < 0) {
+        raii_panic("must be greater than or equal to 0");
+    }
+
+    /* Don't waste our time if it's empty */
+    /* ... or if the multiplier is zero */
+    if (len == 0 || mult == 0)
+        return "";
+
+    /* Initialize the result string */
+    result_len = len * mult;
+    result = calloc_local(1, result_len + 1);
+
+    /* Heavy optimization for situations where input string is 1 byte long */
+    if (len == 1) {
+        memset(result, *str, mult);
+    } else {
+        string_t s, ee;
+        string e;
+        ptrdiff_t l = 0;
+        memcpy(result, str, len);
+        s = result;
+        e = (string)s + len;
+        ee = s + result_len;
+
+        while (e < ee) {
+            l = (e - s) < (ee - e) ? (e - s) : (ee - e);
+            memmove(e, s, l);
+            e += l;
+        }
+    }
+
+    return result;
+}
+
+string str_pad(string str, int length, string pad, str_pad_type pad_type) {
+    size_t pad_str_len, num_pad_chars, i;
+    size_t len = 0, left_pad = 0, right_pad = 0, input_len = simd_strlen(str);
+    string result = nullptr;
+
+    if (is_empty(pad)) {
+        pad = " ";
+        pad_str_len = 1;
+    } else {
+        pad_str_len = simd_strlen(pad);
+    }
+
+    if (!pad_type)
+        pad_type = STR_PAD_RIGHT; /* The padding type value */
+
+    /* If resulting string turns out to be shorter than input string,
+       we simply copy the input and return. */
+    if (length < 0 || (size_t)length <= input_len) {
+        return str;
+    }
+
+    if (pad_str_len == 0) {
+        raii_panic("must be a non-empty string");
+    }
+
+    if (pad_type < STR_PAD_LEFT || pad_type > STR_PAD_BOTH) {
+        raii_panic("must be STR_PAD_LEFT, STR_PAD_RIGHT, or STR_PAD_BOTH");
+    }
+
+    num_pad_chars = length - input_len;
+    result = calloc_local(1, input_len + num_pad_chars + 1);
+
+    /* We need to figure out the left/right padding lengths. */
+    switch (pad_type) {
+        case STR_PAD_RIGHT:
+            left_pad = 0;
+            right_pad = num_pad_chars;
+            break;
+
+        case STR_PAD_LEFT:
+            left_pad = num_pad_chars;
+            right_pad = 0;
+            break;
+
+        case STR_PAD_BOTH:
+            left_pad = num_pad_chars / 2;
+            right_pad = num_pad_chars - left_pad;
+            break;
+    }
+
+    /* First we pad on the left. */
+    for (i = 0; i < left_pad; i++)
+        result[len++] = pad[i % pad_str_len];
+
+    /* Then we copy the input string. */
+    memcpy((result + len), str, input_len);
+    len += input_len;
+
+    /* Finally, we pad on the right. */
+    for (i = 0; i < right_pad; i++)
+        result[len++] = pad[i % pad_str_len];
+
+    return result;
+}
+
 RAII_INLINE string str_toupper(string s, size_t len) {
     u_string c;
     u_string_t e;

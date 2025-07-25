@@ -319,6 +319,32 @@ TEST(raii_concat) {
     return 0;
 }
 
+TEST(str_repeat) {
+    ASSERT_STR(str_repeat("-=", 10), "-=-=-=-=-=-=-=-=-=-=");
+    return 0;
+}
+
+TEST(str_pad) {
+    string input = "Alien";
+    ASSERT_STR(str_pad(input, 10, nullptr, 0), "Alien     ");
+    ASSERT_STR(str_pad(input, 10, "-=", STR_PAD_LEFT), "-=-=-Alien");
+    ASSERT_STR(str_pad(input, 10, "_", STR_PAD_BOTH), "__Alien___");
+    ASSERT_STR(str_pad(input, 6, "___", 0), "Alien_");
+    ASSERT_STR(str_pad(input, 3, "*", 0), "Alien");
+    return 0;
+}
+
+TEST(str_explode) {
+    string_t pizza = "piece1 piece2 piece3 piece4 piece5 piece6";
+    arrays_t pieces = nullptr;
+    ASSERT_TRUE(is_array(pieces = str_explode(pizza, " ")));
+    ASSERT_TRUE(($size(pieces) == 6));
+    ASSERT_STR("piece1", pieces[0].char_ptr);
+    ASSERT_STR("piece3", pieces[2].char_ptr);
+    ASSERT_STR("piece6", pieces[5].char_ptr);
+    return 0;
+}
+
 TEST(raii_split) {
     char **token, **parts;
     const char *any = "lots=1&of=2&parameters=3&too=4&here=5";
@@ -365,6 +391,9 @@ TEST(list) {
     EXEC_TEST(strlen);
     EXEC_TEST(raii_replace);
     EXEC_TEST(raii_concat);
+    EXEC_TEST(str_repeat);
+    EXEC_TEST(str_pad);
+    EXEC_TEST(str_explode);
     EXEC_TEST(raii_split);
 
     return result;
