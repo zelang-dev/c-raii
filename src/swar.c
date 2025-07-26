@@ -87,7 +87,7 @@ RAII_INLINE bool hasbyte(uint64_t x, uint8_t c) {
 }
 
 RAII_INLINE uint32_t _memchr8(bool Printable, bool Exists, bool Reverse, string_t s, uint8_t c) {
-#if defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+#if defined(__arm__) || defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
     // int 32 of all c's
     uint32_t m = extend(c);
 
@@ -189,9 +189,7 @@ static RAII_INLINE uint32_t _memchr(bool Printable, bool Known, string_t s, uint
     string_t end = s + len;
 
     // If shorter than 8 bytes, we have to mask away c bytes past len
-
-
-#if defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+#if defined(__arm__) || defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
     uint16_t partLen = (len & 3) ? (len & 3) : 4;
     uint32_t partMask = len < 4 ? ~0ul >> (32 - partLen * 4) : 0ul;
     uint32_t first = cast(p) & ~(partMask & extend(c));
@@ -473,7 +471,7 @@ RAII_INLINE size_t simd_strlen(string_t str) {
 }
 
 RAII_INLINE string simd_memchr(string_t s, uint8_t c, uint32_t len) {
-#if defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+#if defined(__arm__) || defined(_X86_) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
     string ptr = (string)s;
     return (string)memchr(ptr, c, simd_strlen(s));
 #endif
@@ -481,7 +479,7 @@ RAII_INLINE string simd_memchr(string_t s, uint8_t c, uint32_t len) {
 }
 
 RAII_INLINE string simd_memrchr(string_t s, uint8_t c, uint32_t len) {
-#if defined(_WIN32) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+#if defined(_WIN32) || defined(__arm__) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
     return (string)str_memrchr((const_t)s, (int)c, (size_t)len);
 #else
     return (string)s + _memrchr(false, false, s, len, c);
