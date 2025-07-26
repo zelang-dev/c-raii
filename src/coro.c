@@ -119,9 +119,6 @@ struct routine_s {
     u32 tid;
     coro_states status;
     run_mode run_code;
-#if defined(USE_VALGRIND)
-    u32 vg_stack_id;
-#endif
     void_t user_data;
     void_t args;
     /* Coroutine result of function return/exit. */
@@ -735,11 +732,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
         *--p = (long)coro_done;          /* if func returns */
         *--p = (long)coro_awaitable;     /* start of function */
         *(long *)handle = (long)p;     /* stack pointer */
-
-#ifdef USE_VALGRIND
-        size_t stack_addr = _coro_align_forward((size_t)handle + sizeof(routine_t), 16);
-        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
     }
 
     return handle;
@@ -866,11 +858,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
         ((int64_t *)handle)[30] = (int64_t)handle + size; /* stack base */
         ((int64_t *)handle)[31] = (int64_t)handle;        /* stack limit */
 #endif
-
-#ifdef USE_VALGRIND
-        size_t stack_addr = _coro_align_forward((size_t)handle + sizeof(routine_t), 16);
-        handle->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
     }
 
     return handle;
@@ -913,10 +900,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
         handle[9] = (size_t)coro_func;
 
         co = (routine_t *)handle;
-#ifdef USE_VALGRIND
-        size_t stack_addr = _coro_align_forward((size_t)co + sizeof(routine_t), 16);
-        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
     }
 
     return co;
@@ -1003,10 +986,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
 #endif
 
         co = (routine_t *)handle;
-#ifdef USE_VALGRIND
-        size_t stack_addr = _coro_align_forward((size_t)co + sizeof(routine_t), 16);
-        co->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
     }
 
     return co;
@@ -1231,10 +1210,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
     context->gprs[12] = (uint64_t)coro_func;
     context->lr = (uint64_t)coro_func;
 
-#ifdef USE_VALGRIND
-    size_t stack_addr = _coro_align_forward((size_t)memory + sizeof(routine_t), 16);
-    ((routine_t *)memory)->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
     return (routine_t *)memory;
 }
 
@@ -1280,10 +1255,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
     ctx->d[2] = (void *)(coro_done);
     ctx->lr = (void *)(coro_awaitable);
     ctx->sp = (void *)((size_t)memory + size);
-#ifdef USE_VALGRIND
-    size_t stack_addr = _coro_align_forward((size_t)memory + sizeof(routine_t), 16);
-    ((routine_t *)memory)->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
 
     return (routine_t *)memory;
 }
@@ -1464,10 +1435,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
     ctx->pc = (void *)(coro_awaitable);
     ctx->ra = (void *)(coro_done);
     ctx->sp = (void *)((size_t)memory + size);
-#ifdef USE_VALGRIND
-    size_t stack_addr = _coro_align_forward((size_t)memory + sizeof(routine_t), 16);
-    ((routine_t *)memory)->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
 
     return (routine_t *)memory;
 }
@@ -1572,10 +1539,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
         *(uintptr_t *)&handle[2] = (uintptr_t)p;            // s0 (frame pointer)
         *(uintptr_t *)&handle[3] = (uintptr_t)coro_func;    // s1 (entry point)
     }
-#ifdef USE_VALGRIND
-    size_t stack_addr = _coro_align_forward((size_t)handle + sizeof(routine_t), 16);
-    ctx->vg_stack_id = VALGRIND_STACK_REGISTER(stack_addr, stack_addr + size);
-#endif
 
     return (routine_t *)handle;
 }
@@ -1711,12 +1674,6 @@ static void coro_delete(routine_t *co) {
                ) {
         co->event_err_code = -CORO_ERRED;
     } else {
-#ifdef USE_VALGRIND
-        if (co->vg_stack_id != 0) {
-            VALGRIND_STACK_DEREGISTER(co->vg_stack_id);
-            co->vg_stack_id = 0;
-        }
-#endif
         if (co->interrupt_active) {
             co->status = CORO_EVENT_DEAD;
             co->interrupt_active = false;

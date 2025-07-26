@@ -4,7 +4,7 @@
 TEST(memchr) {
     ASSERT_LEQ(memchr8("12345678=90", '='), -1);
 
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(memchr8("1234567=890", '='), 7);
     ASSERT_LEQ(memchr8("123456=7890", '='), 6);
     ASSERT_LEQ(memchr8("12345=67890", '='), 5);
@@ -15,7 +15,7 @@ TEST(memchr) {
     ASSERT_LEQ(memchr8("1=234567890", '='), 1);
     ASSERT_LEQ(memchr8("=1234567890", '='), 0);
 
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(memchr8("1234=", '='), 4);
 #endif
     ASSERT_LEQ(memchr8("123=4", '='), 3);
@@ -39,7 +39,7 @@ TEST(cast8) {
     ASSERT_UEQ(cast8("1234567890", 2), 0x3231ull);
     ASSERT_UEQ(cast8("1234567890", 3), 0x333231ull);
     ASSERT_UEQ(cast8("1234567890", 4), 0x34333231ull);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_UEQ(cast8("1234567890", 5), 0x3534333231ull);
     ASSERT_UEQ(cast8("1234567890", 6), 0x363534333231ull);
     ASSERT_UEQ(cast8("1234567890", 7), 0x37363534333231ull);
@@ -55,7 +55,7 @@ TEST(atoi) {
     ASSERT_LEQ(atou8("1234567890", 3), 123);
     ASSERT_LEQ(atou8("1234567890", 4), 1234);
 
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(atou8("1234567890", 5), 12345);
     ASSERT_LEQ(atou8("1234567890", 6), 123456);
     ASSERT_LEQ(atou8("1234567890", 7), 1234567);
@@ -68,7 +68,7 @@ TEST(atoi) {
     ASSERT_UEQ(simd_atou("12345678901234567890", 2), 12ull);
     ASSERT_UEQ(simd_atou("12345678901234567890", 3), 123ull);
     ASSERT_UEQ(simd_atou("12345678901234567890", 4), 1234ull);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_UEQ(simd_atou("12345678901234567890", 5), 12345ull);
     ASSERT_UEQ(simd_atou("12345678901234567890", 6), 123456ull);
     ASSERT_UEQ(simd_atou("12345678901234567890", 7), 1234567ull);
@@ -94,7 +94,7 @@ TEST(atoi) {
     ASSERT_UEQ(simd_atoi("12345678901234567890", 3), 123ll);
     ASSERT_UEQ(simd_atoi("12345678901234567890", 4), 1234ll);
 
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_UEQ(simd_atoi("12345678901234567890", 5), 12345ll);
     ASSERT_UEQ(simd_atoi("12345678901234567890", 6), 123456ll);
     ASSERT_UEQ(simd_atoi("12345678901234567890", 7), 1234567ll);
@@ -117,7 +117,7 @@ TEST(atoi) {
     ASSERT_UEQ(simd_atoi("+12345678901234567890", 3), 12ll);
     ASSERT_UEQ(simd_atoi("+12345678901234567890", 4), 123ll);
     ASSERT_UEQ(simd_atoi("+12345678901234567890", 5), 1234ll);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_UEQ(simd_atoi("+12345678901234567890", 6), 12345ll);
     ASSERT_UEQ(simd_atoi("+12345678901234567890", 7), 123456ll);
     ASSERT_UEQ(simd_atoi("+12345678901234567890", 8), 1234567ll);
@@ -140,7 +140,7 @@ TEST(atoi) {
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 3), -12ll);
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 4), -123ll);
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 5), -1234ll);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 6), -12345ll);
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 7), -123456ll);
     ASSERT_UEQ(simd_atoi("-12345678901234567890", 8), -1234567ll);
@@ -166,7 +166,7 @@ TEST(htou) {
     ASSERT_LEQ(htou8("123456789abcdef0", 2), 0x12);
     ASSERT_LEQ(htou8("123456789abcdef0", 3), 0x123);
     ASSERT_LEQ(htou8("123456789abcdef0", 4), 0x1234);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(htou8("123456789abcdef0", 5), 0x12345);
     ASSERT_LEQ(htou8("123456789abcdef0", 6), 0x123456);
     ASSERT_LEQ(htou8("123456789aBCDEf0", 7), 0x1234567);
@@ -178,7 +178,7 @@ TEST(htou) {
     ASSERT_UEQ(simd_htou("123456789abcdef0", 2), 0x12ull);
     ASSERT_UEQ(simd_htou("123456789abcdef0", 3), 0x123ull);
     ASSERT_UEQ(simd_htou("123456789abcdef0", 4), 0x1234ull);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_UEQ(simd_htou("123456789abcdef0", 5), 0x12345ull);
     ASSERT_UEQ(simd_htou("123456789abcdef0", 6), 0x123456ull);
     ASSERT_UEQ(simd_htou("123456789aBCDEf0", 7), 0x1234567ull);
@@ -198,7 +198,7 @@ TEST(htou) {
     ASSERT_LEQ(htou8("abcdef..", 3), 0xabc);
     ASSERT_LEQ(htou8("abcdef..", 4), 0xabcd);
 
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(htou8("abcdef..", 5), 0xabcde);
     ASSERT_LEQ(htou8("abcdef..", 6), 0xabcdef);
 #endif
@@ -208,13 +208,13 @@ TEST(htou) {
     ASSERT_LEQ(htou8("ABCDEF..", 3), 0xabc);
     ASSERT_LEQ(htou8("ABCDEF..", 4), 0xabcd);
 
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(htou8("ABCDEF..", 5), 0xabcde);
     ASSERT_LEQ(htou8("ABCDEF..", 6), 0xabcdef);
 #endif
 
     ASSERT_LEQ(htou8("abef0189", 5), 0xabef0);
-#if !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
+#if !defined(__arm__) && !defined(_X86_) && !defined(__i386__) && !defined(__i486__) && !defined(__i586__) && !defined(__i686__)
     ASSERT_LEQ(htou8("abef0189", 6), 0xabef01);
     ASSERT_LEQ(htou8("abef0189", 7), 0xabef018);
     ASSERT_LEQ(htou8("abef0189", 8), 0xabef0189);

@@ -192,10 +192,6 @@ typedef struct awaitable_s {
   #define section(name) __attribute__((section("." #name "#")))
 #endif
 
-#ifdef USE_VALGRIND
-#include <valgrind/valgrind.h>
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
