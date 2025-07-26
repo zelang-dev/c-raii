@@ -991,7 +991,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
     return co;
 }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-#define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
 
 #define MIN_STACK 0x10000lu
@@ -1192,7 +1191,7 @@ routine_t *coro_derive(void_t memory, size_t size) {
     }
 
     /* save current context into new context to initialize it */
-    swap_context(context, context);
+    swap_context((routine_t *)context, (routine_t *)context);
 
     /* align stack */
     sp = (uint8_t *)memory + size - STACK_ALIGN;
