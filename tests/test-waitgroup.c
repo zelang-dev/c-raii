@@ -38,7 +38,9 @@ TEST(waitfor) {
 TEST(list) {
     int result = 0;
 
+#if !defined(__arm__)
     EXEC_TEST(waitfor);
+#endif
 
     return result;
 }

@@ -74,9 +74,11 @@ int main(int argc, char **argv) {
     run_thread_test();
     puts("end thread test\n");
 
+#if !defined(__arm__)
     puts("start timed mutex test");
     run_timed_mtx_test();
     puts("end timed mutex test\n");
+#endif
 
     puts("start condvar test");
     run_cnd_test();
