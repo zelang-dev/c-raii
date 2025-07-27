@@ -15,7 +15,7 @@ coro_sys_func coro_main_func = nullptr;
 bool coro_sys_set = false;
 
 /* Base coroutine context. */
-typedef struct {
+typedef struct coro_s {
 #if defined(_WIN32) && defined(_M_IX86) && !defined(USE_UCONTEXT)
     void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
     void_t xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
@@ -68,9 +68,13 @@ typedef struct {
     uint64_t vmx[12 * 2];
     uint32_t vrsave;
 #endif
+#elif defined(USE_SJLJ)
+    sigjmp_buf sig_ctx;
+    call_t sig_func;
+    void_t stack;
 #else
     unsigned long int uc_flags;
-    struct ucontext *uc_link;
+    struct coro_s *uc_link;
     stack_t uc_stack;
     mcontext_t uc_mcontext;
     __sigset_t uc_sigmask;
@@ -585,13 +589,13 @@ alignas(4096)
 section(text)
 #endif
 
-#if defined(WIN32) && defined(USE_UCONTEXT)
+#if defined(_WIN32) && defined(USE_UCONTEXT)
 int getcontext(ucontext_t *ucp) {
     int ret;
 
     /* Retrieve the full machine context */
-    ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
-    ret = GetThreadContext(GetCurrentThread(), &ucp->uc_mcontext);
+    ucp->type->uc_mcontext.ContextFlags = CONTEXT_FULL;
+    ret = GetThreadContext(GetCurrentThread(), &ucp->type->uc_mcontext);
 
     return (ret == 0) ? -1 : 0;
 }
@@ -600,7 +604,7 @@ int setcontext(const ucontext_t *ucp) {
     int ret;
 
     /* Restore the full machine context (already set) */
-    ret = SetThreadContext(GetCurrentThread(), &ucp->uc_mcontext);
+    ret = SetThreadContext(GetCurrentThread(), &ucp->type->uc_mcontext);
     return (ret == 0) ? -1 : 0;
 }
 
@@ -610,20 +614,19 @@ int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...) {
     char *sp;
 
     /* Stack grows down */
-    sp = (char *)(size_t)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size;
-
-    if (sp < (char *)ucp->uc_stack.ss_sp) {
+    sp = (char *)(size_t)ucp->type->uc_stack.ss_sp + ucp->type->uc_stack.ss_size;
+    if (sp < (char *)ucp->type->uc_stack.ss_sp) {
         /* errno = ENOMEM;*/
         return RAII_ERR;
     }
 
     /* Set the instruction and the stack pointer */
 #if defined(_X86_)
-    ucp->uc_mcontext.Eip = (unsigned long long)coro_func;
-    ucp->uc_mcontext.Esp = (unsigned long long)(sp - 4);
+    ucp->type->uc_mcontext.Eip = (unsigned long long)func;
+    ucp->type->uc_mcontext.Esp = (unsigned long long)(sp - 4);
 #else
-    ucp->uc_mcontext.Rip = (unsigned long long)coro_func;
-    ucp->uc_mcontext.Rsp = (unsigned long long)(sp - 40);
+    ucp->type->uc_mcontext.Rip = (unsigned long long)func;
+    ucp->type->uc_mcontext.Rsp = (unsigned long long)(sp - 40);
 #endif
     /* Save/Restore the full machine context */
     ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
@@ -640,39 +643,184 @@ int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...) {
     return 0;
 }
 
-int swapcontext(routine_t *oucp, const routine_t *ucp) {
+int swapcontext(ucontext_t *oucp, const ucontext_t *ucp) {
     int ret;
 
-    if (is_empty(oucp) || is_empty(ucp)) {
+    if (is_empty(oucp) || is_empty((void_t)ucp)) {
         /*errno = EINVAL;*/
         return RAII_ERR;
     }
 
-    ret = getcontext((ucontext_t *)oucp);
+    ret = getcontext(oucp);
     if (ret == 0) {
-        ret = setcontext((ucontext_t *)ucp);
+        ret = setcontext(ucp);
     }
     return ret;
 }
 #endif
 
-#if defined(USE_UCONTEXT)
+#if defined(USE_SJLJ)
+static void springboard(int ignored) {
+    if (sigsetjmp(coro()->running->type->sig_ctx, 0)) {
+        coro()->active_handle->type->sig_func();
+    }
+}
+
+static void swap_coro(routine_t *co) {
+    routine_t *coro_previous_handle = coro()->active_handle;
+    if (!sigsetjmp(((coro_t *)coro()->active_handle)->sig_ctx, 0)) {
+        coro()->active_handle = co;
+        coro()->active_handle->status = CORO_RUNNING;
+        coro()->current_handle = coro_previous_handle;
+        coro()->current_handle->status = CORO_NORMAL;
+        siglongjmp(((coro_t *)coro()->active_handle)->sig_ctx, 1);
+    }
+}
+
+static void delete_coro(routine_t *co) {
+    if (co) {
+        if (((coro_t *)co)->stack)
+            RAII_FREE(((coro_t *)co)->stack);
+
+        RAII_FREE(co);
+    }
+}
+
+static routine_t *create_routine(size_t heapsize) {
+    if (!coro()->active_handle)
+        coro()->active_handle = coro()->active_buffer;
+
+    coro_t *contxt = try_calloc(1, sizeof(routine_t));
+    if (contxt) {
+        struct sigaction handler;
+        struct sigaction old_handler;
+
+        stack_t stack;
+        stack_t old_stack;
+
+        contxt->sig_func = contxt->stack = nullptr;
+
+        stack.ss_flags = 0;
+        stack.ss_size = heapsize + sizeof(raii_values_t);
+        contxt->stack = stack.ss_sp = try_calloc(1, heapsize + sizeof(raii_values_t));
+        if (stack.ss_sp && !sigaltstack(&stack, &old_stack)) {
+            handler.sa_handler = springboard;
+            handler.sa_flags = SA_ONSTACK;
+            sigemptyset(&handler.sa_mask);
+            coro()->running = (routine_t *)contxt;
+
+            if (!sigaction(SIGUSR1, &handler, &old_handler)) {
+                if (!raise(SIGUSR1)) {
+                    contxt->sig_func = coro_func;
+                }
+
+                sigaltstack(&old_stack, 0);
+                sigaction(SIGUSR1, &old_handler, 0);
+            }
+        }
+
+        if (contxt->sig_func != coro_func) {
+            delete_coro((routine_t *)contxt);
+            contxt = nullptr;
+        }
+    }
+
+    return (routine_t *)contxt;
+}
+
 static routine_t *coro_derive(void_t memory, size_t size) {
     if (!coro()->active_handle)
         coro()->active_handle = coro()->active_buffer;
 
-    ucontext_t *contxt = (ucontext_t *)memory;
+    coro_t *contxt = (coro_t *)memory;
     memory = (unsigned char *)memory + sizeof(routine_t);
     size -= sizeof(routine_t);
-    if ((!getcontext(contxt) && !(contxt->uc_stack.ss_sp = 0)) && (contxt->uc_stack.ss_sp = memory)) {
-        contxt->uc_link = (ucontext_t *)coro()->active_handle;
-        contxt->uc_stack.ss_size = size;
-        makecontext(contxt, coro_func, 0);
-    } else {
-        raii_panic("getcontext failed!");
+    if (contxt) {
+        struct sigaction handler;
+        struct sigaction old_handler;
+
+        stack_t stack;
+        stack_t old_stack;
+
+        contxt->sig_func = contxt->stack = nullptr;
+
+        stack.ss_flags = 0;
+        stack.ss_size = size;
+        contxt->stack = stack.ss_sp = memory;
+        if (stack.ss_sp && !sigaltstack(&stack, &old_stack)) {
+            handler.sa_handler = springboard;
+            handler.sa_flags = SA_ONSTACK;
+            sigemptyset(&handler.sa_mask);
+            coro()->current_handle = (routine_t *)contxt;
+
+            if (!sigaction(SIGUSR1, &handler, &old_handler)) {
+                if (!raise(SIGUSR1)) {
+                    contxt->sig_func = coro_func;
+                }
+
+                sigaltstack(&old_stack, 0);
+                sigaction(SIGUSR1, &old_handler, 0);
+            }
+        }
+
+        if (contxt->sig_func != coro_func) {
+            delete_coro((routine_t *)contxt);
+            contxt = nullptr;
+        }
     }
 
     return (routine_t *)contxt;
+}
+
+#elif defined(USE_UCONTEXT)
+static void delete_coro(routine_t *co) {
+    if (co) {
+        if (((coro_t *)co)->uc_stack.ss_sp)
+            RAII_FREE(((coro_t *)co)->uc_stack.ss_sp);
+
+        RAII_FREE(co);
+    }
+}
+
+static routine_t *create_routine(size_t heapsize) {
+    if (!coro()->active_handle)
+        coro()->active_handle = coro()->active_buffer;
+
+    ucontext_t *co = try_calloc(1, sizeof(routine_t));
+    if (co) {
+        if ((!getcontext(co) && !(((coro_t *)co)->uc_stack.ss_sp = 0))
+            && (((coro_t *)co)->uc_stack.ss_sp = try_calloc(1, heapsize + sizeof(raii_values_t)))) {
+            ((coro_t *)co)->uc_link = ((coro_t *)coro()->active_handle);
+            ((coro_t *)co)->uc_stack.ss_size = heapsize + sizeof(raii_values_t);
+            makecontext(co, coro_func, 0);
+        } else {
+            delete_coro((routine_t *)co);
+            co = nullptr;
+        }
+    }
+
+    return (routine_t *)co;
+}
+
+static routine_t *coro_derive(void_t memory, size_t size) {
+    if (!coro()->active_handle)
+        coro()->active_handle = coro()->active_buffer;
+
+    ucontext_t *co = (ucontext_t *)memory;
+    memory = (unsigned char *)memory + sizeof(routine_t);
+    size -= sizeof(routine_t);
+    if (co) {
+        if ((!getcontext(co) && !(((coro_t *)co)->uc_stack.ss_sp = 0))
+            && (((coro_t *)co)->uc_stack.ss_sp = memory)) {
+            ((coro_t *)co)->uc_link = ((coro_t *)coro()->active_handle);
+            ((coro_t *)co)->uc_stack.ss_size = size + sizeof(raii_values_t);
+            makecontext(co, coro_func, 0);
+        } else {
+            raii_panic("getcontext failed!");
+        }
+    }
+
+    return (routine_t *)co;
 }
 #else
 
@@ -991,11 +1139,11 @@ routine_t *coro_derive(void_t memory, size_t size) {
     return co;
 }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-#define ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
+#define PPC_ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
 
-#define MIN_STACK 0x10000lu
-#define MIN_STACK_FRAME 0x20lu
-#define STACK_ALIGN 0x10lu
+#define PPC_MIN_STACK 0x10000lu
+#define PPC_MIN_STACK_FRAME 0x20lu
+#define STACK_PPC_ALIGN 0x10lu
 
 static void coro_init(void) {}
 
@@ -1185,29 +1333,29 @@ __asm__(
 
 routine_t *coro_derive(void_t memory, size_t size) {
     uint8_t *sp;
-    coro_t *context = (coro_t *)memory;
+    routine_t *context = (routine_t *)memory;
     if (!coro_swap) {
         coro_swap = (void (*)(routine_t *, routine_t *))swap_context;
     }
 
     /* save current context into new context to initialize it */
-    swap_context((routine_t *)context, (routine_t *)context);
+    swap_context(context, context);
 
     /* align stack */
-    sp = (uint8_t *)memory + size - STACK_ALIGN;
-    sp = (uint8_t *)ALIGN(sp, STACK_ALIGN);
+    sp = (uint8_t *)memory + size - STACK_PPC_ALIGN;
+    sp = (uint8_t *)PPC_ALIGN(sp, STACK_PPC_ALIGN);
 
     /* write 0 for initial backchain */
     *(uint64_t *)sp = 0;
 
     /* create new frame with backchain */
-    sp -= MIN_STACK_FRAME;
-    *(uint64_t *)sp = (uint64_t)(sp + MIN_STACK_FRAME);
+    sp -= PPC_MIN_STACK_FRAME;
+    *(uint64_t *)sp = (uint64_t)(sp + PPC_MIN_STACK_FRAME);
 
     /* update context with new stack (r1) and func (r12, lr) */
-    context->gprs[1] = (uint64_t)sp;
-    context->gprs[12] = (uint64_t)coro_func;
-    context->lr = (uint64_t)coro_func;
+    ((coro_t *)context)->gprs[1] = (uint64_t)sp;
+    ((coro_t *)context)->gprs[12] = (uint64_t)coro_func;
+    ((coro_t *)context)->lr = (uint64_t)coro_func;
 
     return (routine_t *)memory;
 }
@@ -1259,270 +1407,93 @@ routine_t *coro_derive(void_t memory, size_t size) {
 }
 
 #elif defined(__riscv)
-void swap_context(routine_t *from, routine_t *to);
-__asm__(
-    ".text\n"
-    ".globl swap_context\n"
-    ".type swap_context @function\n"
-    ".hidden swap_context\n"
-    "swap_context:\n"
-#if __riscv_xlen == 64
-    "  sd s0, 0x00(a0)\n"
-    "  sd s1, 0x08(a0)\n"
-    "  sd s2, 0x10(a0)\n"
-    "  sd s3, 0x18(a0)\n"
-    "  sd s4, 0x20(a0)\n"
-    "  sd s5, 0x28(a0)\n"
-    "  sd s6, 0x30(a0)\n"
-    "  sd s7, 0x38(a0)\n"
-    "  sd s8, 0x40(a0)\n"
-    "  sd s9, 0x48(a0)\n"
-    "  sd s10, 0x50(a0)\n"
-    "  sd s11, 0x58(a0)\n"
-    "  sd ra, 0x60(a0)\n"
-    "  sd ra, 0x68(a0)\n" // pc
-    "  sd sp, 0x70(a0)\n"
-#ifdef __riscv_flen
-#if __riscv_flen == 64
-    "  fsd fs0, 0x78(a0)\n"
-    "  fsd fs1, 0x80(a0)\n"
-    "  fsd fs2, 0x88(a0)\n"
-    "  fsd fs3, 0x90(a0)\n"
-    "  fsd fs4, 0x98(a0)\n"
-    "  fsd fs5, 0xa0(a0)\n"
-    "  fsd fs6, 0xa8(a0)\n"
-    "  fsd fs7, 0xb0(a0)\n"
-    "  fsd fs8, 0xb8(a0)\n"
-    "  fsd fs9, 0xc0(a0)\n"
-    "  fsd fs10, 0xc8(a0)\n"
-    "  fsd fs11, 0xd0(a0)\n"
-    "  fld fs0, 0x78(a1)\n"
-    "  fld fs1, 0x80(a1)\n"
-    "  fld fs2, 0x88(a1)\n"
-    "  fld fs3, 0x90(a1)\n"
-    "  fld fs4, 0x98(a1)\n"
-    "  fld fs5, 0xa0(a1)\n"
-    "  fld fs6, 0xa8(a1)\n"
-    "  fld fs7, 0xb0(a1)\n"
-    "  fld fs8, 0xb8(a1)\n"
-    "  fld fs9, 0xc0(a1)\n"
-    "  fld fs10, 0xc8(a1)\n"
-    "  fld fs11, 0xd0(a1)\n"
-#else
-#error "Unsupported RISC-V FLEN"
-#endif
-#endif //  __riscv_flen
-    "  ld s0, 0x00(a1)\n"
-    "  ld s1, 0x08(a1)\n"
-    "  ld s2, 0x10(a1)\n"
-    "  ld s3, 0x18(a1)\n"
-    "  ld s4, 0x20(a1)\n"
-    "  ld s5, 0x28(a1)\n"
-    "  ld s6, 0x30(a1)\n"
-    "  ld s7, 0x38(a1)\n"
-    "  ld s8, 0x40(a1)\n"
-    "  ld s9, 0x48(a1)\n"
-    "  ld s10, 0x50(a1)\n"
-    "  ld s11, 0x58(a1)\n"
-    "  ld ra, 0x60(a1)\n"
-    "  ld a2, 0x68(a1)\n" // pc
-    "  ld sp, 0x70(a1)\n"
-    "  jr a2\n"
-#elif __riscv_xlen == 32
-    "  sw s0, 0x00(a0)\n"
-    "  sw s1, 0x04(a0)\n"
-    "  sw s2, 0x08(a0)\n"
-    "  sw s3, 0x0c(a0)\n"
-    "  sw s4, 0x10(a0)\n"
-    "  sw s5, 0x14(a0)\n"
-    "  sw s6, 0x18(a0)\n"
-    "  sw s7, 0x1c(a0)\n"
-    "  sw s8, 0x20(a0)\n"
-    "  sw s9, 0x24(a0)\n"
-    "  sw s10, 0x28(a0)\n"
-    "  sw s11, 0x2c(a0)\n"
-    "  sw ra, 0x30(a0)\n"
-    "  sw ra, 0x34(a0)\n" // pc
-    "  sw sp, 0x38(a0)\n"
-#ifdef __riscv_flen
-#if __riscv_flen == 64
-    "  fsd fs0, 0x3c(a0)\n"
-    "  fsd fs1, 0x44(a0)\n"
-    "  fsd fs2, 0x4c(a0)\n"
-    "  fsd fs3, 0x54(a0)\n"
-    "  fsd fs4, 0x5c(a0)\n"
-    "  fsd fs5, 0x64(a0)\n"
-    "  fsd fs6, 0x6c(a0)\n"
-    "  fsd fs7, 0x74(a0)\n"
-    "  fsd fs8, 0x7c(a0)\n"
-    "  fsd fs9, 0x84(a0)\n"
-    "  fsd fs10, 0x8c(a0)\n"
-    "  fsd fs11, 0x94(a0)\n"
-    "  fld fs0, 0x3c(a1)\n"
-    "  fld fs1, 0x44(a1)\n"
-    "  fld fs2, 0x4c(a1)\n"
-    "  fld fs3, 0x54(a1)\n"
-    "  fld fs4, 0x5c(a1)\n"
-    "  fld fs5, 0x64(a1)\n"
-    "  fld fs6, 0x6c(a1)\n"
-    "  fld fs7, 0x74(a1)\n"
-    "  fld fs8, 0x7c(a1)\n"
-    "  fld fs9, 0x84(a1)\n"
-    "  fld fs10, 0x8c(a1)\n"
-    "  fld fs11, 0x94(a1)\n"
-#elif __riscv_flen == 32
-    "  fsw fs0, 0x3c(a0)\n"
-    "  fsw fs1, 0x40(a0)\n"
-    "  fsw fs2, 0x44(a0)\n"
-    "  fsw fs3, 0x48(a0)\n"
-    "  fsw fs4, 0x4c(a0)\n"
-    "  fsw fs5, 0x50(a0)\n"
-    "  fsw fs6, 0x54(a0)\n"
-    "  fsw fs7, 0x58(a0)\n"
-    "  fsw fs8, 0x5c(a0)\n"
-    "  fsw fs9, 0x60(a0)\n"
-    "  fsw fs10, 0x64(a0)\n"
-    "  fsw fs11, 0x68(a0)\n"
-    "  flw fs0, 0x3c(a1)\n"
-    "  flw fs1, 0x40(a1)\n"
-    "  flw fs2, 0x44(a1)\n"
-    "  flw fs3, 0x48(a1)\n"
-    "  flw fs4, 0x4c(a1)\n"
-    "  flw fs5, 0x50(a1)\n"
-    "  flw fs6, 0x54(a1)\n"
-    "  flw fs7, 0x58(a1)\n"
-    "  flw fs8, 0x5c(a1)\n"
-    "  flw fs9, 0x60(a1)\n"
-    "  flw fs10, 0x64(a1)\n"
-    "  flw fs11, 0x68(a1)\n"
-#else
-#error "Unsupported RISC-V FLEN"
-#endif
-#endif // __riscv_flen
-    "  lw s0, 0x00(a1)\n"
-    "  lw s1, 0x04(a1)\n"
-    "  lw s2, 0x08(a1)\n"
-    "  lw s3, 0x0c(a1)\n"
-    "  lw s4, 0x10(a1)\n"
-    "  lw s5, 0x14(a1)\n"
-    "  lw s6, 0x18(a1)\n"
-    "  lw s7, 0x1c(a1)\n"
-    "  lw s8, 0x20(a1)\n"
-    "  lw s9, 0x24(a1)\n"
-    "  lw s10, 0x28(a1)\n"
-    "  lw s11, 0x2c(a1)\n"
-    "  lw ra, 0x30(a1)\n"
-    "  lw a2, 0x34(a1)\n" // pc
-    "  lw sp, 0x38(a1)\n"
-    "  jr a2\n"
-#else
-#error "Unsupported RISC-V XLEN"
-#endif // __riscv_xlen
-    ".size swap_context, .-swap_context\n"
-);
-
-static void coro_init(void) {}
-
-routine_t *coro_derive(void_t memory, size_t size) {
-    coro_t *ctx = (coro_t *)memory;
-    if (!coro_swap) {
-        coro_swap = (void (*)(routine_t *, routine_t *))swap_context;
-    }
-
-    ctx->s[0] = memory;
-    ctx->s[1] = (void *)(coro_awaitable);
-    ctx->pc = (void *)(coro_awaitable);
-    ctx->ra = (void *)(coro_done);
-    ctx->sp = (void *)((size_t)memory + size);
-
-    return (routine_t *)memory;
-}
-/*
 #if __riscv_xlen == 32
-#define I_STORE "sw"
-#define I_LOAD  "lw"
+#   define I_STORE "sw"
+#   define I_LOAD  "lw"
 #elif __riscv_xlen == 64
-#define I_STORE "sd"
-#define I_LOAD  "ld"
+#   define I_STORE "sd"
+#   define I_LOAD  "ld"
 #else
-#error Unsupported RISC-V XLEN
+#   error Unsupported RISC-V XLEN
 #endif
 
 #if !defined(__riscv_flen)
-#define F_STORE "#"
-#define F_LOAD  "#"
+#   define F_STORE "#"
+#   define F_LOAD  "#"
 #elif __riscv_flen == 32
-#define F_STORE "fsw"
-#define F_LOAD  "flw"
+#   define F_STORE "fsw"
+#   define F_LOAD  "flw"
 #elif __riscv_flen == 64
-#define F_STORE "fsd"
-#define F_LOAD  "fld"
+#   define F_STORE "fsd"
+#   define F_LOAD  "fld"
 #else
-#error Unsupported RISC-V FLEN
+#   error Unsupported RISC-V FLEN
 #endif
 
 __attribute__((naked))
 static void swap_context(routine_t *active, routine_t *previous) {
-__asm__(
-  I_STORE " ra,   0 *8(a1)\n"
-  I_STORE " sp,   1 *8(a1)\n"
-  I_STORE " s0,   2 *8(a1)\n"
-  I_STORE " s1,   3 *8(a1)\n"
-  I_STORE " s2,   4 *8(a1)\n"
-  I_STORE " s3,   5 *8(a1)\n"
-  I_STORE " s4,   6 *8(a1)\n"
-  I_STORE " s5,   7 *8(a1)\n"
-  I_STORE " s6,   8 *8(a1)\n"
-  I_STORE " s7,   9 *8(a1)\n"
-  I_STORE " s8,   10*8(a1)\n"
-  I_STORE " s9,   11*8(a1)\n"
-  I_STORE " s10,  12*8(a1)\n"
-  I_STORE " s11,  13*8(a1)\n"
+    __asm__(
+        I_STORE " ra,   0 *8(a1)\n"
+        I_STORE " sp,   1 *8(a1)\n"
+        I_STORE " s0,   2 *8(a1)\n"
+        I_STORE " s1,   3 *8(a1)\n"
+        I_STORE " s2,   4 *8(a1)\n"
+        I_STORE " s3,   5 *8(a1)\n"
+        I_STORE " s4,   6 *8(a1)\n"
+        I_STORE " s5,   7 *8(a1)\n"
+        I_STORE " s6,   8 *8(a1)\n"
+        I_STORE " s7,   9 *8(a1)\n"
+        I_STORE " s8,   10*8(a1)\n"
+        I_STORE " s9,   11*8(a1)\n"
+        I_STORE " s10,  12*8(a1)\n"
+        I_STORE " s11,  13*8(a1)\n"
 
-  F_STORE " fs0,  14*8(a1)\n"
-  F_STORE " fs1,  15*8(a1)\n"
-  F_STORE " fs2,  16*8(a1)\n"
-  F_STORE " fs3,  17*8(a1)\n"
-  F_STORE " fs4,  18*8(a1)\n"
-  F_STORE " fs5,  19*8(a1)\n"
-  F_STORE " fs6,  20*8(a1)\n"
-  F_STORE " fs7,  21*8(a1)\n"
-  F_STORE " fs8,  22*8(a1)\n"
-  F_STORE " fs9,  23*8(a1)\n"
-  F_STORE " fs10, 24*8(a1)\n"
-  F_STORE " fs11, 25*8(a1)\n"
+        F_STORE " fs0,  14*8(a1)\n"
+        F_STORE " fs1,  15*8(a1)\n"
+        F_STORE " fs2,  16*8(a1)\n"
+        F_STORE " fs3,  17*8(a1)\n"
+        F_STORE " fs4,  18*8(a1)\n"
+        F_STORE " fs5,  19*8(a1)\n"
+        F_STORE " fs6,  20*8(a1)\n"
+        F_STORE " fs7,  21*8(a1)\n"
+        F_STORE " fs8,  22*8(a1)\n"
+        F_STORE " fs9,  23*8(a1)\n"
+        F_STORE " fs10, 24*8(a1)\n"
+        F_STORE " fs11, 25*8(a1)\n"
 
-  I_LOAD  " ra,   0 *8(a0)\n"
-  I_LOAD  " sp,   1 *8(a0)\n"
-  I_LOAD  " s0,   2 *8(a0)\n"
-  I_LOAD  " s1,   3 *8(a0)\n"
-  I_LOAD  " s2,   4 *8(a0)\n"
-  I_LOAD  " s3,   5 *8(a0)\n"
-  I_LOAD  " s4,   6 *8(a0)\n"
-  I_LOAD  " s5,   7 *8(a0)\n"
-  I_LOAD  " s6,   8 *8(a0)\n"
-  I_LOAD  " s7,   9 *8(a0)\n"
-  I_LOAD  " s8,   10*8(a0)\n"
-  I_LOAD  " s9,   11*8(a0)\n"
-  I_LOAD  " s10,  12*8(a0)\n"
-  I_LOAD  " s11,  13*8(a0)\n"
+        I_LOAD  " ra,   0 *8(a0)\n"
+        I_LOAD  " sp,   1 *8(a0)\n"
+        I_LOAD  " s0,   2 *8(a0)\n"
+        I_LOAD  " s1,   3 *8(a0)\n"
+        I_LOAD  " s2,   4 *8(a0)\n"
+        I_LOAD  " s3,   5 *8(a0)\n"
+        I_LOAD  " s4,   6 *8(a0)\n"
+        I_LOAD  " s5,   7 *8(a0)\n"
+        I_LOAD  " s6,   8 *8(a0)\n"
+        I_LOAD  " s7,   9 *8(a0)\n"
+        I_LOAD  " s8,   10*8(a0)\n"
+        I_LOAD  " s9,   11*8(a0)\n"
+        I_LOAD  " s10,  12*8(a0)\n"
+        I_LOAD  " s11,  13*8(a0)\n"
 
-  F_LOAD  " fs0,  14*8(a0)\n"
-  F_LOAD  " fs1,  15*8(a0)\n"
-  F_LOAD  " fs2,  16*8(a0)\n"
-  F_LOAD  " fs3,  17*8(a0)\n"
-  F_LOAD  " fs4,  18*8(a0)\n"
-  F_LOAD  " fs5,  19*8(a0)\n"
-  F_LOAD  " fs6,  20*8(a0)\n"
-  F_LOAD  " fs7,  21*8(a0)\n"
-  F_LOAD  " fs8,  22*8(a0)\n"
-  F_LOAD  " fs9,  23*8(a0)\n"
-  F_LOAD  " fs10, 24*8(a0)\n"
-  F_LOAD  " fs11, 25*8(a0)\n"
+        F_LOAD  " fs0,  14*8(a0)\n"
+        F_LOAD  " fs1,  15*8(a0)\n"
+        F_LOAD  " fs2,  16*8(a0)\n"
+        F_LOAD  " fs3,  17*8(a0)\n"
+        F_LOAD  " fs4,  18*8(a0)\n"
+        F_LOAD  " fs5,  19*8(a0)\n"
+        F_LOAD  " fs6,  20*8(a0)\n"
+        F_LOAD  " fs7,  21*8(a0)\n"
+        F_LOAD  " fs8,  22*8(a0)\n"
+        F_LOAD  " fs9,  23*8(a0)\n"
+        F_LOAD  " fs10, 24*8(a0)\n"
+        F_LOAD  " fs11, 25*8(a0)\n"
 
-  "ret\n"
-);
+        "ret\n"
+    );
 }
+
+static void coro_init(void) {}
 
 routine_t *coro_derive(void_t memory, size_t size) {
     uint64_t *handle;
@@ -1541,7 +1512,7 @@ routine_t *coro_derive(void_t memory, size_t size) {
 
     return (routine_t *)handle;
 }
-*/
+
 #endif
 #endif
 #endif
@@ -1550,16 +1521,22 @@ routine_t *coro_derive(void_t memory, size_t size) {
 static RAII_INLINE void coro_switch(routine_t *handle) {
 #if defined(_M_X64) || defined(_M_IX86)
     register routine_t *coro_previous_handle = coro()->active_handle;
-#else
+#elif !defined(USE_SJLJ)
     routine_t *coro_previous_handle = coro()->active_handle;
 #endif
+
+#if defined(USE_SJLJ)
+    swap_coro(handle);
+#else
     coro()->active_handle = handle;
     coro()->active_handle->status = CORO_RUNNING;
     coro()->current_handle = coro_previous_handle;
     coro()->current_handle->status = CORO_NORMAL;
+#endif
+
 #if defined(USE_UCONTEXT)
-    swapcontext((ucontext_t *)coro_previous_handle, (ucontext_t *)coro()->active_handle);
-#else
+    swapcontext((ucontext_t *)coro_previous_handle, (const ucontext_t *)coro()->active_handle);
+#elif !defined(USE_SJLJ)
     coro_swap(coro()->active_handle, coro_previous_handle);
 #endif
 }
@@ -1679,7 +1656,11 @@ static void coro_delete(routine_t *co) {
             co->is_waiting = false;
         } else if (co->magic_number == CORO_MAGIC_NUMBER) {
             co->magic_number = RAII_ERR;
+#if defined(USE_UCONTEXT) || defined(USE_SJLJ)
+            delete_coro(co);
+#else
             RAII_FREE(co);
+#endif
         }
     }
 }
@@ -1711,14 +1692,23 @@ RAII_INLINE bool coro_terminated(routine_t *co) {
 }
 
 /* Create new coroutine. */
-static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
+static routine_t *coro_create(size_t heapsize, raii_func_t func, void_t args) {
     /* Stack size should be at least `CORO_STACK_SIZE`. */
-    if ((size != 0 && size < CORO_STACK_SIZE) || size == 0)
-        size = CORO_STACK_SIZE;
+#ifdef __powerpc64__
+    if ((heapsize != 0 && heapsize < PPC_MIN_STACK) || heapsize == 0)
+        heapsize = PPC_MIN_STACK;
+#else
+    if ((heapsize != 0 && heapsize < CORO_STACK_SIZE) || heapsize == 0)
+        heapsize = CORO_STACK_SIZE;
+#endif
 
-    size = _coro_align_forward(size + sizeof(routine_t), 16); /* Stack size should be aligned to 16 bytes. */
-    void_t memory = try_calloc(1, size + sizeof(raii_values_t));
-    routine_t *co = coro_derive(memory, size);
+#if defined(USE_UCONTEXT) || defined(USE_SJLJ)
+    routine_t *co = create_routine(heapsize);
+#else
+    heapsize = _coro_align_forward(heapsize + sizeof(routine_t), 16); /* Stack size should be aligned to 16 bytes. */
+    void_t memory = try_calloc(1, heapsize + sizeof(raii_values_t));
+    routine_t *co = coro_derive(memory, heapsize);
+#endif
     if (!coro()->current_handle)
         coro()->current_handle = coro_active();
 
@@ -1733,7 +1723,7 @@ static routine_t *coro_create(size_t size, raii_func_t func, void_t args) {
     co->func = func;
     co->args = args;
     co->status = CORO_SUSPENDED;
-    co->stack_size = size + sizeof(raii_values_t);
+    co->stack_size = heapsize + sizeof(raii_values_t);
     co->is_referenced = false;
     co->halt = false;
     co->ready = false;

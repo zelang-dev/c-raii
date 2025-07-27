@@ -2,6 +2,22 @@
 #ifndef _CORO_H
 #define _CORO_H
 
+#define USE_UCONTEXT
+#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
+#   undef USE_UCONTEXT
+#elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
+#   undef USE_UCONTEXT
+#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__)|| defined(__powerpc64__) || defined(__ARM_EABI__) || defined(__riscv))
+#   undef USE_UCONTEXT
+#endif
+
+#if defined(USE_SJLJ)
+/* for sigsetjmp(), sigjmp_buf, and stack_t */
+#define _POSIX_C_SOURCE 200809L
+#include <signal.h>
+#include <setjmp.h>
+#endif
+
 #include "future.h"
 #include "hashtable.h"
 
@@ -37,15 +53,6 @@ typedef struct awaitable_s {
     waitgroup_t wg;
 } _awaitable_t, *awaitable_t;
 
-#define USE_UCONTEXT
-#if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
-#   undef USE_UCONTEXT
-#elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
-#   undef USE_UCONTEXT
-#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__)|| defined(__powerpc64__) || defined(__ARM_EABI__) || defined(__riscv))
-#   undef USE_UCONTEXT
-#endif
-
 #if defined(USE_UCONTEXT)
 #define _BSD_SOURCE
 #if __APPLE__ && __MACH__
@@ -57,27 +64,20 @@ typedef struct awaitable_s {
 #   else
 #       define DUMMYARGS long dummy0, long dummy1, long dummy2, long dummy3,
 #   endif
-    typedef struct __stack {
-        void *ss_sp;
-        size_t ss_size;
-        int ss_flags;
-    } stack_t;
+typedef struct __stack {
+    void_t ss_sp;
+    size_t ss_size;
+    int ss_flags;
+} stack_t;
 
-    typedef CONTEXT mcontext_t;
-    typedef unsigned long __sigset_t;
+typedef CONTEXT mcontext_t;
+typedef unsigned long __sigset_t;
+typedef routine_t ucontext_t;
 
-    typedef struct __ucontext {
-        unsigned long int	uc_flags;
-        struct __ucontext *uc_link;
-        stack_t				uc_stack;
-        mcontext_t			uc_mcontext;
-        __sigset_t			uc_sigmask;
-    } ucontext_t;
-
-    C_API int getcontext(ucontext_t *ucp);
-    C_API int setcontext(const ucontext_t *ucp);
-    C_API int makecontext(ucontext_t *, void (*)(), int, ...);
-    C_API int swapcontext(routine_t *, const routine_t *);
+C_API int getcontext(ucontext_t *ucp);
+C_API int setcontext(const ucontext_t *ucp);
+C_API int makecontext(ucontext_t *, void (*)(), int, ...);
+C_API int swapcontext(ucontext_t *, const ucontext_t *);
 #else
 #   include <ucontext.h>
 #endif
