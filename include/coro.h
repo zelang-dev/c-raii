@@ -3,11 +3,17 @@
 #define _CORO_H
 
 #define USE_UCONTEXT
+#define USE_SJLJ
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
 #   undef USE_UCONTEXT
+#   undef USE_SJLJ
 #elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
 #   undef USE_UCONTEXT
+#   undef USE_SJLJ
 #elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__)|| defined(__powerpc64__) || defined(__ARM_EABI__) || defined(__riscv))
+#   undef USE_UCONTEXT
+#   undef USE_SJLJ
+#else
 #   undef USE_UCONTEXT
 #endif
 
@@ -43,7 +49,9 @@ typedef enum {
 } run_mode;
 
 typedef struct routine_s routine_t;
-typedef struct hash_s *waitgroup_t;
+typedef struct coro_s coro_t;
+typedef struct hash_s hash_t;
+typedef hash_t *waitgroup_t;
 typedef struct generator_s _generator_t;
 typedef _generator_t *generator_t;
 typedef int (*coro_sys_func)(u32, void_t);
@@ -72,7 +80,7 @@ typedef struct __stack {
 
 typedef CONTEXT mcontext_t;
 typedef unsigned long __sigset_t;
-typedef routine_t ucontext_t;
+typedef coro_t ucontext_t;
 
 C_API int getcontext(ucontext_t *ucp);
 C_API int setcontext(const ucontext_t *ucp);
@@ -103,7 +111,11 @@ C_API int swapcontext(ucontext_t *, const ucontext_t *);
 
 #ifndef CORO_STACK_SIZE
 /* Stack size when creating a coroutine. */
+#if defined(USE_UCONTEXT)
 #   define CORO_STACK_SIZE (16 * 1024)
+#else
+#   define CORO_STACK_SIZE (16 * 1024)
+#endif
 #endif
 
 #ifndef SCRAPE_SIZE

@@ -17,8 +17,8 @@ jobs:
             arch: ppc64le
           - target: riscv64
             arch: riscv64
-         # - target: s390x
-         #   arch: s390x
+          - target: s390x
+            arch: s390x
     steps:
       - uses: actions/checkout@v4
       - uses: uraimo/run-on-arch-action@v3

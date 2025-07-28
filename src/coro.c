@@ -1,3 +1,6 @@
+#if defined(__GNUC__) || !defined(_WIN32)
+#undef _FORTIFY_SOURCE
+#endif
 #include "channel.h"
 
 static volatile bool thrd_queue_set = false;
@@ -15,13 +18,13 @@ coro_sys_func coro_main_func = nullptr;
 bool coro_sys_set = false;
 
 /* Base coroutine context. */
-typedef struct coro_s {
-#if defined(_WIN32) && defined(_M_IX86) && !defined(USE_UCONTEXT)
+struct coro_s {
+#if defined(_WIN32) && defined(_M_IX86) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
     void_t xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
     void_t fiber_storage;
     void_t dealloc_stack;
-#elif (defined(__x86_64__) || defined(_M_X64)) && !defined(USE_UCONTEXT)
+#elif (defined(__x86_64__) || defined(_M_X64)) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
 #ifdef _WIN32
     void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15, *rdi, *rsi;
     void_t xmm[20]; /* xmm6, xmm7, xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 */
@@ -30,9 +33,9 @@ typedef struct coro_s {
 #else
     void_t rip, *rsp, *rbp, *rbx, *r12, *r13, *r14, *r15;
 #endif
-#elif (defined(__i386) || defined(__i386__)) && !defined(USE_UCONTEXT)
+#elif (defined(__i386) || defined(__i386__)) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     void_t eip, *esp, *ebp, *ebx, *esi, *edi;
-#elif defined(__riscv) && !defined(USE_UCONTEXT)
+#elif defined(__riscv) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     void *s[12]; /* s0-s11 */
     void *ra;
     void *pc;
@@ -44,7 +47,7 @@ typedef struct coro_s {
     float fs[12]; /* fs0-fs11 */
 #endif
 #endif /* __riscv_flen */
-#elif defined(__ARM_EABI__) && !defined(USE_UCONTEXT)
+#elif defined(__ARM_EABI__) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
 #ifndef __SOFTFP__
     void_t f[16];
 #endif
@@ -52,12 +55,12 @@ typedef struct coro_s {
     void_t r[4]; /* r4-r11 */
     void_t lr;
     void_t sp;
-#elif defined(__aarch64__) && !defined(USE_UCONTEXT)
+#elif defined(__aarch64__) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     void_t x[12]; /* x19-x30 */
     void_t sp;
     void_t lr;
     void_t d[8]; /* d8-d15 */
-#elif (defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2) && !defined(USE_UCONTEXT)
+#elif (defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     uint64_t gprs[32];
     uint64_t lr;
     uint64_t ccr;
@@ -74,16 +77,20 @@ typedef struct coro_s {
     void_t stack;
 #else
     unsigned long int uc_flags;
-    struct coro_s *uc_link;
+    ucontext_t *uc_link;
     stack_t uc_stack;
     mcontext_t uc_mcontext;
     __sigset_t uc_sigmask;
 #endif
-} coro_t;
+};
 
 /* Coroutine extended context. */
 struct routine_s {
+#if defined(USE_UCONTEXT)
+    ucontext_t type[1];
+#else
     coro_t type[1];
+#endif
     /* Stack base address, can be used to scan memory in a garbage collector. */
     void_t stack_base;
 #if defined(_WIN32) && (defined(_M_X64) || defined(_M_IX86))
@@ -191,6 +198,9 @@ typedef struct {
     routine_t *running;
     /* Variable holding the current running coroutine per thread. */
     routine_t *active_handle;
+#if defined(USE_SJLJ)
+    routine_t *creating;
+#endif
     /* Variable holding the main target `scheduler` that gets called once an coroutine
     function fully completes and return. */
     routine_t *main_handle;
@@ -418,6 +428,8 @@ static routine_t *deque_peek(raii_deque_t *q, u32 index) {
 static void coro_transfer(raii_deque_t *queue);
 static void coro_destroy(void);
 static void coro_scheduler(void);
+/* Delete specified coroutine. */
+static void coro_delete(routine_t *co);
 
 static RAII_INLINE void coro_interrupter(void) {
     if (coro_interrupt_set) {
@@ -594,8 +606,8 @@ int getcontext(ucontext_t *ucp) {
     int ret;
 
     /* Retrieve the full machine context */
-    ucp->type->uc_mcontext.ContextFlags = CONTEXT_FULL;
-    ret = GetThreadContext(GetCurrentThread(), &ucp->type->uc_mcontext);
+    ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
+    ret = GetThreadContext(GetCurrentThread(), &ucp->uc_mcontext);
 
     return (ret == 0) ? -1 : 0;
 }
@@ -604,7 +616,7 @@ int setcontext(const ucontext_t *ucp) {
     int ret;
 
     /* Restore the full machine context (already set) */
-    ret = SetThreadContext(GetCurrentThread(), &ucp->type->uc_mcontext);
+    ret = SetThreadContext(GetCurrentThread(), &ucp->uc_mcontext);
     return (ret == 0) ? -1 : 0;
 }
 
@@ -614,19 +626,19 @@ int makecontext(ucontext_t *ucp, void (*func)(), int argc, ...) {
     char *sp;
 
     /* Stack grows down */
-    sp = (char *)(size_t)ucp->type->uc_stack.ss_sp + ucp->type->uc_stack.ss_size;
-    if (sp < (char *)ucp->type->uc_stack.ss_sp) {
+    sp = (char *)(size_t)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size;
+    if (sp < (char *)ucp->uc_stack.ss_sp) {
         /* errno = ENOMEM;*/
         return RAII_ERR;
     }
 
     /* Set the instruction and the stack pointer */
 #if defined(_X86_)
-    ucp->type->uc_mcontext.Eip = (unsigned long long)func;
-    ucp->type->uc_mcontext.Esp = (unsigned long long)(sp - 4);
+    ucp->uc_mcontext.Eip = (unsigned long long)func;
+    ucp->uc_mcontext.Esp = (unsigned long long)(sp - 4);
 #else
-    ucp->type->uc_mcontext.Rip = (unsigned long long)func;
-    ucp->type->uc_mcontext.Rsp = (unsigned long long)(sp - 40);
+    ucp->uc_mcontext.Rip = (unsigned long long)func;
+    ucp->uc_mcontext.Rsp = (unsigned long long)(sp - 40);
 #endif
     /* Save/Restore the full machine context */
     ucp->uc_mcontext.ContextFlags = CONTEXT_FULL;
@@ -661,79 +673,26 @@ int swapcontext(ucontext_t *oucp, const ucontext_t *ucp) {
 
 #if defined(USE_SJLJ)
 static void springboard(int ignored) {
-    if (sigsetjmp(coro()->running->type->sig_ctx, 0)) {
-        coro()->active_handle->type->sig_func();
+    if (sigsetjmp(((coro_t *)coro()->creating)->sig_ctx, 0)) {
+        ((coro_t *)coro()->active_handle)->sig_func();
     }
 }
 
-static void swap_coro(routine_t *co) {
-    routine_t *coro_previous_handle = coro()->active_handle;
-    if (!sigsetjmp(((coro_t *)coro()->active_handle)->sig_ctx, 0)) {
+static void swap_context(routine_t *co) {
+    if (!sigsetjmp(((coro_t *)coro_active())->sig_ctx, 0)) {
+        routine_t *coro_previous_handle = coro()->active_handle;
         coro()->active_handle = co;
         coro()->active_handle->status = CORO_RUNNING;
         coro()->current_handle = coro_previous_handle;
+        coro()->creating = coro()->current_handle;
         coro()->current_handle->status = CORO_NORMAL;
         siglongjmp(((coro_t *)coro()->active_handle)->sig_ctx, 1);
     }
 }
 
-static void delete_coro(routine_t *co) {
-    if (co) {
-        if (((coro_t *)co)->stack)
-            RAII_FREE(((coro_t *)co)->stack);
-
-        RAII_FREE(co);
-    }
-}
-
-static routine_t *create_routine(size_t heapsize) {
-    if (!coro()->active_handle)
-        coro()->active_handle = coro()->active_buffer;
-
-    coro_t *contxt = try_calloc(1, sizeof(routine_t));
-    if (contxt) {
-        struct sigaction handler;
-        struct sigaction old_handler;
-
-        stack_t stack;
-        stack_t old_stack;
-
-        contxt->sig_func = contxt->stack = nullptr;
-
-        stack.ss_flags = 0;
-        stack.ss_size = heapsize + sizeof(raii_values_t);
-        contxt->stack = stack.ss_sp = try_calloc(1, heapsize + sizeof(raii_values_t));
-        if (stack.ss_sp && !sigaltstack(&stack, &old_stack)) {
-            handler.sa_handler = springboard;
-            handler.sa_flags = SA_ONSTACK;
-            sigemptyset(&handler.sa_mask);
-            coro()->running = (routine_t *)contxt;
-
-            if (!sigaction(SIGUSR1, &handler, &old_handler)) {
-                if (!raise(SIGUSR1)) {
-                    contxt->sig_func = coro_func;
-                }
-
-                sigaltstack(&old_stack, 0);
-                sigaction(SIGUSR1, &old_handler, 0);
-            }
-        }
-
-        if (contxt->sig_func != coro_func) {
-            delete_coro((routine_t *)contxt);
-            contxt = nullptr;
-        }
-    }
-
-    return (routine_t *)contxt;
-}
-
-static routine_t *coro_derive(void_t memory, size_t size) {
-    if (!coro()->active_handle)
-        coro()->active_handle = coro()->active_buffer;
-
-    coro_t *contxt = (coro_t *)memory;
-    memory = (unsigned char *)memory + sizeof(routine_t);
+static routine_t *coro_derive(void_t co, size_t stack_size) {
+    coro_t *contxt = (coro_t *)co;
+    size_t size = stack_size + sizeof(raii_values_t);
     size -= sizeof(routine_t);
     if (contxt) {
         struct sigaction handler;
@@ -746,12 +705,12 @@ static routine_t *coro_derive(void_t memory, size_t size) {
 
         stack.ss_flags = 0;
         stack.ss_size = size;
-        contxt->stack = stack.ss_sp = memory;
+        contxt->stack = stack.ss_sp = (void_t)co;
         if (stack.ss_sp && !sigaltstack(&stack, &old_stack)) {
             handler.sa_handler = springboard;
             handler.sa_flags = SA_ONSTACK;
             sigemptyset(&handler.sa_mask);
-            coro()->current_handle = (routine_t *)contxt;
+            coro()->creating = (routine_t *)co;
 
             if (!sigaction(SIGUSR1, &handler, &old_handler)) {
                 if (!raise(SIGUSR1)) {
@@ -764,7 +723,7 @@ static routine_t *coro_derive(void_t memory, size_t size) {
         }
 
         if (contxt->sig_func != coro_func) {
-            delete_coro((routine_t *)contxt);
+            coro_delete((routine_t *)contxt);
             contxt = nullptr;
         }
     }
@@ -773,54 +732,32 @@ static routine_t *coro_derive(void_t memory, size_t size) {
 }
 
 #elif defined(USE_UCONTEXT)
-static void delete_coro(routine_t *co) {
-    if (co) {
-        if (((coro_t *)co)->uc_stack.ss_sp)
-            RAII_FREE(((coro_t *)co)->uc_stack.ss_sp);
-
-        RAII_FREE(co);
-    }
-}
-
-static routine_t *create_routine(size_t heapsize) {
-    if (!coro()->active_handle)
-        coro()->active_handle = coro()->active_buffer;
-
-    ucontext_t *co = try_calloc(1, sizeof(routine_t));
-    if (co) {
-        if ((!getcontext(co) && !(((coro_t *)co)->uc_stack.ss_sp = 0))
-            && (((coro_t *)co)->uc_stack.ss_sp = try_calloc(1, heapsize + sizeof(raii_values_t)))) {
-            ((coro_t *)co)->uc_link = ((coro_t *)coro()->active_handle);
-            ((coro_t *)co)->uc_stack.ss_size = heapsize + sizeof(raii_values_t);
-            makecontext(co, coro_func, 0);
-        } else {
-            delete_coro((routine_t *)co);
-            co = nullptr;
-        }
-    }
-
-    return (routine_t *)co;
-}
-
-static routine_t *coro_derive(void_t memory, size_t size) {
-    if (!coro()->active_handle)
-        coro()->active_handle = coro()->active_buffer;
-
-    ucontext_t *co = (ucontext_t *)memory;
-    memory = (unsigned char *)memory + sizeof(routine_t);
+static routine_t *coro_derive(void_t co, size_t stack_size) {
+    ucontext_t *ctx = (ucontext_t *)co;
+    size_t size = stack_size + sizeof(raii_values_t);
     size -= sizeof(routine_t);
-    if (co) {
-        if ((!getcontext(co) && !(((coro_t *)co)->uc_stack.ss_sp = 0))
-            && (((coro_t *)co)->uc_stack.ss_sp = memory)) {
-            ((coro_t *)co)->uc_link = ((coro_t *)coro()->active_handle);
-            ((coro_t *)co)->uc_stack.ss_size = size + sizeof(raii_values_t);
-            makecontext(co, coro_func, 0);
-        } else {
-            raii_panic("getcontext failed!");
-        }
+
+    /* Initialize ucontext. */
+    if (getcontext(ctx)) {
+        raii_panic("getcontext failed!");
     }
 
+    ctx->uc_link = (ucontext_t *)coro()->main_handle;
+    ctx->uc_stack.ss_sp = (void_t)co;
+    ctx->uc_stack.ss_size = size;
+    makecontext(ctx, (void (*)(void))coro_func, 0);
+
     return (routine_t *)co;
+}
+
+void swap_context(routine_t *co) {
+    routine_t *coro_previous_handle = coro()->active_handle;
+    coro()->active_handle = co;
+    coro()->active_handle->status = CORO_RUNNING;
+    coro()->current_handle = coro_previous_handle;
+    coro()->current_handle->status = CORO_NORMAL;
+    if (swapcontext((ucontext_t *)coro()->current_handle, (ucontext_t *)coro()->active_handle))
+        RAII_LOG("Error: `swapcontext`");
 }
 #else
 
@@ -1519,24 +1456,20 @@ routine_t *coro_derive(void_t memory, size_t size) {
 
 /* Switch to specified coroutine. */
 static RAII_INLINE void coro_switch(routine_t *handle) {
+#if defined(USE_SJLJ) || defined(USE_UCONTEXT)
+    swap_context(handle);
+#else
 #if defined(_M_X64) || defined(_M_IX86)
     register routine_t *coro_previous_handle = coro()->active_handle;
-#elif !defined(USE_SJLJ)
+#else
     routine_t *coro_previous_handle = coro()->active_handle;
 #endif
 
-#if defined(USE_SJLJ)
-    swap_coro(handle);
-#else
     coro()->active_handle = handle;
     coro()->active_handle->status = CORO_RUNNING;
     coro()->current_handle = coro_previous_handle;
     coro()->current_handle->status = CORO_NORMAL;
-#endif
 
-#if defined(USE_UCONTEXT)
-    swapcontext((ucontext_t *)coro_previous_handle, (const ucontext_t *)coro()->active_handle);
-#elif !defined(USE_SJLJ)
     coro_swap(coro()->active_handle, coro_previous_handle);
 #endif
 }
@@ -1656,11 +1589,7 @@ static void coro_delete(routine_t *co) {
             co->is_waiting = false;
         } else if (co->magic_number == CORO_MAGIC_NUMBER) {
             co->magic_number = RAII_ERR;
-#if defined(USE_UCONTEXT) || defined(USE_SJLJ)
-            delete_coro(co);
-#else
             RAII_FREE(co);
-#endif
         }
     }
 }
@@ -1693,6 +1622,12 @@ RAII_INLINE bool coro_terminated(routine_t *co) {
 
 /* Create new coroutine. */
 static routine_t *coro_create(size_t heapsize, raii_func_t func, void_t args) {
+    if (!coro()->current_handle)
+        coro()->current_handle = coro_active();
+
+    if (!coro()->main_handle)
+        coro()->main_handle = coro()->active_handle;
+
     /* Stack size should be at least `CORO_STACK_SIZE`. */
 #ifdef __powerpc64__
     if ((heapsize != 0 && heapsize < PPC_MIN_STACK) || heapsize == 0)
@@ -1702,18 +1637,9 @@ static routine_t *coro_create(size_t heapsize, raii_func_t func, void_t args) {
         heapsize = CORO_STACK_SIZE;
 #endif
 
-#if defined(USE_UCONTEXT) || defined(USE_SJLJ)
-    routine_t *co = create_routine(heapsize);
-#else
     heapsize = _coro_align_forward(heapsize + sizeof(routine_t), 16); /* Stack size should be aligned to 16 bytes. */
     void_t memory = try_calloc(1, heapsize + sizeof(raii_values_t));
     routine_t *co = coro_derive(memory, heapsize);
-#endif
-    if (!coro()->current_handle)
-        coro()->current_handle = coro_active();
-
-    if (!coro()->main_handle)
-        coro()->main_handle = coro()->active_handle;
 
     if (UNLIKELY(raii_deferred_init(&co->scope->defer) < 0)) {
         RAII_FREE(co);
