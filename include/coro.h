@@ -2,19 +2,21 @@
 #ifndef _CORO_H
 #define _CORO_H
 
-#define USE_UCONTEXT
-#define USE_SJLJ
 #if ((defined(__clang__) || defined(__GNUC__)) && defined(__i386__)) || (defined(_MSC_VER) && defined(_M_IX86))
 #   undef USE_UCONTEXT
 #   undef USE_SJLJ
 #elif ((defined(__clang__) || defined(__GNUC__)) && defined(__amd64__)) || (defined(_MSC_VER) && defined(_M_AMD64))
 #   undef USE_UCONTEXT
 #   undef USE_SJLJ
-#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__)|| defined(__powerpc64__) || defined(__ARM_EABI__) || defined(__riscv))
+#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__) || defined(__ARM_EABI__))
 #   undef USE_UCONTEXT
 #   undef USE_SJLJ
-#else
+#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__powerpc64__) || defined(__riscv))
 #   undef USE_UCONTEXT
+#   define USE_SJLJ
+#else
+#   define USE_UCONTEXT
+#   undef USE_SJLJ
 #endif
 
 #if defined(USE_SJLJ)
