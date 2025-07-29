@@ -93,7 +93,7 @@ static void future_close(future f) {
 static int thrd_raii_wrapper(void_t arg) {
     worker_t *f = (worker_t *)arg;
     int err = 0;
-    values_type res[1] = {0};
+    template_t res[1] = {0};
     f->value->scope->err = nullptr;
     raii_init()->threading++;
     raii_local()->queued = f->queue;
@@ -153,7 +153,7 @@ RAII_INLINE future thrd_launch(thrd_func_t fn, void_t args) {
     return thrd_async_ex(get_scope(), fn, params);
 }
 
-values_type thrd_get(future f) {
+template_t thrd_get(future f) {
     if (is_type(f, RAII_FUTURE) && !is_empty(f->value) && is_type(f->value, RAII_PROMISE)) {
         raii_values_t *r = promise_get(f->value);
         if (thrd_join(f->thread, NULL) == thrd_success) {
@@ -204,7 +204,7 @@ vectors_t thrd_data(size_t numof, ...) {
     return args;
 }
 
-RAII_INLINE values_type thrd_result(rid_t id) {
+RAII_INLINE template_t thrd_result(rid_t id) {
     result_t value = raii_result_get(id);
     if (value->is_ready)
         return value->result->value;

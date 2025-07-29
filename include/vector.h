@@ -57,12 +57,12 @@ C_API arrays_t array_ex(memory_t *, size_t, va_list);
 C_API arrays_t array_copy(arrays_t des, arrays_t src);
 C_API void array_deferred_set(arrays_t, memory_t *);
 C_API void array_append(arrays_t, void_t);
-C_API value_t array_pop(arrays_t arr);
-C_API value_t array_shift(arrays_t arr);
+C_API template array_pop(arrays_t arr);
+C_API template array_shift(arrays_t arr);
 C_API void array_append_item(arrays_t arr, ...);
 C_API void array_delete(arrays_t);
 C_API void array_remove(arrays_t, size_t);
-C_API void array_reset(arrays_t);
+C_API arrays_t array_reset(arrays_t);
 C_API bool is_array(void_t);
 
 /* Returns a sequence of numbers, in a given range, this is same as `arrays_of`,
@@ -93,7 +93,7 @@ C_API arrays_t arrays(void);
 #define $shift(arr) array_shift((arrays_t)arr)
 #define $reset(arr) array_reset((arrays_t)arr)
 
-C_API values_type get_arg(void_t);
+C_API template_t get_arg(void_t);
 
 #define vectorize(vec) vectors_t vec = vector_variant()
 #define vector(vec, count, ...) vectors_t vec = vector_for(nullptr, count, __VA_ARGS__)
@@ -108,10 +108,10 @@ C_API values_type get_arg(void_t);
 #define kv(key, value) (key), (value)
 #define in ,
 #define foreach_xp(X, A) X A
-#define foreach_in(X, S) values_type X; int i##X;  \
+#define foreach_in(X, S) template_t X; int i##X;  \
     for (i##X = 0; i##X < (int)$size(S); i##X++)      \
         if ((X.object = S[i##X].object) || X.object == nullptr)
-#define foreach_in_back(X, S) values_type X; int i##X; \
+#define foreach_in_back(X, S) template_t X; int i##X; \
     for (i##X = (int)$size(S) - 1; i##X >= 0; i##X--)     \
         if ((X.object = S[i##X].object) || X.object == nullptr)
 

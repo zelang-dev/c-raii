@@ -184,7 +184,7 @@ linked_iter_t *link_next(linked_iter_t *iterator) {
     return nullptr;
 }
 
-RAII_INLINE value_t link_value(linked_iter_t *iterator) {
+RAII_INLINE template link_value(linked_iter_t *iterator) {
     if (iterator)
         return *iterator->item->value;
 

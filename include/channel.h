@@ -16,7 +16,7 @@ C_API channel_t channel_buf(int);
 C_API int chan_send(channel_t, void_t);
 
 /* Receive data from the channel. */
-C_API values_type chan_recv(channel_t);
+C_API template_t chan_recv(channel_t);
 C_API bool chan_ready(channel_t);
 C_API void chan_ready_reset(channel_t);
 C_API void channel_print(channel_t);
@@ -53,7 +53,7 @@ Must use `_else_if` to end block, or `_break` to end an `_else_if` chain. */
 Must use `_else_if` to end block, or `_break` to end an `_else_if` chain. */
 #define _recv(ch, data) \
   if (chan_ready(ch) && $##__FUNCTION__##_fs == false) {    \
-      chan_ready_reset(ch); values_type data = chan_recv(ch);
+      chan_ready_reset(ch); template_t data = chan_recv(ch);
 
 #define _break          \
   $##__FUNCTION__##_fs = true;  \

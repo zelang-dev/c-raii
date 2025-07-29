@@ -813,8 +813,8 @@ bool try_next(ex_error_t *err, ex_context_t *ex_err) {
     return false;
 }
 
-values_type *trying(void_t with, raii_func_t tryFunc, raii_func_t catchFunc, final_func_t finalFunc) {
-    values_type *value = calloc_local(1, sizeof(values_type));
+template_t *trying(void_t with, raii_func_t tryFunc, raii_func_t catchFunc, final_func_t finalFunc) {
+    template_t *value = calloc_local(1, sizeof(template_t));
     try {
         value->object = tryFunc(with);
     } catch_any {

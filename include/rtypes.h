@@ -128,7 +128,7 @@ typedef union {
     intptr_t **array_int;
     uintptr_t **array_uint;
     raii_func_t func;
-} value_t, *params_t, *ranges_t, *arrays_t, *waitresult_t;
+} template, *params_t, *ranges_t, *arrays_t, *waitresult_t;
 typedef void_t(*callable_t)(params_t);
 
 enum {
@@ -263,19 +263,19 @@ typedef union {
     uintptr_t **array_uint;
     raii_func_t func;
     char buffer[64];
-} values_type, *vectors_t, *args_t;
+} template_t, *vectors_t, *args_t;
 typedef void (*for_func_t)(i64, i64);
 typedef void_t(*result_func_t)(void_t result, size_t id, vectors_t iter);
 typedef void_t(*thrd_func_t)(args_t);
 typedef void (*wait_func)(void);
-typedef void (*final_func_t)(values_type *);
+typedef void (*final_func_t)(template_t *);
 
 typedef struct {
-    values_type value;
+    template_t value;
     int is_arrayed;
     int is_vectored;
     void_t extended;
-    value_t valued;
+    template valued;
 } raii_values_t;
 
 typedef struct {

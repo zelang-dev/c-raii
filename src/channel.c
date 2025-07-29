@@ -400,7 +400,7 @@ RAII_INLINE int chan_send(channel_t c, void_t v) {
     return _channel_op(c, CHANNEL_SEND, &v, 1);
 }
 
-RAII_INLINE values_type chan_recv(channel_t c) {
+RAII_INLINE template_t chan_recv(channel_t c) {
     _channel_op(c, CHANNEL_RECV, c->data, 1);
     return c->data->value;
 }

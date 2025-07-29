@@ -24,7 +24,7 @@ C_API future thrd_launch(thrd_func_t fn, void_t args);
 
 /* Returns the value of `future` ~promise~, a thread's shared object, If not ready, this
 function blocks the calling thread and waits until it is ready. */
-C_API values_type thrd_get(future);
+C_API template_t thrd_get(future);
 
 /* This function blocks the calling thread and waits until `future` is ready,
 will execute provided `yield` callback function continuously. */
@@ -53,7 +53,7 @@ C_API vectors_t thrd_data(size_t, ...);
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
 C_API rid_t thrd_spawn(thrd_func_t fn, size_t, ...);
-C_API values_type thrd_result(rid_t id);
+C_API template_t thrd_result(rid_t id);
 C_API void thrd_set_result(raii_values_t *, int);
 
 C_API future_t thrd_for(for_func_t loop, intptr_t initial, intptr_t times);

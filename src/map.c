@@ -4,7 +4,7 @@
 
 struct map_item_s {
     raii_type type;
-    values_type value;
+    template_t value;
     u32 indic;
     string_t key;
     map_item_t *prev;
@@ -98,7 +98,7 @@ static map_t map_for_ex(map_t hash, u32 num_of_pairs, va_list ap_copy) {
                 map_add_pair(hash, kv);
             } else {
                 for (item = hash->head; item; item = item->next) {
-                    if (item->value.char_ptr == ((values_type *)has)->char_ptr) {
+                    if (item->value.char_ptr == ((template_t *)has)->char_ptr) {
                         kv = (hash_pair_t *)hash_replace(hash->dict, k, va_arg(ap, void_t));
                         item->value = hash_pair_value(kv);
                         item->type = hash_pair_type(kv);
@@ -203,7 +203,7 @@ RAII_INLINE void slice_put(slice_t hash, int64_t index, void_t value) {
     map_put(hash, slice_find(hash, index), value);
 }
 
-RAII_INLINE values_type slice_get(slice_t hash, int64_t index) {
+RAII_INLINE template_t slice_get(slice_t hash, int64_t index) {
     return map_get(hash, slice_find(hash, index));
 }
 
@@ -325,8 +325,8 @@ void map_push(map_t hash, void_t value) {
     map_add_pair(hash, kv);
 }
 
-values_type map_pop(map_t hash) {
-    values_type value;
+template_t map_pop(map_t hash) {
+    template_t value;
     map_item_t *item;
 
     if (!hash || !hash->tail)
@@ -379,8 +379,8 @@ u32 map_shift(map_t hash, void_t value) {
     return item->indic;
 }
 
-values_type map_unshift(map_t hash) {
-    values_type value;
+template_t map_unshift(map_t hash) {
+    template_t value;
     map_item_t *item;
 
     if (!hash || !hash->head)
@@ -442,7 +442,7 @@ RAII_INLINE void_t map_delete(map_t hash, string_t key) {
     return map_remove(hash, hash_get(hash->dict, key));
 }
 
-RAII_INLINE values_type map_get(map_t hash, string_t key) {
+RAII_INLINE template_t map_get(map_t hash, string_t key) {
     return raii_value(hash_get(hash->dict, key));
 }
 
@@ -455,7 +455,7 @@ RAII_INLINE void map_put(map_t hash, string_t key, void_t value) {
         map_add_pair(hash, kv);
     } else {
         for (item = hash->head; item; item = item->next) {
-            if (item->value.char_ptr == ((values_type *)has)->char_ptr) {
+            if (item->value.char_ptr == ((template_t *)has)->char_ptr) {
                 kv = (hash_pair_t *)hash_replace(hash->dict, key, value);
                 item->value = hash_pair_value(kv);
                 item->type = hash_pair_type(kv);
@@ -507,7 +507,7 @@ map_iter_t *iter_next(map_iter_t *iterator) {
     return nullptr;
 }
 
-RAII_INLINE values_type iter_value(map_iter_t *iterator) {
+RAII_INLINE template_t iter_value(map_iter_t *iterator) {
     if (iterator)
         return iterator->item->value;
 
@@ -566,7 +566,7 @@ map_iter_t *iter_remove(map_iter_t *iterator) {
 }
 
 reflect_func(map_item_t,
-             (UNION, values_type, value),
+             (UNION, template_t, value),
              (UINT, u32, indic),
              (CONST_CHAR, string_t, key),
              (STRUCT, map_item_t *, prev),

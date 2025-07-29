@@ -59,7 +59,6 @@ typedef enum {
 
 typedef struct routine_s routine_t;
 typedef struct coro_s coro_t;
-typedef struct hash_s hash_t;
 typedef hash_t *waitgroup_t;
 typedef struct generator_s _generator_t;
 typedef _generator_t *generator_t;
@@ -222,7 +221,7 @@ extern "C" {
 
     /* Returns results of an completed coroutine, by `result id`, will panic,
     if called before `waitfor` returns. */
-    C_API value_t result_for(rid_t);
+    C_API template result_for(rid_t);
 
     /* Explicitly give up the CPU for at least ms milliseconds.
     Other tasks continue to run during this time. */
@@ -245,7 +244,7 @@ extern "C" {
     C_API generator_t generator(callable_t, u64, ...);
 
     /* Resume specified ~coroutine/generator~, returning data from `yielding`. */
-    C_API value_t yield_for(generator_t);
+    C_API template yield_for(generator_t);
 
     /* Return `generator id` in scope for last `yield_for` execution. */
     C_API rid_t yield_id(void);
@@ -283,7 +282,7 @@ extern "C" {
     C_API waitresult_t waitfor(waitgroup_t);
 
     C_API awaitable_t async(callable_t, u64, ...);
-    C_API value_t await(awaitable_t);
+    C_API template await(awaitable_t);
 
     /* Check ~ptr~ and `free` using it's matching `type_of` ~cleanup~ function. */
     C_API void delete(void_t ptr);
@@ -310,7 +309,7 @@ extern "C" {
     C_API void_t get_coro_data(routine_t *);
     C_API void coro_data_set(routine_t *, void_t data);
 
-    C_API value_t *get_coro_result(routine_t *);
+    C_API template *get_coro_result(routine_t *);
     C_API routine_t *get_coro_context(routine_t *);
     C_API void coro_context_set(routine_t *, routine_t *);
 
@@ -367,7 +366,7 @@ extern "C" {
 
     These functions are designed to break the `waitfor` loop, set `result`, and `return` to ~caller~.
     The launched coroutine should first call `coro_active()` and store the `required` context. */
-    C_API value_t coro_await(callable_t, size_t, ...);
+    C_API template coro_await(callable_t, size_t, ...);
 
     /* Create an coroutine and immediately execute, intended to be used to launch
     another coroutine like `coro_await` to create an background `interrupt` coroutine. */

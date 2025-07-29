@@ -13,7 +13,7 @@ struct hash_pair_s {
     uint32_t hash;
     void_t key;
     void_t value;
-    values_type *extended;
+    template_t *extended;
 };
 
 make_atomic(hash_pair_t, atomic_hash_pair_t)
@@ -176,7 +176,7 @@ hash_pair_t *hash_operation(hash_t *hash, const_t key, const_t value, raii_type 
 
             // Update the new values
             buckets[idx]->type = op;
-            if (op == RAII_STRING && simd_strlen((string)value) > (sizeof(values_type) - 1))
+            if (op == RAII_STRING && simd_strlen((string)value) > (sizeof(template_t) - 1))
                 buckets[idx]->type = RAII_CONST_CHAR;
 
             buckets[idx]->extended = value_create(hash->val_ops.cp(value, hash->val_ops.arg), op);
@@ -321,7 +321,7 @@ RAII_INLINE bool hash_pair_is_null(hash_pair_t *pair) {
     return is_empty(pair) || is_empty(pair->extended) || is_empty(pair->extended->object);
 }
 
-RAII_INLINE values_type hash_pair_value(hash_pair_t *pair) {
+RAII_INLINE template_t hash_pair_value(hash_pair_t *pair) {
     if (!hash_pair_is_null(pair))
         return *pair->extended;
 
@@ -430,7 +430,7 @@ static size_t hash_getidx(hash_t *htable, size_t idx, uint32_t hash_val,
 hash_pair_t *pair_create(uint32_t hash, const_t key, const_t value, raii_type op) {
     hash_pair_t *p = try_calloc(1, sizeof(hash_pair_t));
     p->type = op;
-    if (op == RAII_STRING && simd_strlen((string)value) > (sizeof(values_type) - 1))
+    if (op == RAII_STRING && simd_strlen((string)value) > (sizeof(template_t) - 1))
         p->type = RAII_CONST_CHAR;
 
     p->extended = value_create(value, op);

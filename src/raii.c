@@ -60,8 +60,8 @@ RAII_INLINE uint64_t get_timer(void) {
     return lapse;
 }
 
-values_type *value_create(const_t data, raii_type op) {
-    values_type *value = try_calloc(1, sizeof(values_type));
+template_t *value_create(const_t data, raii_type op) {
+    template_t *value = try_calloc(1, sizeof(template_t));
     size_t slen;
     string text;
 
@@ -100,7 +100,7 @@ values_type *value_create(const_t data, raii_type op) {
         case RAII_CONST_CHAR:
         case RAII_STRING:
             slen = simd_strlen((string)data);
-            if (slen > sizeof(values_type) - 1) {
+            if (slen > sizeof(template_t) - 1) {
                 text = try_calloc(1, slen + sizeof(char) + 1);
                 str_copy(text, (string)data, slen);
                 value->char_ptr = text;
@@ -623,7 +623,7 @@ void guard_delete(memory_t *ptr) {
     }
 }
 
-RAII_INLINE values_type raii_value(void_t data) {
+RAII_INLINE template_t raii_value(void_t data) {
     if (data)
         return ((raii_values_t *)data)->value;
 

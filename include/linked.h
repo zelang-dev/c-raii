@@ -26,7 +26,7 @@ struct linked_s {
     doubly_t head;
     doubly_t tail;
     size_t count;
-    value_t value[1];
+    template value[1];
 };
 
 C_API doubly_t doubly_create(void);
@@ -74,7 +74,7 @@ C_API size_t link_count(linked_t *list);
 
 C_API linked_iter_t *link_iter_create(linked_t *, bool forward);
 C_API linked_iter_t *link_next(linked_iter_t *);
-C_API value_t link_value(linked_iter_t *);
+C_API template link_value(linked_iter_t *);
 C_API linked_t *link_item(linked_iter_t *);
 C_API doubly_t link_list_first(linked_t *);
 C_API doubly_t link_list_last(linked_t *);

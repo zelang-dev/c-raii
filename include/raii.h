@@ -232,8 +232,8 @@ This uses current `context` smart pointer, being in `guard` blocks,
 inside `thread/future`, or active `coroutine` call. */
 C_API void_t calloc_local(int count, size_t size);
 
-C_API values_type *value_create(const_t, raii_type);
-C_API values_type raii_value(void_t);
+C_API template_t *value_create(const_t, raii_type);
+C_API template_t raii_value(void_t);
 C_API raii_type type_of(void_t);
 C_API bool is_type(void_t, raii_type);
 C_API bool is_inaccessible(void_t);

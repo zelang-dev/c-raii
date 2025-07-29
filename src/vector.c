@@ -319,10 +319,10 @@ RAII_INLINE void array_append(arrays_t arr, void_t value) {
     vector_set_size(arr, vector_length(arr) + 1);
 }
 
-RAII_INLINE value_t array_pop(arrays_t arr) {
+RAII_INLINE template array_pop(arrays_t arr) {
     size_t sz = vector_length(arr);
     if (sz > 0) {
-        value_t val = arr[sz - 1];
+        template val = arr[sz - 1];
         array_remove(arr, sz - 1);
 
         return val;
@@ -331,10 +331,10 @@ RAII_INLINE value_t array_pop(arrays_t arr) {
     return raii_values_empty->valued;
 }
 
-RAII_INLINE value_t array_shift(arrays_t arr) {
+RAII_INLINE template array_shift(arrays_t arr) {
     size_t sz = vector_length(arr);
     if (sz > 0) {
-        value_t val = arr[0];
+        template val = arr[0];
         array_remove(arr, 0);
 
         return val;
@@ -378,8 +378,9 @@ void array_append_item(arrays_t arr, ...) {
     vector_set_size(arr, index + 1);
 }
 
-RAII_INLINE void array_reset(arrays_t arr) {
+RAII_INLINE arrays_t array_reset(arrays_t arr) {
     vector_clear((vectors_t)arr);
+    return arr;
 }
 
 arrays_t array_of(memory_t *scope, size_t count, ...) {
@@ -461,6 +462,6 @@ RAII_INLINE bool is_args(void_t params) {
         : vector_type((args_t)params) == RAII_ARGS;
 }
 
-RAII_INLINE values_type get_arg(void_t params) {
+RAII_INLINE template_t get_arg(void_t params) {
     return raii_value(params);
 }

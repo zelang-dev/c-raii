@@ -63,7 +63,7 @@ var_t *assign(interface src, raii_type type) {
     } else if (type == RAII_STRING || type == RAII_CHAR_P || type == RAII_CONST_CHAR) {
         as->value = str_trim(src, simd_strlen((string_t)src));
     } else {
-        as->value = calloc_local(1, sizeof(values_type) + sizeof(src));
+        as->value = calloc_local(1, sizeof(template_t) + sizeof(src));
         memcpy(as->value, src, sizeof(src));
     }
 

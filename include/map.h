@@ -36,13 +36,13 @@ typedef enum {
 C_API map_t maps(void);
 C_API map_t map_create(void);
 C_API map_t map_for(u32 num_of_pairs, ...);
-C_API values_type map_get(map_t, string_t);
+C_API template_t map_get(map_t, string_t);
 C_API void map_put(map_t, string_t, void_t);
 C_API map_t map_insert(map_t, ...);
-C_API values_type map_pop(map_t hash);
+C_API template_t map_pop(map_t hash);
 C_API void map_push(map_t hash, void_t value);
 C_API u32 map_shift(map_t hash, void_t value);
-C_API values_type map_unshift(map_t hash);
+C_API template_t map_unshift(map_t hash);
 C_API void map_free(map_t);
 C_API void_t map_remove(map_t, void_t);
 C_API void_t map_delete(map_t, string_t);
@@ -51,14 +51,14 @@ C_API size_t map_count(map_t);
 C_API map_array_t map_array(array_type type, u32 num_of_items, ...);
 C_API slice_t slice(map_array_t array, int64_t start, int64_t end);
 C_API void slice_put(slice_t hash, int64_t index, void_t value);
-C_API values_type slice_get(slice_t hash, int64_t index);
+C_API template_t slice_get(slice_t hash, int64_t index);
 C_API void_t slice_delete(slice_t hash, int64_t index);
 
 C_API map_iter_t *iter_create(map_t, bool forward);
 C_API map_iter_t *iter_next(map_iter_t *iterator);
 C_API map_iter_t *iter_remove(map_iter_t *iterator);
 C_API string_t iter_key(map_iter_t *iterator);
-C_API values_type iter_value(map_iter_t *iterator);
+C_API template_t iter_value(map_iter_t *iterator);
 C_API raii_type iter_type(map_iter_t *iterator);
 
 #define kv_object(key, value) RAII_OBJ, kv(key, (void_t)(value))

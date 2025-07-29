@@ -62,7 +62,7 @@ C_API void_t hash_replace(hash_t *, const_t key, const_t value);
 C_API size_t hash_count(hash_t *);
 C_API size_t hash_capacity(hash_t *);
 C_API hash_pair_t *hash_buckets(hash_t *, u32 index);
-C_API values_type hash_pair_value(hash_pair_t *);
+C_API template_t hash_pair_value(hash_pair_t *);
 C_API string_t hash_pair_key(hash_pair_t *);
 C_API raii_type hash_pair_type(hash_pair_t *);
 C_API bool hash_pair_is_null(hash_pair_t *);

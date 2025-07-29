@@ -52,7 +52,7 @@ struct coro_s {
     void_t r[4]; /* r4-r11 */
     void_t lr;
     void_t sp;
-#elif defined(__aarch64__) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
+#elif (defined(_M_ARM64) || defined(__aarch64__)) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     void_t x[12]; /* x19-x30 */
     void_t sp;
     void_t lr;
@@ -130,7 +130,7 @@ struct routine_s {
     void_t user_data;
     void_t args;
     /* Coroutine result of function return/exit. */
-    value_t *results;
+    template *results;
     raii_func_t func;
     raii_values_t interrupt_result[1];
     memory_t scope[1];
@@ -148,7 +148,7 @@ struct generator_s {
     raii_type type;
     rid_t rid;
     bool is_ready;
-    value_t values[1];
+    template values[1];
     routine_t *context;
 };
 
@@ -1529,7 +1529,7 @@ RAII_INLINE void coro_data_set(routine_t *co, void_t data) {
     co->user_data = data;
 }
 
-RAII_INLINE value_t *get_coro_result(routine_t *co) {
+RAII_INLINE template *get_coro_result(routine_t *co) {
     return co->results;
 }
 
@@ -2499,7 +2499,7 @@ RAII_INLINE string_t catch_message(void) {
     return raii_message_by(coro_scope());
 }
 
-RAII_INLINE value_t result_for(rid_t id) {
+RAII_INLINE template result_for(rid_t id) {
     result_t value = raii_result_get(id);
     if (value->is_ready)
         return value->result->valued;
@@ -2680,7 +2680,7 @@ awaitable_t async(callable_t fn, u64 num_of_args, ...) {
     return awaitable;
 }
 
-value_t await(awaitable_t task) {
+template await(awaitable_t task) {
     if (!is_empty(task) && is_type(task, RAII_CORO)) {
         task->type = RAII_ERR;
         rid_t rid = task->cid;
@@ -2710,7 +2710,7 @@ generator_t generator(callable_t fn, u64 num_of, ...) {
     va_end(ap);
 
     rid_t rid = create_coro((raii_func_t)fn, params, gq_result.stacksize, CORO_RUN_NORMAL);
-    t = (routine_t *)((values_type *)hash_get(wg, __itoa(rid)))->object;
+    t = (routine_t *)((template_t *)hash_get(wg, __itoa(rid)))->object;
     if (!snprintf(t->name, sizeof(t->name), "Generator #%d", (int)rid))
         RAII_LOG("Invalid generator");
 
@@ -2746,7 +2746,7 @@ RAII_INLINE void yielding(void_t data) {
     coro_yielding_active();
 }
 
-RAII_INLINE value_t yield_for(generator_t gen) {
+RAII_INLINE template yield_for(generator_t gen) {
     if (!is_type(gen, RAII_YIELD))
         return raii_values_empty->valued;
 
@@ -2784,7 +2784,7 @@ void delete(void_t ptr) {
     }
 }
 
-value_t coro_await(callable_t fn, size_t num_of_args, ...) {
+template coro_await(callable_t fn, size_t num_of_args, ...) {
     va_list ap;
     waitgroup_t wg = waitgroup_ex(2);
     coro_active()->interrupt_active = true;
@@ -2823,7 +2823,7 @@ routine_t *coro_unmark(rid_t id, string_t name) {
     routine_t *c = nullptr, *co = coro_active();
     if (!is_empty(co->event_group)) {
         waitgroup_t eg = co->event_group;
-        c = (routine_t *)((values_type *)hash_get(eg, __itoa(id)))->object;
+        c = (routine_t *)((template_t *)hash_get(eg, __itoa(id)))->object;
         c->is_waiting = false;
         if (!snprintf(c->name, sizeof(c->name), "%s #%d", name, (int)c->cid))
             RAII_LOG("Invalid unmarking");
