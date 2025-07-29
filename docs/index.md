@@ -1,8 +1,9 @@
 # c-raii
 
-[![windows & linux & macos](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml)
-[![centos](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml)
-[![various cpu's](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml)
+[![Windows & Ubuntu & Apple macOS](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci.yml)
+[![CentOS Stream 9](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_centos.yml)
+[![armv7, aarch64, riscv64](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu.yml)
+[![ppc64le - ucontext](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu-ppc64le.yml/badge.svg)](https://github.com/zelang-dev/c-raii/actions/workflows/ci_cpu-ppc64le.yml)
 
 An robust high-level **Defer**, _RAII_ implementation for `C89`, automatic memory safety _smartly_, with **ultra** simple `threading` capabilities.
 
