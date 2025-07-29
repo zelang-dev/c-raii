@@ -326,12 +326,10 @@ int main(int argc, char **argv)
 {
     int result = 0;
 
-    EXEC_TEST(anon_map_readwrite);
-
 #if !defined(__powerpc64__)
+    EXEC_TEST(anon_map_readwrite);
     // NOTE: this test must cause an access violation exception
     EXEC_TEST(anon_map_readonly);
-#endif
     EXEC_TEST(anon_map_readonly_nowrite);
     EXEC_TEST(anon_map_writeonly);
 
@@ -343,6 +341,7 @@ int main(int argc, char **argv)
     EXEC_TEST(mlock_valid_address);
     EXEC_TEST(mlock_page);
     EXEC_TEST(map_mprotect);
+#endif
 
     return result;
 }

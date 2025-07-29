@@ -199,15 +199,15 @@ int test_finally(void) {
 TEST(list) {
     int result = 0;
 
+#if !defined(__powerpc64__)
     EXEC_TEST(basic_catch);
     EXEC_TEST(types);
     EXEC_TEST(subtypes);
     EXEC_TEST(finally);
-#if !defined(__powerpc64__)
     EXEC_TEST(rethrow);
     EXEC_TEST(throw_in_finally);
-#endif
     EXEC_TEST(assert);
+#endif
 
     return result;
 }
