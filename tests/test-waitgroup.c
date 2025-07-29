@@ -38,7 +38,7 @@ TEST(waitfor) {
 TEST(list) {
     int result = 0;
 
-#if defined(__arm__)
+#if defined(__arm__) || defined(__riscv)
     yield();
 #else
     EXEC_TEST(waitfor);

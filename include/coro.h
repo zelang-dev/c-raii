@@ -15,7 +15,7 @@
 #   undef USE_UCONTEXT
 #   undef USE_SJLJ
 #elif (defined(__clang__) || defined(__GNUC__)) && defined(__powerpc64__)
-#   undef USE_UCONTEXT
+#   define USE_UCONTEXT
 #   undef USE_SJLJ
 #define PPC_MIN_STACK 0x10000lu
 #define PPC_ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
