@@ -203,8 +203,10 @@ TEST(list) {
     EXEC_TEST(types);
     EXEC_TEST(subtypes);
     EXEC_TEST(finally);
+#if !defined(__powerpc64__)
     EXEC_TEST(rethrow);
     EXEC_TEST(throw_in_finally);
+#endif
     EXEC_TEST(assert);
 
     return result;

@@ -1,4 +1,4 @@
-name: armv7, aarch64
+name: ppc64le - ucontext
 
 on:
   pull_request:
@@ -13,10 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: arm
-            arch: armv7
-          - target: aarch64
-            arch: aarch64
+          - target: ppc64v2
+            arch: ppc64le
     steps:
       - uses: actions/checkout@v4
       - uses: uraimo/run-on-arch-action@v3

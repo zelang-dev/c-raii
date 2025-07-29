@@ -1,4 +1,4 @@
-name: riscv64, ppc64le
+name: armv7, aarch64, riscv64
 
 on:
   pull_request:
@@ -13,8 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: ppc64v2
-            arch: ppc64le
+          - target: arm
+            arch: armv7
+          - target: aarch64
+            arch: aarch64
           - target: riscv64
             arch: riscv64
     steps:
