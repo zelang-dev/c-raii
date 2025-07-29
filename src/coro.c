@@ -1,6 +1,3 @@
-#if defined(__GNUC__) || !defined(_WIN32)
-#undef _FORTIFY_SOURCE
-#endif
 #include "channel.h"
 
 static volatile bool thrd_queue_set = false;
@@ -1616,17 +1613,11 @@ RAII_INLINE bool coro_terminated(routine_t *co) {
 
 /* Create new coroutine. */
 static routine_t *coro_create(size_t heapsize, raii_func_t func, void_t args) {
-    if (!coro()->current_handle)
-        coro()->current_handle = coro_active();
-
-    if (!coro()->main_handle)
-        coro()->main_handle = coro()->active_handle;
-
-    /* Stack size should be at least `CORO_STACK_SIZE`. */
-#ifdef __powerpc64__
+#if defined(__powerpc64__) && !defined(USE_UCONTEXT) && !defined(USE_SJLJ)
     if ((heapsize != 0 && heapsize < PPC_MIN_STACK) || heapsize == 0)
         heapsize = PPC_MIN_STACK;
 #else
+    /* Stack size should be at least `CORO_STACK_SIZE`. */
     if ((heapsize != 0 && heapsize < CORO_STACK_SIZE) || heapsize == 0)
         heapsize = CORO_STACK_SIZE;
 #endif
@@ -1634,6 +1625,12 @@ static routine_t *coro_create(size_t heapsize, raii_func_t func, void_t args) {
     heapsize = _coro_align_forward(heapsize + sizeof(routine_t), 16); /* Stack size should be aligned to 16 bytes. */
     void_t memory = try_calloc(1, heapsize + sizeof(raii_values_t));
     routine_t *co = coro_derive(memory, heapsize);
+
+    if (!coro()->current_handle)
+        coro()->current_handle = coro_active();
+
+    if (!coro()->main_handle)
+        coro()->main_handle = coro()->active_handle;
 
     if (UNLIKELY(raii_deferred_init(&co->scope->defer) < 0)) {
         RAII_FREE(co);
