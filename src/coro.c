@@ -1076,12 +1076,6 @@ routine_t *coro_derive(void_t memory, size_t size) {
     return co;
 }
 #elif defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-#define PPC_ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
-
-#define PPC_MIN_STACK 0x10000lu
-#define PPC_MIN_STACK_FRAME 0x20lu
-#define STACK_PPC_ALIGN 0x10lu
-
 static void coro_init(void) {}
 
 void swap_context(routine_t *read, routine_t *write);

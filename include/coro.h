@@ -11,9 +11,16 @@
 #elif (defined(__clang__) || defined(__GNUC__)) && (defined(__arm__) || defined(__aarch64__) || defined(__ARM_EABI__))
 #   undef USE_UCONTEXT
 #   undef USE_SJLJ
-#elif (defined(__clang__) || defined(__GNUC__)) && (defined(__powerpc64__) || defined(__riscv))
+#elif (defined(__clang__) || defined(__GNUC__)) && defined(__riscv)
 #   undef USE_UCONTEXT
-#   define USE_SJLJ
+#   undef USE_SJLJ
+#elif (defined(__clang__) || defined(__GNUC__)) && defined(__powerpc64__)
+#   undef USE_UCONTEXT
+#   undef USE_SJLJ
+#define PPC_MIN_STACK 0x10000lu
+#define PPC_ALIGN(p, x) ((void_t)((uintptr_t)(p) & ~((x)-1)))
+#define PPC_MIN_STACK_FRAME 0x20lu
+#define STACK_PPC_ALIGN 0x10lu
 #else
 #   define USE_UCONTEXT
 #   undef USE_SJLJ
