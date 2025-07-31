@@ -30,7 +30,7 @@ The features now encompass most things you might find in higher level languages,
 
 > See [tests](https://github.com/zelang-dev/c-raii/blob/main/tests) and [examples](https://github.com/zelang-dev/c-raii/blob/main/examples) **folder** for _usage_.
 
-This library has come full circle from it's initial aim at being _decoupled_ from ~c-coroutine~ [uv_coroutine](https://zelang-dev.github.io/uv_coroutine) to _bridging_ it back with different startup strategy behavior. Must either **`#define USE_CORO`** or call **`coro_start(main_func, argc, argv, 0)`**. When active **C** become whatever _high level_ language you can imagine that offers _automatic memory management_, otherwise no coroutine support, program will **crash** calling any specific coroutine only functions.
+This library has come full circle from it's initial aim at being _decoupled_ from ~c-coroutine~ [c-asio](https://zelang-dev.github.io/c-asio) to _bridging_ it back with different startup strategy behavior. Must either **`#define USE_CORO`** or call **`coro_start(main_func, argc, argv, 0)`**. When active **C** become whatever _high level_ language you can imagine that offers _automatic memory management_, otherwise no coroutine support, program will **crash** calling any specific coroutine only functions.
 
 > The one _essential_ thing that all languages must _control_ and _redefine_ doing the compiler creation process, _function_ **"creation/signature/entrance/exit"** _process_. The whole **"signature/entrance/exit"** process hereforth is under **C-RAII** control.
 
@@ -42,13 +42,13 @@ but don't have [work stealing](https://en.wikipedia.org/wiki/Work_stealing) in t
 
 The model here mimics [Go concurrency](https://en.wikipedia.org/wiki/Go_(programming_language)#Concurrency) aka [Green thread](https://en.wikipedia.org/wiki/Green_thread) in _execution_ with follows [Cilk](https://en.wikipedia.org/wiki/Cilk) behavior. There are also [Weave](https://github.com/mratsim/weave) and [Lace](https://github.com/trolando/lace) both compete with **Cilk** behavior. **Weave** using [Nim programming language](https://nim-lang.org/), in which it's origins is `C`, and still compiles down to. **Lace** is `C11` base. In fact **Go** initial origins started as `C`, it's just a _matter of time_ before a [turing-complete](https://en.wikipedia.org/wiki/Turing_completeness) _understanding_ take effect, build _self_ with _self_. **It's amazing how things always come full circle**.
 
-**_Everything that follows at this point is from version `1.x`, noteing ~c-coroutine~ [uv_coroutine repo](https://zelang-dev.github.io/uv_coroutine) will be restructured/refactored for the sole purpose of integrating [libuv](https://github.com/libuv/libuv), the coroutine part to be removed._**
+**_Everything that follows at this point is from version `1.x`, noteing ~c-coroutine~ [c-asio repo](https://zelang-dev.github.io/c-asio) will be restructured/refactored for the sole purpose of integrating [libuv](https://github.com/libuv/libuv), the coroutine part to be removed._**
 
 ---
 
-This library has been decoupled from ~c-coroutine~ [uv_coroutine](https://zelang-dev.github.io/uv_coroutine) to be independently developed.
+This library has been decoupled from ~c-coroutine~ [c-asio](https://zelang-dev.github.io/c-asio) to be independently developed.
 
-In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), and [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [uv_coroutine](https://github.com/zelang-dev/uv_coroutine).
+In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), and [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [c-asio](https://github.com/zelang-dev/c-asio).
 
 This library uses an custom version of [rpmalloc](https://github.com/mjansson/rpmalloc) for **malloc/heap** allocation, not **C11** compiler `thread local` dependant, nor **C++** focus, _removed_. The customization is merged with required [cthread](https://github.com/zelang-dev/cthread) for **C11** _thread like emulation_.
 
