@@ -1,4 +1,6 @@
 //
+// Modified from https://github.com/yb303/swar
+//
 // Function naming convention <prefix>: <function> <length> <suffix>
 //  Length
 //                  8 means input is 8 bytes

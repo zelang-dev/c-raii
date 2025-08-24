@@ -3,6 +3,10 @@
 thrd_local(memory_t, raii, NULL)
 const raii_values_t raii_values_empty[1] = {0};
 raii_results_t gq_result = {0};
+ex_setup_func guard_setup_func = nullptr;
+ex_unwind_func guard_unwind_func = nullptr;
+ex_terminate_func guard_ctrl_c_func = nullptr;
+ex_terminate_func guard_terminate_func = nullptr;
 
 #if defined(WIN32)
 int gettimeofday(struct timeval *tp, struct timezone *tzp) {
@@ -405,7 +409,7 @@ void raii_delete(memory_t *ptr) {
     if (ptr != &thrd_raii_buffer)
 #endif
     {
-        memset(ptr, RAII_ERR, sizeof(memory_t));
+        memset(ptr, 0, sizeof(memory_t));
         RAII_FREE(ptr);
     }
 
@@ -595,6 +599,20 @@ RAII_INLINE const char *err_message(void) {
     return raii_message_by(get_scope());
 }
 
+void guarding(future f, args_t args) {
+	raii_init()->local = args;
+	f->value->scope->err = nullptr;
+	template_t result[1] = {0};
+
+	guard {
+		args_destructor_set(args);
+		result->object = f->func(args);
+		promise_set(f->value, result->object);
+	} guarded_exception(f->value);
+
+	raii_destroy();
+}
+
 void guard_set(ex_context_t *ctx, const char *ex, const char *message) {
     memory_t *scope = raii_local()->arena;
     scope->err = (void_t)ex;
@@ -611,8 +629,8 @@ void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind) {
     raii_local()->arena = scope;
     ex_swap_reset(ex_local());
     ex_local()->is_guarded = false;
-    exception_setup_func = set;
-    exception_unwind_func = unwind;
+    guard_setup_func = set;
+    guard_unwind_func = unwind;
 }
 
 void guard_delete(memory_t *ptr) {
@@ -726,6 +744,10 @@ bool is_equal_ex(void_t mem, void_t mem2) {
             len = sizeof(mem2);
     }
     return memcmp(mem, mem2, len) == 0;
+}
+
+RAII_INLINE bool is_addressable(void_t self) {
+	return ((ptrdiff_t)self > 0x20000000);
 }
 
 RAII_INLINE bool raii_is_exiting(void) {

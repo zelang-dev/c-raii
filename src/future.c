@@ -18,17 +18,7 @@ struct future_pool {
     raii_deque_t *queue;
 };
 
-struct _future {
-    raii_type type;
-    int id;
-    int is_pool;
-    thrd_t thread;
-    thrd_func_t func;
-    memory_t *scope;
-    promise *value;
-};
-
-static promise *promise_create(memory_t *scope) {
+promise *promise_create(memory_t *scope) {
     promise *p = malloc_full(scope, sizeof(promise), RAII_FREE);
     p->scope = scope;
     atomic_flag_clear(&p->mutex);
@@ -38,7 +28,7 @@ static promise *promise_create(memory_t *scope) {
     return p;
 }
 
-static void promise_set(promise *p, void_t res) {
+void promise_set(promise *p, void_t res) {
     atomic_lock(&p->mutex);
     p->result = (raii_values_t *)calloc_full(p->scope, 1, sizeof(raii_values_t), RAII_FREE);
     if (!is_empty(res)) {
@@ -54,6 +44,15 @@ static void promise_set(promise *p, void_t res) {
     atomic_flag_test_and_set(&p->done);
 }
 
+void promise_erred(promise *p, ex_context_t err) {
+	atomic_lock(&p->mutex);
+	p->scope->err = (void_t)err.ex;
+	p->scope->panic = err.panic;
+	p->scope->backtrace = err.backtrace;
+	atomic_unlock(&p->mutex);
+	atomic_flag_test_and_set(&p->done);
+}
+
 static RAII_INLINE raii_values_t *promise_get(promise *p) {
     while (!atomic_flag_load(&p->done))
         thrd_yield();
@@ -61,18 +60,19 @@ static RAII_INLINE raii_values_t *promise_get(promise *p) {
     return p->result;
 }
 
-static void promise_close(promise *p) {
+void promise_close(promise *p) {
     if (is_type(p, RAII_PROMISE)) {
         p->type = RAII_ERR;
         atomic_flag_clear(&p->mutex);
         atomic_flag_clear(&p->done);
         if (!is_empty(p->scope->err))
-            ex_throw(p->scope->err, "unknown", 0, "thrd_raii_wrapper", p->scope->panic, p->scope->backtrace);
+            ex_throw(p->scope->err, "unknown", 0, "future_wrapper", p->scope->panic, p->scope->backtrace);
     }
 }
 
-static future future_create(thrd_func_t start_routine) {
-    future f = try_malloc(sizeof(struct _future));
+future future_create(thrd_func_t start_routine) {
+	future f = try_malloc(sizeof(struct _future));
+	atomic_flag_clear(&f->started);
     f->is_pool = 0;
     f->func = (thrd_func_t)start_routine;
     f->type = RAII_FUTURE;
@@ -96,15 +96,16 @@ static int thrd_raii_wrapper(void_t arg) {
     template_t res[1] = {0};
     f->value->scope->err = nullptr;
     raii_init()->threading++;
-    raii_local()->queued = f->queue;
+	raii_local()->queued = f->queue;
+	raii_local()->local = f->arg;
     rpmalloc_init();
 
     guard {
         args_destructor_set(f->arg);
         res->object = f->func((args_t)f->arg);
-    } guarded_exception(f->value->scope);
+    	promise_set(f->value, res->object);
+    } guarded_exception(f->value);
 
-    promise_set(f->value, res->object);
     if (is_type(f, RAII_FUTURE_ARG)) {
         memset(f, 0, sizeof(*f));
         RAII_FREE(f);
@@ -188,11 +189,11 @@ vectors_t thrd_data(size_t numof, ...) {
     vectors_t args = nullptr;
     size_t i;
     bool is_arguments = is_args(raii_init()->local);
-    if (!is_arguments) {
-        va_start(ap, numof);
+	if (!is_arguments) {
+		va_start(ap, numof);
         args = args_ex(numof, ap);
         va_end(ap);
-    } else {
+	} else {
         args = raii_local()->local;
         $clear(args);
         va_start(ap, numof);

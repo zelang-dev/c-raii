@@ -40,14 +40,14 @@ struct memory_s {
     raii_deque_t *queued;
 };
 
-typedef struct _promise {
-    raii_type type;
-    int id;
-    atomic_flag done;
-    atomic_spinlock mutex;
-    memory_t *scope;
-    raii_values_t *result;
-} promise;
+struct _promise {
+	raii_type type;
+	int id;
+	atomic_flag done;
+	atomic_spinlock mutex;
+	memory_t *scope;
+	raii_values_t *result;
+};
 
 typedef struct _future_arg worker_t;
 struct _future_arg {
@@ -126,6 +126,18 @@ struct raii_results_s {
     atomic_size_t take_count;
     atomic_result_t *results;
 };
+
+struct _future {
+	raii_type type;
+	int id;
+	int is_pool;
+	atomic_flag started;
+	thrd_t thread;
+	thrd_func_t func;
+	memory_t *scope;
+	promise *value;
+};
+
 C_API raii_results_t gq_result;
 
 C_API memory_t *raii_local(void);
@@ -254,6 +266,7 @@ C_API bool is_str_empty(const char *str);
 C_API bool is_guard(void_t self);
 C_API bool is_equal(void_t, void_t);
 C_API bool is_equal_ex(void_t, void_t);
+C_API bool is_addressable(void_t);
 
 C_API bool raii_is_exiting(void);
 C_API bool raii_is_running(void);
@@ -266,6 +279,7 @@ C_API void_t try_calloc(int, size_t);
 C_API void_t try_malloc(size_t);
 C_API void_t try_realloc(void_t, size_t);
 
+C_API void guarding(future f, args_t args);
 C_API void guard_set(ex_context_t *ctx, const char *ex, const char *message);
 C_API void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind);
 C_API void guard_delete(memory_t *ptr);
@@ -330,10 +344,10 @@ are only valid between these sections.
     if (!exception_signal_set)                          \
         ex_signal_setup();                              \
     void_t s##__FUNCTION__ = raii_init()->arena;         \
-    ex_setup_func sf##__FUNCTION__ = exception_setup_func;      \
-    ex_unwind_func uf##__FUNCTION__ = exception_unwind_func;    \
-    exception_unwind_func = (ex_unwind_func)raii_deferred_free; \
-    exception_setup_func = guard_set;                   \
+    ex_setup_func gsf_##__FUNCTION__ = guard_setup_func;      \
+    ex_unwind_func guf_##__FUNCTION__ = guard_unwind_func;    \
+    guard_unwind_func = (ex_unwind_func)raii_deferred_free; \
+    guard_setup_func = guard_set;                   \
     unique_t *_$##__FUNCTION__ = unique_init();         \
     (_$##__FUNCTION__)->status = RAII_GUARDED_STATUS;   \
     raii_local()->status = (_$##__FUNCTION__)->status;  \
@@ -351,7 +365,7 @@ are only valid between these sections.
         if ((is_type(&(_$##__FUNCTION__)->defer, RAII_DEF_ARR)))    \
             raii_deferred_free(_$##__FUNCTION__);                   \
     } finally {                                                     \
-        guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
+        guard_reset(s##__FUNCTION__, gsf_##__FUNCTION__, guf_##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);                             \
     }                                                             \
     return result;                                                  \
@@ -379,12 +393,10 @@ are only valid between these sections.
     } catch_if {                             \
         raii_deferred_free(_$##__FUNCTION__);   \
         if (!_$##__FUNCTION__->is_recovered && raii_is_caught(_$##__FUNCTION__, raii_message_by(_$##__FUNCTION__))) { \
-            ((memory_t *)error)->err = (void_t)ex_err.ex;       \
-            ((memory_t *)error)->panic = ex_err.panic;          \
-            ((memory_t *)error)->backtrace = ex_err.backtrace;  \
+            promise_erred(error, ex_err);  \
         }                                       \
     } finally {                                 \
-        guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
+        guard_reset(s##__FUNCTION__, gsf_##__FUNCTION__, guf_##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);         \
     }                                     \
 }
@@ -413,6 +425,10 @@ are only valid between these sections.
 thrd_local_extern(memory_t, raii)
 thrd_local_extern(ex_context_t, except)
 C_API const raii_values_t raii_values_empty[1];
+C_API ex_setup_func guard_setup_func;
+C_API ex_unwind_func guard_unwind_func;
+C_API ex_terminate_func guard_ctrl_c_func;
+C_API ex_terminate_func guard_terminate_func;
 
 #define match(variable_type) switch (type_of(variable_type))
 #define and(ENUM) case ENUM:

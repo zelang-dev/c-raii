@@ -118,7 +118,9 @@ static void ex_unwind_stack(ex_context_t *ctx) {
 
     ctx->unstack = 1;
 
-    if (ctx->is_unwind && exception_unwind_func) {
+	if (ctx->is_unwind && guard_unwind_func) {
+		guard_unwind_func(ctx->data);
+	} else if (ctx->is_unwind && exception_unwind_func) {
         exception_unwind_func(ctx->data);
     } else if (ctx->is_unwind && ctx->is_raii && ctx->data == (void *)raii_local()) {
         raii_deferred_clean();
@@ -368,14 +370,20 @@ void ex_terminate(void) {
     else
         ex_print(ex_local(), "\nExiting with uncaught exception");
 
-    if (got_ctrl_c && exception_ctrl_c_func) {
-        got_ctrl_c = false;
-        exception_ctrl_c_func();
+	if (got_ctrl_c) {
+		got_ctrl_c = false;
+		if (guard_ctrl_c_func)
+			guard_ctrl_c_func();
+		else if (exception_ctrl_c_func)
+			exception_ctrl_c_func();
     }
 
-    if (can_terminate && exception_terminate_func) {
-        can_terminate = false;
-        exception_terminate_func();
+    if (can_terminate) {
+		can_terminate = false;
+		if (guard_terminate_func)
+			guard_terminate_func();
+		else if (exception_terminate_func)
+			exception_terminate_func();
     }
 
     if (got_signal)
@@ -399,9 +407,11 @@ void ex_throw(string_t exception, string_t file, int line, string_t function, st
     ctx->line = line;
     ctx->is_unwind = false;
     ctx->function = function;
-    ctx->panic = message;
+	ctx->panic = message;
 
-    if (exception_setup_func)
+	if (guard_setup_func)
+		guard_setup_func(ctx, ctx->ex, ctx->panic);
+	else if (exception_setup_func)
         exception_setup_func(ctx, ctx->ex, ctx->panic);
     else if (ctx->is_raii)
         raii_unwind_set(ctx, ctx->ex, ctx->panic);
@@ -459,7 +469,9 @@ int catch_seh(const char *exception, DWORD code, struct _EXCEPTION_POINTERS *ep)
                     ctx->ex = ex_sig[i].ex;
             }
 
-            if (exception_setup_func)
+			if (guard_setup_func)
+				guard_setup_func(ctx, ctx->ex, ctx->panic);
+			else if (exception_setup_func)
                 exception_setup_func(ctx, ctx->ex, ctx->panic);
             else if (ctx->is_raii)
                 raii_unwind_set(ctx, ctx->ex, ctx->panic);
@@ -491,7 +503,9 @@ int catch_filter_seh(DWORD code, struct _EXCEPTION_POINTERS *ep) {
             ctx->line = 0;
             ctx->function = NULL;
 
-            if (exception_setup_func)
+            if (guard_setup_func)
+                guard_setup_func(ctx, ctx->ex, ctx->panic);
+            else if (exception_setup_func)
                 exception_setup_func(ctx, ctx->ex, ctx->panic);
             else if (ctx->is_raii)
                 raii_unwind_set(ctx, ctx->ex, ctx->panic);

@@ -222,6 +222,7 @@ typedef struct memory_s memory_t;
 typedef struct raii_results_s raii_results_t;
 typedef struct raii_deque_s raii_deque_t;
 typedef struct _future *future;
+typedef struct _promise promise;
 typedef struct future_pool *future_t;
 typedef struct hash_s hash_t;
 typedef struct hash_pair_s hash_pair_t;

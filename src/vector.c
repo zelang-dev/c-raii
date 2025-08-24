@@ -457,9 +457,7 @@ RAII_INLINE bool is_array(void_t params) {
 }
 
 RAII_INLINE bool is_args(void_t params) {
-    return is_empty(params) || is_null(params)
-        ? false
-        : vector_type((args_t)params) == RAII_ARGS;
+    return vector_type((args_t)params) == RAII_ARGS;
 }
 
 RAII_INLINE template_t get_arg(void_t params) {

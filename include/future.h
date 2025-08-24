@@ -50,6 +50,12 @@ C_API vectors_t thrd_data(size_t, ...);
 /* Return/create an pair `vector/array` ~values~, only available within `thread/future` */
 #define $$(val1, val2) thrd_data(2, (val1), (val2))
 
+C_API future future_create(thrd_func_t start_routine);
+C_API promise *promise_create(memory_t *scope);
+C_API void promise_set(promise *p, void_t res);
+C_API void promise_close(promise *p);
+C_API void promise_erred(promise *p, ex_context_t err);
+
 C_API future_t thrd_scope(void);
 C_API future_t thrd_sync(future_t);
 C_API rid_t thrd_spawn(thrd_func_t fn, size_t, ...);
