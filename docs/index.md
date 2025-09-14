@@ -668,8 +668,8 @@ Add to **CMakeLists.txt**
 find_package(raii QUIET)
 if(NOT raii_FOUND)
     FetchContent_Declare(raii
-        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/2.1.0.zip
-        URL_MD5 e97338afb9360b320aecf74716be5fdc
+        URL https://github.com/zelang-dev/c-raii/archive/refs/tags/2.1.1.zip
+        URL_MD5 15c0497b21eb12960fbec91523df8b30
     )
     FetchContent_MakeAvailable(raii)
 endif()
