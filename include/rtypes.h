@@ -387,4 +387,9 @@ typedef char cacheline_pad_t[CACHELINE_SIZE];
 #   define C_API extern
 #endif
 
+#ifndef CLR_LN
+#	define CLR_LN  "\033[0K\n"
+#	define LN_CLR  "\n\033[0K"
+#endif
+
 #endif /* RAII_DEFINE_TYPES_H */

@@ -466,7 +466,7 @@ static RAII_INLINE bool coro_sched_is_assignable(size_t active) {
 }
 
 static RAII_INLINE void coro_result_set(routine_t *co, void_t data) {
-    if (!is_empty(data) && co->rid != RAII_ERR) {
+	if (!is_empty(data) && is_addressable(co) && co->rid != RAII_ERR) {
         rid_t id = co->rid;
         raii_values_t *result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), RAII_FREE);
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
@@ -2850,7 +2850,7 @@ void coro_detached(routine_t *co) {
 }
 
 static void coro_await_result(routine_t *co, void_t data, ptrdiff_t plain, bool is_plain) {
-    if (is_plain || (!is_empty(data) && co->rid != RAII_ERR)) {
+	if (is_addressable(co) && (is_plain || (!is_empty(data) && co->rid != RAII_ERR))) {
         rid_t id = co->rid;
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
         atomic_thread_fence(memory_order_seq_cst);

@@ -2,8 +2,8 @@
 #define RAII_H
 
 #define RAII_VERSION_MAJOR 2
-#define RAII_VERSION_MINOR 0
-#define RAII_VERSION_PATCH 0
+#define RAII_VERSION_MINOR 1
+#define RAII_VERSION_PATCH 1
 
 #include "vector.h"
 #include "cthread.h"
@@ -267,6 +267,9 @@ C_API bool is_guard(void_t self);
 C_API bool is_equal(void_t, void_t);
 C_API bool is_equal_ex(void_t, void_t);
 C_API bool is_addressable(void_t);
+
+C_API bool is_promise(void_t);
+C_API bool is_future(void_t);
 
 C_API bool raii_is_exiting(void);
 C_API bool raii_is_running(void);

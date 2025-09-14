@@ -750,6 +750,14 @@ RAII_INLINE bool is_addressable(void_t self) {
 	return ((ptrdiff_t)self > 0x20000000);
 }
 
+RAII_INLINE bool is_promise(void_t self) {
+	return is_type(self, RAII_PROMISE);
+}
+
+RAII_INLINE bool is_future(void_t self) {
+	return is_type(self, RAII_FUTURE);
+}
+
 RAII_INLINE bool raii_is_exiting(void) {
     return !atomic_flag_load(&gq_result.is_errorless) || atomic_flag_load(&gq_result.is_finish);
 }
