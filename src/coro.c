@@ -3140,6 +3140,7 @@ string cin(size_t length) {
 		}
 	}
 
+	fflush(stdout);
 	if ((count = read(STDIN_FILENO, buf, len)) > 0) {
 		buf[count] = '\0';
 		return buf;
