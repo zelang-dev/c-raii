@@ -69,6 +69,12 @@ typedef struct awaitable_s {
     waitgroup_t wg;
 } _awaitable_t, *awaitable_t;
 
+typedef struct {
+	raii_type type;
+	string data;
+	size_t length;
+} buf_t;
+
 #if defined(USE_UCONTEXT)
 #define _BSD_SOURCE
 #if __APPLE__ && __MACH__
@@ -468,7 +474,9 @@ extern "C" {
     C_API void preempt_enable(void);
     C_API void preempt_stop(void);
 
-    C_API coro_sys_func coro_main_func;
+	C_API string cin(size_t length);
+
+	C_API coro_sys_func coro_main_func;
     C_API bool coro_sys_set;
 #ifdef __cplusplus
 }

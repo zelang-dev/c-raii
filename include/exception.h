@@ -70,7 +70,7 @@
 #   define RAII_ASSERT(c) assert(c)
 #   define RAII_LOG(s) puts(s)
 #   define RAII_INFO(s, ...) fprintf(stdout, s, __VA_ARGS__ )
-#   define RAII_HERE fprintf(stderr, "Here %s:%d <- \n", __FILE__, __LINE__)
+#   define RAII_HERE fprintf(stderr, "Here %s:%d"CLR_LN, __FILE__, __LINE__)
 #   ifdef _WIN32
 #       include <DbgHelp.h>
 #       pragma comment(lib,"Dbghelp.lib")

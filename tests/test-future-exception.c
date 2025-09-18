@@ -6,7 +6,7 @@ int some_worker(int args) {
     return args / 0;
 }
 
-void *is_future(args_t args) {
+void *future_check(args_t args) {
     string arg1 = args[0].char_ptr;
     int num = args[1].integer;
     raii_callable_t worker = (raii_callable_t)args[2].func;
@@ -20,16 +20,16 @@ void *is_future(args_t args) {
 }
 
 TEST(thrd_async) {
-    future fut = thrd_async(is_future, 3, "hello world", 128, some_worker);
+	future fut = thrd_async(future_check, 3, "hello world", 128, some_worker);
 
-    ASSERT_TRUE(is_type(fut, RAII_FUTURE));
+    ASSERT_TRUE(is_future(fut));
     ASSERT_FALSE(thrd_is_done(fut));
 
     try {
         ASSERT_TRUE(thrd_get(fut).boolean);
     } catch (division_by_zero) {
         ASSERT_STR(err.name, "division_by_zero");
-    } 
+    }
 
     return 0;
 }

@@ -382,7 +382,7 @@ are only valid between these sections.
     } catch_if {                                \
         raii_deferred_free(_$##__FUNCTION__);   \
     } finally {                                 \
-        guard_reset(s##__FUNCTION__, sf##__FUNCTION__, uf##__FUNCTION__);   \
+        guard_reset(s##__FUNCTION__, gsf_##__FUNCTION__, guf_##__FUNCTION__);   \
         guard_delete(_$##__FUNCTION__);         \
     }                                     \
 }
@@ -449,6 +449,9 @@ makes reference if variable. */
 #  define va_copy(a,b) (*(a) = *(b))
 # endif /* __va_copy */
 #endif /* va_copy */
+
+C_API int cerr(string_t msg, ...);
+C_API int cout(string_t msg, ...);
 
 #ifdef __cplusplus
     }

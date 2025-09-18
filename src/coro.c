@@ -1788,7 +1788,7 @@ RAII_INLINE void coro_info(routine_t *t, int pos) {
     }
 
     char line[SCRAPE_SIZE];
-    snprintf(line, SCRAPE_SIZE, "\033[0K\n\r\033[%dA", pos);
+	snprintf(line, SCRAPE_SIZE, CLR_LN"\r\033[%dA", pos);
     fprintf(stderr, "\t\t - Thrd #%zx, id: %u cid: %u (%s) %s cycles: %zu%s",
             thrd_self(),
             t->tid,
@@ -1796,7 +1796,7 @@ RAII_INLINE void coro_info(routine_t *t, int pos) {
             (!is_empty(t->name) && t->cid > 0 ? t->name : !t->is_referenced ? "" : "referenced"),
             coro_state(t->status),
             t->cycles,
-            (line_end ? "\033[0K\n" : line)
+            (line_end ? ""CLR_LN : line)
     );
 #endif
 }
@@ -2270,13 +2270,14 @@ static int scheduler(void) {
             } else if (!coro()->is_main && (coro_sched_empty() || raii_is_exiting())) {
                 if (coro_is_threading() && coro_queue_active_count() > 0)
                     atomic_fetch_sub(&gq_result.active_count, 1);
-                RAII_INFO("Thrd #%zx waiting to exit.\033[0K\n", thrd_self());
-                /* Wait for global exit signal */
-                while (raii_is_running()
-                       && !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown))
-                    thrd_yield();
+                RAII_INFO("Thrd #%zx waiting to exit."CLR_LN, thrd_self());
+				/* Wait for global exit signal */
+				if (!atomic_flag_load(&gq_result.is_disabled))
+					while (raii_is_running()
+						&& !atomic_flag_load(&gq_result.queue->local[coro()->thrd_id]->shutdown))
+						thrd_yield();
 
-                RAII_INFO("Thrd #%zx exiting, %d runnable coroutines.\033[0K\n", thrd_self(), coro()->used_count);
+                RAII_INFO("Thrd #%zx exiting, %d runnable coroutines."CLR_LN, thrd_self(), coro()->used_count);
                 return coro()->exiting;
             }
         }
@@ -3110,4 +3111,39 @@ int coro_start(coro_sys_func main, u32 argc, void_t argv, size_t queue_size) {
     }
 
     return RAII_ERR;
+}
+
+string cin(size_t length) {
+	buf_t *inbuf = nullptr;
+	string buf = nullptr;
+	size_t len = 0;
+	int count = 0;
+	bool has_data = false;
+	void_t data = coro_data();
+
+	if (is_type(data, RAII_BUFFER)) {
+		inbuf = (buf_t *)data;
+		buf = inbuf->data;
+		len = inbuf->length < length ? inbuf->length : length;
+	} else {
+		if (is_empty(data)) {
+			inbuf = calloc_local(1, sizeof(buf_t));
+			buf = calloc_local(1, length + 1);
+			len = length;
+			inbuf->data = buf;
+			inbuf->length = len;
+			inbuf->type = RAII_BUFFER;
+			coro_data_set(coro_active(), (void_t)inbuf);
+		} else {
+			/* todo */
+			has_data = true;
+		}
+	}
+
+	if ((count = read(STDIN_FILENO, buf, len)) > 0) {
+		buf[count] = '\0';
+		return buf;
+	}
+
+	return nullptr;
 }

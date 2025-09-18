@@ -31,6 +31,25 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 }
 #endif
 
+int cerr(string_t msg, ...) {
+	va_list ap;
+	va_start(ap, msg);
+	int r = vfprintf(stderr, msg, ap);
+	va_end(ap);
+	return r;
+}
+
+int cout(string_t msg, ...) {
+	va_list ap;
+	va_start(ap, msg);
+	int r = vfprintf(stdout, msg, ap);
+	va_end(ap);
+	if (r)
+		fflush(stdout);
+
+	return r;
+}
+
 RAII_INLINE uint64_t get_timer(void) {
     uint64_t lapse = 0;
     struct timeval tv;
