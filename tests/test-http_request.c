@@ -5,12 +5,12 @@ TEST(http_request) {
     http_t *parser = http_for(HTTP_REQUEST, nullptr, 1.1);
     ASSERT_TRUE((type_of(parser) == RAII_HTTPINFO));
 
-    string request = str_concat(13, "GET /index.html HTTP/1.1", CRLF,
-                                  "Host: url.com", CRLF,
-                                  "Accept: */*", CRLF,
-                                  "User-Agent: http_client", CRLF,
-                                  "X-Powered-By: Ze", CRLF,
-                                  "Connection: close", CRLF, CRLF);
+    string request = str_concat(6, "GET /index.html HTTP/1.1" CRLF,
+                                  "Host: url.com" CRLF,
+                                  "Accept: */*" CRLF,
+                                  "User-Agent: http_client" CRLF,
+                                  "X-Powered-By: Ze" CRLF,
+                                  "Connection: close" CRLF CRLF);
 
     char raw[] = "POST /path?free=one&open=two HTTP/1.1\n\
  User-Agent: PHP-SOAP/BeSimpleSoapClient\n\
@@ -24,8 +24,12 @@ TEST(http_request) {
  <b>hello world</b>";
 
     parse_http(parser, raw);
-    ASSERT_STR(request, http_request(parser, HTTP_GET, "http://url.com/index.html", nullptr, nullptr, nullptr, "x-powered-by=Ze;"));
-    ASSERT_STR("http://url.com/index.html", parser->uri);
+	ASSERT_STR(request, http_request(parser, HTTP_GET, "url.com/index.html", nullptr, nullptr, 2,
+		kv(head_by, "Ze"),
+		kv(head_conn, "close"))
+	);
+
+	ASSERT_STR("http://url.com/index.html", parser->uri);
     ASSERT_STR("PHP-SOAP/BeSimpleSoapClient", get_header(parser, "User-Agent"));
     ASSERT_STR("url.com:80", get_header(parser, "Host"));
     ASSERT_STR("*/*", get_header(parser, "Accept"));

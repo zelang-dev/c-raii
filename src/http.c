@@ -1,6 +1,12 @@
 #include "url_http.h"
 
 #if defined(_WIN32) || defined(_WIN64)
+#   include "compat/dirent.h"
+#else
+#   include <dirent.h>
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
 struct tm *gmtime_r(const time_t *timer, struct tm *buf) {
     int r = gmtime_s(buf, timer);
     if (r)
@@ -22,6 +28,10 @@ static string_t const day_short_names[] = {
     "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
 };
 
+static char http_server_name[NAME_MAX] = HTTP_SERVER;
+static char http_agent_name[NAME_MAX] = HTTP_AGENT;
+static char http_std_timestamp[81] = nil;
+
 #define PROXY_CONNECTION "proxy-connection"
 #define CONNECTION "connection"
 #define CONTENT_LENGTH "content-length"
@@ -31,38 +41,35 @@ static string_t const day_short_names[] = {
 #define KEEP_ALIVE "keep-alive"
 #define CLOSE "close"
 
-RAII_INLINE void_t concat_headers(void_t lines, string_t key, const_t value) {
-    lines = str_concat(5, (string)lines, key, ": ", value, CRLF);
+RAII_INLINE void_t concat_headers(void_t line, string_t key, const_t value) {
+	void_t lines = line;
+	lines = str_cat_ex(nullptr, 5, (string)lines, key, ": ", value, CRLF);
+	RAII_FREE(line);
 
     return lines;
 }
 
 /* Return date string in standard format for http headers */
 string http_std_date(time_t t) {
-    struct tm *tm1, tm_buf;
-    string str;
-    if (t == 0) {
-        time_t timer;
-        t = time(&timer);
-    }
+	struct tm *tm1, tm_buf;
+	if (t == 0) {
+		time_t timer;
+		t = time(&timer);
+	}
 
-    tm1 = gmtime_r(&t, &tm_buf);
-    str = calloc_local(1, 81);
-    str[0] = '\0';
+	tm1 = gmtime_r(&t, &tm_buf);
+	if (!tm1) {
+		return http_std_timestamp;
+	}
 
-    if (!tm1) {
-        return str;
-    }
+	snprintf(http_std_timestamp, sizeof(http_std_timestamp), "%s, %02d %s %04d %02d:%02d:%02d GMT",
+		day_short_names[tm1->tm_wday],
+		tm1->tm_mday,
+		mon_short_names[tm1->tm_mon],
+		tm1->tm_year + 1900,
+		tm1->tm_hour, tm1->tm_min, tm1->tm_sec);
 
-    snprintf(str, 80, "%s, %02d %s %04d %02d:%02d:%02d GMT",
-             day_short_names[tm1->tm_wday],
-             tm1->tm_mday,
-             mon_short_names[tm1->tm_mon],
-             tm1->tm_year + 1900,
-             tm1->tm_hour, tm1->tm_min, tm1->tm_sec);
-
-    str[79] = 0;
-    return (str);
+	return (http_std_timestamp);
 }
 
 string_t http_status_str(uint16_t const status) {
@@ -168,76 +175,75 @@ hash_http_t *parse_str(string lines, string sep, string part) {
 }
 
 void parse_http(http_t *this, string headers) {
-    int x = 0, count = 0;
-    this->raw = headers;
+	int x = 0, count = 0;
+	this->raw = headers;
 
-    string *p_headers = str_split(this->raw, "\n\n", &count);
-    this->body = (count > 1 && !is_empty(p_headers[1]))
-        ? trim(p_headers[1]) : nullptr;
-    string *lines = (count > 0 && !is_empty(p_headers[0]))
-        ? str_split_ex(nullptr, p_headers[0], "\n", &count) : nullptr;
+	arrays_t p_headers = str_explode(this->raw, LFLF);
+	count = $size(p_headers);
+	this->body = count > 1 && !is_empty(p_headers[1].char_ptr)
+		? trim(p_headers[1].char_ptr)
+		: nullptr;
 
-    if (count >= 1) {
-        this->headers = hashtable_init(key_ops_string, val_ops_string, hash_lp_idx, SCRAPE_SIZE);
-        deferring((func_t)hash_free, this->headers);
-        string *parts = nullptr;
-        string *params = nullptr;
-        for (x = 0; x < count; x++) {
-            // clean the line
-            string line = lines[x];
-            bool found = false;
-            if (is_str_in(line, ": ")) {
-                found = true;
-                parts = str_split_ex(nullptr, line, ": ", nullptr);
-            } else if (is_str_in(line, ":")) {
-                found = true;
-                parts = str_split_ex(nullptr, line, ":", nullptr);
-            } else if (is_str_in(line, "HTTP/") && this->action == HTTP_REQUEST) {
-                params = str_split(line, " ", nullptr);
-                this->method = trim(params[0]);
-                this->path = trim(params[1]);
-                this->protocol = trim(params[2]);
-            } else if (is_str_in(line, "HTTP/") && this->action == HTTP_RESPONSE) {
-                params = str_split(line, " ", nullptr);
-                this->protocol = trim(params[0]);
-                this->code = atoi(params[1]);
-                this->message = trim(params[2]);
-            }
+	string *lines = (count > 0 && !is_empty(p_headers[0].char_ptr))
+		? str_split_ex(nullptr, p_headers[0].char_ptr, "\n", &count)
+		: nullptr;
 
-            if (found && !is_empty(parts)) {
-                hash_put_str((hash_t *)this->headers, trim(parts[0]), trim(parts[1]));
-                RAII_FREE(parts);
-            }
-        }
+	if (count >= 1) {
+		this->headers = hashtable_init(key_ops_string, val_ops_string, hash_lp_idx, SCRAPE_SIZE);
+		deferring((func_t)hash_free, this->headers);
+		string *parts = nullptr;
+		string *params = nullptr;
+		string delim = nullptr;
+		for (x = 0; x < count; x++) {
+			// clean the line
+			string line = lines[x];
+			bool found = false;
+			if (is_str_in(line, ": ") || is_str_in(line, ":")) {
+				delim = is_str_in(line, ": ") ? ": " : ":";
+				found = true;
+				parts = str_split_ex(nullptr, line, delim, nullptr);
+			} else if (is_str_in(line, "HTTP/")) {
+				params = str_split(line, " ", nullptr);
+				if (this->action == HTTP_REQUEST) {
+					this->method = trim(params[0]);
+					this->path = trim(params[1]);
+					this->protocol = trim(params[2]);
+				} else if (this->action == HTTP_RESPONSE) {
+					this->protocol = trim(params[0]);
+					this->code = atoi(params[1]);
+					this->message = trim(params[2]);
+				}
+			}
 
-        if (this->action == HTTP_REQUEST) {
-            // split path and parameters string
-            params = str_split(this->path, "?", nullptr);
-            this->path = params[0];
-            string parameters = params[1];
+			if (found && !is_empty(parts)) {
+				hash_put_str((hash_t *)this->headers, trim(parts[0]), trim(parts[1]));
+				RAII_FREE(parts);
+			}
+		}
 
-            // parse the parameters
-            if (!is_empty(parameters)) {
-                this->parameters = parse_str(parameters, "&", nullptr);
-            }
-        }
+		if (this->action == HTTP_REQUEST) {
+			// split path and parameters string
+			params = str_split(this->path, "?", nullptr);
+			this->path = params[0];
+			string parameters = params[1];
 
-        if (!is_empty(lines))
-            RAII_FREE(lines);
-    }
+			// parse the parameters
+			if (!is_empty(parameters)) {
+				this->parameters = parse_str(parameters, "&", nullptr);
+			}
+		}
+
+		if (!is_empty(lines))
+			RAII_FREE(lines);
+	}
 }
+
 
 http_t *http_for(http_parser_type action, string hostname, double protocol) {
     http_t *this = calloc_local(1, sizeof(http_t));
 
-    this->parameters = nullptr;
-    this->header = nullptr;
-    this->path = nullptr;
-    this->method = nullptr;
-    this->cookies = nullptr;
-    this->code = STATUS_OK;
-    this->message = nullptr;
     this->action = action;
+    this->code = STATUS_OK;
     this->hostname = hostname;
     this->version = protocol;
     this->type = RAII_HTTPINFO;
@@ -245,118 +251,210 @@ http_t *http_for(http_parser_type action, string hostname, double protocol) {
     return this;
 }
 
-string http_response(http_t *this, string body, http_status status, string type, string extras) {
-    char scrape[SCRAPE_SIZE];
-    char scrape2[SCRAPE_SIZE];
-    char scrape3[SCRAPE_SIZE];
-    int x, i = 0;
-    if (!is_zero(status)) {
-        this->status = status;
-    }
-
-    if (is_empty(body) && is_zero(status)) {
-        this->status = status = STATUS_NOT_FOUND;
-    }
-
-    this->body = is_empty(body)
-        ? str_concat(7,
-                     "<h1>",
-                     HTTP_SERVER,
-                     ": ",
-                     simd_itoa(status, scrape3),
-                     " - ",
-                     http_status_str(status),
-                     "</h1>")
-        : body;
-
-    // Create a string out of the response data
-    string lines = str_concat(20,
-                              // response status
-                              "HTTP/", (is_empty(this->protocol) ? gcvt(this->version, 2, scrape) : this->protocol), " ",
-                              simd_itoa(this->status, scrape3), " ", http_status_str(this->status), CRLF,
-                              // set initial headers
-                              "Date: ", http_std_date(0), CRLF,
-                              "Content-Type: ", (is_empty(type) ? "text/html" : type), "; charset=utf-8", CRLF,
-                              "Content-Length: ", simd_itoa(simd_strlen(this->body), scrape2), CRLF,
-                              "Server: ", HTTP_SERVER, CRLF
-    );
-
-    if (!is_empty(extras)) {
-        string *token = str_split(extras, ";", &i);
-        for (x = 0; x < i; x++) {
-            string *parts = str_split(token[x], "=", nullptr);
-            if (!is_empty(parts))
-                put_header(this, parts[0], parts[1], true);
-        }
-    }
-
-    // add the headers
-    lines = hash_iter(this->header, lines, concat_headers);
-
-    // Build a response header string based on the current line data.
-    string headerString = str_concat(3, (string)lines, CRLF, this->body);
-
-    return headerString;
+RAII_INLINE void http_user_agent(string name) {
+	if (snprintf(http_agent_name, sizeof(http_agent_name), "%s", name))	return;
 }
 
-string http_request(http_t *this,
-                    http_method method,
-                    string path,
-                    string type,
-                    string connection,
-                    string body_data,
-                    string extras
-) {
-    char scrape[SCRAPE_SIZE];
-    this->uri = is_str_in(path, "://")
-        ? path
-        : str_concat(2, (is_empty(this->hostname) ? "http://" : this->hostname), path);
-    url_t *url_array = parse_url(this->uri);
-    string hostname = !is_empty(url_array->host) ? url_array->host : this->hostname;
-    if (!is_empty(url_array->path)) {
-        string path = url_array->path;
-        if (!is_empty(url_array->query))
-            path = str_concat(3, path, "?", url_array->query);
-
-        if (!is_empty(url_array->fragment))
-            path = str_concat(3, path, "#", url_array->fragment);
-    } else {
-        char path[] = "/";
-    }
-
-    string headers = str_concat(14, method_strings[method], " ", url_array->path,
-                                " HTTP/", gcvt(this->version, 2, scrape), CRLF,
-                                "Host: ", hostname, CRLF,
-                                "Accept: */*", CRLF,
-                                "User-Agent: ", HTTP_AGENT, CRLF
-    );
-
-    if (!is_empty(body_data)) {
-        headers = str_concat(8, headers,
-                             "Content-Type: ", (is_empty(type) ? "text/html" : type), "; charset=utf-8", CRLF,
-                             "Content-Length: ", simd_itoa(simd_strlen(body_data), scrape), CRLF
-        );
-    }
-
-    if (!is_empty(extras)) {
-        int x, count = 0;
-        string *lines = str_split(extras, ";", &count);
-        for (x = 0; x < count; x++) {
-            string *parts = str_split(lines[x], "=", nullptr);
-            if (!is_empty(parts))
-                headers = str_concat(5, headers, word_toupper(parts[0], '-'), ": ", parts[1], CRLF);
-        }
-    }
-
-    headers = str_concat(5, headers,
-                         "Connection: ", (is_empty(connection) ? "close" : connection), CRLF, CRLF
-    );
-
-    if (!is_empty(body_data))
-        headers = str_concat(2, headers, body_data);
-
-    return headers;
+RAII_INLINE void http_server_agent(string name) {
+	if (snprintf(http_server_name, sizeof(http_server_name), "%s", name)) return;
 }
+
+string http_response(http_t *this, string body, http_status status,
+	string type, u32 header_pairs, ...) {
+	va_list extras;
+	header_types k;
+	string key, val, lines;
+	bool found, force_cap;
+	char scrape[SCRAPE_SIZE];
+	char scrape2[SCRAPE_SIZE];
+	char scrape3[SCRAPE_SIZE];
+	int x, i = 0;
+
+	if (!is_zero(status)) {
+		this->status = status;
+	}
+
+	if (is_empty(body) && is_zero(status)) {
+		this->status = status = STATUS_NOT_FOUND;
+	}
+
+	this->body = is_empty(body)
+		? str_cat_ex(nullptr, 7,
+			"<h1>",
+			http_server_name,
+			": ",
+			simd_itoa(status, scrape3),
+			" - ",
+			http_status_str(status),
+			"</h1>")
+		: body;
+
+	// Create a string out of the response data
+	lines = str_cat_ex(nullptr, 19,
+		// response status
+		"HTTP/", (is_empty(this->protocol) ? gcvt(this->version, 2, scrape) : this->protocol), " ",
+		simd_itoa(this->status, scrape3), " ", http_status_str(this->status), CRLF,
+		// set initial headers
+		"Date: ", http_std_date(0), CRLF,
+		"Content-Type: ", (is_empty(type) ? "text/html" : type), "; charset=utf-8" CRLF,
+		"Content-Length: ", simd_itoa(simd_strlen(this->body), scrape2), CRLF,
+		"Server: ", http_server_name, CRLF
+	);
+
+	if (header_pairs > 0) {
+		va_start(extras, header_pairs);
+		for (i = 0; i < (int)header_pairs; i++) {
+			found = false;
+			force_cap = false;
+			k = va_arg(extras, header_types);
+			val = va_arg(extras, string);
+			switch (k) {
+				case head_cookie:
+					found = true;
+					key = "Set-Cookie";
+					break;
+				case head_secure:
+					found = true;
+					key = "Strict-Transport-Security";
+					break;
+				case head_conn:
+					found = true;
+					key = "Connection";
+					break;
+				case head_custom:
+					found = true;
+					force_cap = true;
+					key = val;
+					val = va_arg(extras, string);
+					break;
+				case head_by:
+					found = true;
+					key = "X-Powered-By";
+					break;
+			}
+
+			if (found) {
+				put_header(this, key, val, force_cap);
+			}
+		}
+		va_end(extras);
+	}
+
+	// add the headers
+	lines = hash_iter(this->header, lines, concat_headers);
+
+	// Build a response header string based on the current line data.
+	string headerString = str_concat(3, (string)lines, CRLF, this->body);
+	RAII_FREE(lines);
+	if (is_empty(body))
+		RAII_FREE(this->body);
+
+	return headerString;
+}
+
+string http_request(http_t *this, http_method method, string path, string type,
+	string body_data, u32 header_pairs, ...) {
+	va_list extras;
+	header_types k;
+	string key, val;
+	char scrape[SCRAPE_SIZE];
+	bool found;
+	int x, count = 0;
+	string localpath = path;
+
+	if (is_str_in(path, "://"))
+		this->uri = path;
+	else
+		this->uri = str_concat(2, (is_empty(this->hostname) ? "http://" : this->hostname), path);
+
+	url_t *url_array = parse_uri(this->uri);
+	string hostname = !is_empty(url_array->host) ? url_array->host : this->hostname;
+	if (!is_empty(url_array->path)) {
+		localpath = url_array->path;
+		if (!is_empty(url_array->query)) {
+			RAII_FREE(url_array->path);
+			url_array->path = str_cat_ex(nullptr, 3, localpath, "?", url_array->query);
+			RAII_FREE(localpath);
+			localpath = url_array->path;
+		}
+
+		if (!is_empty(url_array->fragment)) {
+			RAII_FREE(url_array->path);
+			url_array->path = str_cat_ex(nullptr, 3, localpath, "#", url_array->fragment);
+			RAII_FREE(localpath);
+		}
+	}
+
+	string headers, header = str_cat_ex(nullptr, 13, method_strings[method], " ",
+		(is_empty(path) ? "/" : url_array->path),
+		" HTTP/", gcvt(this->version, 2, scrape), CRLF,
+		"Host: ", hostname, CRLF,
+		"Accept: */*" CRLF,
+		"User-Agent: ", http_agent_name, CRLF
+	);
+
+	if (!is_empty(body_data)) {
+		headers = str_cat_ex(nullptr, 7, header,
+			"Content-Type: ", (is_empty(type) ? "text/html" : type), "; charset=utf-8" CRLF,
+			"Content-Length: ", simd_itoa(simd_strlen(body_data), scrape), CRLF
+		);
+		RAII_FREE(header);
+		header = headers;
+	}
+
+	if (header_pairs > 0) {
+		va_start(extras, header_pairs);
+		for (x = 0; x < (int)header_pairs; x++) {
+			found = false;
+			k = va_arg(extras, header_types);
+			val = va_arg(extras, string);
+			switch (k) {
+				case head_cookie:
+					found = true;
+					key = "Set-Cookie";
+					break;
+				case head_secure:
+					found = true;
+					key = "Strict-Transport-Security";
+					break;
+				case head_conn:
+					found = true;
+					key = "Connection";
+					break;
+				case head_custom:
+					found = true;
+					key = word_toupper(val, '-');
+					val = va_arg(extras, string);
+					break;
+				case head_by:
+					found = true;
+					key = "X-Powered-By";
+					break;
+			}
+
+			if (found) {
+				headers = str_cat_ex(nullptr, 5, header, key, ": ", val, CRLF);
+				RAII_FREE(header);
+				header = headers;
+			}
+		}
+		va_end(extras);
+	}
+
+	headers = str_cat_ex(nullptr, 2, header, CRLF);
+	RAII_FREE(header);
+	header = headers;
+
+	if (!is_empty(body_data)) {
+		headers = str_cat_ex(nullptr, 2, header, body_data);
+		RAII_FREE(header);
+	}
+
+	uri_free(url_array);
+	deferring(RAII_FREE, headers);
+	return headers;
+}
+
 
 RAII_INLINE string get_header(http_t *this, string key) {
     if (has_header(this, key)) {
@@ -367,20 +465,34 @@ RAII_INLINE string get_header(http_t *this, string key) {
 }
 
 string get_variable(http_t *this, string key, string var) {
-    if (has_variable(this, key, var)) {
-        int x, count = 1;
-        string line = get_header(this, key);
-        string *sections = (is_str_in(line, "; ")) ? str_split(line, "; ", &count) : (string *)line;
-        for (x = 0; x < count; x++) {
-            string parts = sections[x];
-            string *variable = str_split(parts, "=", nullptr);
-            if (is_str_eq(variable[0], var)) {
-                return !is_empty(variable[1]) ? variable[1] : nullptr;
-            }
-        }
-    }
+	int x, has_sect = 0, count = 1;
+	string *sections, line;
+	if (has_variable(this, key, var)) {
+		line = get_header(this, key);
+		if (is_str_in(line, "; ")) {
+			sections = str_split_ex(nullptr, line, "; ", &count);
+			has_sect = 1;
+		} else {
+			sections = (string *)line;
+		}
 
-    return "";
+		for (x = 0; x < count; x++) {
+			string parts = sections[x], *variable = str_split_ex(nullptr, parts, "=", nullptr);
+			if (is_str_eq(variable[0], var)) {
+				if (has_sect)
+					RAII_FREE(sections);
+
+				deferring(RAII_FREE, variable);
+				return !is_empty(variable[1]) ? variable[1] : nullptr;
+			}
+			RAII_FREE(variable);
+		}
+	}
+
+	if (has_sect)
+		RAII_FREE(sections);
+
+	return "";
 }
 
 RAII_INLINE string get_parameter(http_t *this, string key) {
@@ -401,7 +513,7 @@ void put_header(http_t *this, string key, string value, bool force_cap) {
     if (force_cap)
         temp = word_toupper(key, '-');
 
-    hash_put_str(this->header, trim(temp), trim(value));
+    hash_put_str(this->header, temp, value);
 }
 
 RAII_INLINE bool has_header(http_t *this, string key) {

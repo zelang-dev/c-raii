@@ -42,7 +42,7 @@ static raii_type scheme_type(string scheme) {
     } else if (is_str_eq(scheme, "udp")) {
         return RAII_SCHEME_UDP;
     } else {
-        return RAII_INVALID;
+		return -RAII_SCHEME_INVALID;
     }
 }
 
@@ -281,7 +281,7 @@ static string_t binary_strcspn(string_t s, string_t e, string_t chars) {
     return e;
 }
 
-string replace_ctrl_ex(string str, size_t len) {
+static string replace_ctrl_ex(string str, size_t len) {
     unsigned char *s = (unsigned char *)str;
     unsigned char *e = (unsigned char *)str + len;
 
@@ -300,14 +300,24 @@ string replace_ctrl_ex(string str, size_t len) {
     return (str);
 }
 
-url_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
-    char port_buf[6];
-    url_t *ret = calloc_local(1, sizeof(url_t));
-    char const *s, *e, *p, *pp, *ue;
+static RAII_INLINE string uri_dup(const_t src, size_t len) {
+	string ptr = (string)try_calloc(1, len + 1);
+
+	return memcpy(ptr, src, len);
+}
+
+static url_t *url_parse_ex2(char const *str, size_t length, bool *has_port, bool autofree) {
+	url_t *ret = (autofree) ? calloc_local(1, sizeof(url_t)) : try_calloc(1, sizeof(uri_t));
+	char port_buf[6];
+	char const *s, *e, *p, *pp, *ue;
+
+	ret->is_rejected = false;
+	ret->is_autofreeable = autofree;
 
     *has_port = 0;
     s = str;
-    ue = s + length;
+	ue = s + length;
+
 
     /* parse scheme */
     if ((e = memchr(s, ':', length)) && e != s) {
@@ -329,9 +339,9 @@ url_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
             p++;
         }
 
-        if (e + 1 == ue) { /* only scheme is available */
-            ret->scheme = str_trim(s, (e - s));
-            replace_ctrl_ex(ret->scheme, simd_strlen(ret->scheme));
+		if (e + 1 == ue) { /* only scheme is available */
+			ret->scheme = (autofree) ? str_trim(s, (e - s)) : uri_dup(s, (e - s));
+			replace_ctrl_ex(ret->scheme, simd_strlen(ret->scheme));
             return ret;
         }
 
@@ -350,15 +360,15 @@ url_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
 
             if ((p == ue || *p == '/') && (p - e) < 7) {
                 goto parse_port;
-            }
+			}
 
-            ret->scheme = str_trim(s, (e - s));
+			ret->scheme = (autofree) ? str_trim(s, (e - s)) : uri_dup(s, (e - s));
             replace_ctrl_ex(ret->scheme, simd_strlen(ret->scheme));
 
             s = e + 1;
             goto just_path;
-        } else {
-            ret->scheme = str_trim(s, (e - s));
+		} else {
+			ret->scheme = (autofree) ? str_trim(s, (e - s)) : uri_dup(s, (e - s));
             replace_ctrl_ex(ret->scheme, simd_strlen(ret->scheme));
 
             if (e + 2 < ue && *(e + 2) == '/') {
@@ -400,11 +410,13 @@ url_t *url_parse_ex2(char const *str, size_t length, bool *has_port) {
                 if (s + 1 < ue && *s == '/' && *(s + 1) == '/') { /* relative-scheme URL */
                     s += 2;
                 }
-            } else {
-                return NULL;
+			} else {
+				ret->is_rejected = true;
+				return (autofree) ? NULL : ret;
             }
-        } else if (p == pp && pp == ue) {
-            return NULL;
+		} else if (p == pp && pp == ue) {
+			ret->is_rejected = true;
+			return (autofree) ? NULL : ret;
         } else if (s + 1 < ue && *s == '/' && *(s + 1) == '/') { /* relative-scheme URL */
             s += 2;
         } else {
@@ -421,15 +433,15 @@ parse_host:
 
     /* check for login and password */
     if ((p = str_memrchr(s, '@', (e - s)))) {
-        if ((pp = memchr(s, ':', (p - s)))) {
-            ret->user = str_trim(s, (pp - s));
+		if ((pp = memchr(s, ':', (p - s)))) {
+			ret->user = (autofree) ? str_trim(s, (pp - s)) : uri_dup(s, (pp - s));
             replace_ctrl_ex(ret->user, simd_strlen(ret->user));
 
             pp++;
-            ret->pass = str_trim(pp, (p - pp));
+			ret->pass = (autofree) ? str_trim(pp, (p - pp)) : uri_dup(pp, (p - pp));
             replace_ctrl_ex(ret->pass, simd_strlen(ret->pass));
         } else {
-            ret->user = str_trim(s, (p - s));
+			ret->user = (autofree) ? str_trim(s, (p - s)) : uri_dup(s, (p - s));
             replace_ctrl_ex(ret->user, simd_strlen(ret->user));
         }
 
@@ -449,8 +461,9 @@ parse_host:
     if (p) {
         if (!ret->port) {
             p++;
-            if (e - p > 5) { /* port cannot be longer then 5 characters */
-                return NULL;
+			if (e - p > 5) { /* port cannot be longer then 5 characters */
+				ret->is_rejected = true;
+				return (autofree) ? NULL : ret;
             } else if (e - p > 0) {
                 long port;
                 string end;
@@ -460,8 +473,9 @@ parse_host:
                 if (port >= 0 && port <= 65535 && end != port_buf) {
                     *has_port = 1;
                     ret->port = (unsigned short)port;
-                } else {
-                    return NULL;
+				} else {
+					ret->is_rejected = true;
+					return (autofree) ? NULL : ret;
                 }
             }
             p--;
@@ -471,11 +485,12 @@ parse_host:
     }
 
     /* check if we have a valid host, if we don't reject the string as url */
-    if ((p - s) < 1) {
-        return NULL;
+	if ((p - s) < 1) {
+		ret->is_rejected = true;
+		return (autofree) ? NULL : ret;
     }
 
-    ret->host = str_trim(s, (p - s));
+	ret->host = (autofree) ? str_trim(s, (p - s)) : uri_dup(s, (p - s));
     replace_ctrl_ex(ret->host, simd_strlen(ret->host));
 
     if (e == ue) {
@@ -491,7 +506,7 @@ just_path:
     if (p) {
         p++;
         if (p < e) {
-            ret->fragment = str_trim(p, (e - p));
+			ret->fragment = (autofree) ? str_trim(p, (e - p)) : uri_dup(p, (e - p));
             replace_ctrl_ex(ret->fragment, simd_strlen(ret->fragment));
         }
         e = p - 1;
@@ -501,31 +516,79 @@ just_path:
     if (p) {
         p++;
         if (p < e) {
-            ret->query = str_trim(p, (e - p));
+			ret->query = (autofree) ? str_trim(p, (e - p)) : uri_dup(p, (e - p));
             replace_ctrl_ex(ret->query, simd_strlen(ret->query));
         }
         e = p - 1;
     }
 
     if (s < e || s == ue) {
-        ret->path = str_trim(s, (e - s));
+		ret->path = (autofree) ? str_trim(s, (e - s)) : uri_dup(s, (e - s));
         replace_ctrl_ex(ret->path, simd_strlen(ret->path));
     }
 
     return ret;
 }
 
-static url_t *url_parse_ex(char const *str, size_t length) {
+static url_t *url_parse_ex(char const *str, size_t length, bool autofree) {
     bool has_port;
-    return url_parse_ex2(str, length, &has_port);
+    return url_parse_ex2(str, length, &has_port, autofree);
 }
 
-url_t *parse_url(char const *str) {
-    url_t *url = url_parse_ex(str, simd_strlen(str));
+url_t *parse_url(string_t str) {
+    url_t *url = url_parse_ex(str, simd_strlen(str), true);
     if (!is_empty(url))
         url->type = scheme_type(url->scheme);
 
     return url;
+}
+
+void uri_free(uri_t *uri) {
+	if (is_type(uri, RAII_SCHEME_TLS)
+		|| is_type(uri, RAII_SCHEME_TCP)
+		|| is_type(uri, RAII_SCHEME_UDP)
+		|| is_type(uri, RAII_SCHEME_PIPE)
+		|| (is_type(uri, -RAII_SCHEME_INVALID) && uri->is_rejected)) {
+		if (uri->is_autofreeable)
+			return;
+
+		uri->type = RAII_INVALID;
+		uri->port = RAII_ERR;
+		uri->is_rejected = false;
+		if (!is_empty(uri->scheme))
+			RAII_FREE(uri->scheme);
+
+		if (!is_empty(uri->user))
+			RAII_FREE(uri->user);
+
+		if (!is_empty(uri->pass))
+			RAII_FREE(uri->pass);
+
+		if (!is_empty(uri->host))
+			RAII_FREE(uri->host);
+
+		if (!is_empty(uri->path))
+			RAII_FREE(uri->path);
+
+		if (!is_empty(uri->query))
+			RAII_FREE(uri->query);
+
+		if (!is_empty(uri->fragment))
+			RAII_FREE(uri->fragment);
+
+		RAII_FREE(uri);
+	}
+}
+
+uri_t *parse_uri(string_t str) {
+	uri_t *uri = url_parse_ex(str, simd_strlen(str), false);
+	uri->type = scheme_type(uri->scheme);
+	if (uri->is_rejected) {
+		uri_free(uri);
+		return nullptr;
+	}
+
+	return uri;
 }
 
 fileinfo_t *pathinfo(string filepath) {

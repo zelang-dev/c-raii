@@ -2,9 +2,6 @@
 #define _URL_HTTP_H_
 
 #include "hashtable.h"
-
-#define CRLF "\r\n"
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -21,15 +18,17 @@ typedef struct fileinfo_s {
 
 typedef struct url_s {
     raii_type type;
-    unsigned short port;
-    string scheme;
+	bool is_rejected;
+	bool is_autofreeable;
+	unsigned short port;
+	string scheme;
     string user;
     string pass;
     string host;
     string path;
     string query;
     string fragment;
-} url_t;
+} url_t, uri_t;
 
 typedef enum {
     URL_SCHEME,
@@ -149,7 +148,7 @@ typedef enum {
 } http_method;
 
 typedef enum {
-    HTTP_REQUEST,
+    HTTP_REQUEST = HTTP_PURGE + 1,
     HTTP_RESPONSE,
     HTTP_BOTH
 } http_parser_type;
@@ -162,6 +161,23 @@ typedef enum {
     F_UPGRADE = 1 << 4,
     F_SKIP_BODY = 1 << 5
 } http_flags;
+
+#define kv_custom(key, value) (head_custom), (key), (value)
+typedef enum {
+	/* For X-Powered-By */
+	head_by = HTTP_BOTH + 1,
+	/* For Set-Cookie, `; Path=; Max-Age=; HttpOnly; Secure` */
+	head_cookie,
+	/* For Strict-Transport-Security,
+	`max-age=31536000; includeSubDomains; preload` */
+	head_secure,
+	/* For Connection, `keep-alive`, `close`, `etc...` */
+	head_conn,
+	head_bearer,
+	head_auth_basic,
+	/* Internal: use `kv_custom("key", "value")` */
+	head_custom,
+} header_types;
 
 typedef struct cookie_s {
     bool httpOnly;
@@ -218,7 +234,15 @@ Parse a URL and return its components, return `NULL` for malformed URLs.
 Modifed C code from PHP userland function
 see https://php.net/manual/en/function.parse-url.php
 */
-C_API url_t *parse_url(char const *str);
+C_API url_t *parse_url(string_t str);
+
+/*
+Same as `parse_url`, but user MUST call `uri_free` to release allocated memory.
+
+NOTE: Each field is separately allocated, MUST `nullptr` assign, if ~modify/free~.
+*/
+C_API uri_t *parse_uri(string_t str);
+C_API void uri_free(uri_t *uri);
 C_API string url_decode(string str, size_t len);
 C_API string url_encode(char const *s, size_t len);
 C_API fileinfo_t *pathinfo(string filepath);
@@ -251,28 +275,48 @@ C_API void parse_http(http_t *this, string headers);
  */
 C_API http_t *http_for(http_parser_type action, string hostname, double protocol);
 
+/* Set User agent name for request, max length = `NAME_MAX/MAX_PATH` */
+C_API void http_user_agent(string);
+
+/* Set Server name for response, max length = `NAME_MAX/MAX_PATH` */
+C_API void http_server_agent(string);
+
 /**
  * Construct a new response string.
  *
- * - `body` defaults to `Not Found`, if `status` empty
- * - `status` defaults to `STATUS_NO_FOUND`, if `body` empty, otherwise `STATUS_OK`
- * - `type`
- * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
+ * @param this current `http_t` instance
+ * @param body defaults to `Not Found`, if `status` empty
+ * @param status defaults to `STATUS_NO_FOUND`, if `body` empty, otherwise `STATUS_OK`
+ * @param type defaults to `text/html; charset=utf-8`, if empty
+ * @param header_pairs number of additional headers
+ *
+ *	- `using:` header_types = `head_by, head_cookie, head_secure, head_conn, head_bearer, head_auth_basic`
+
+ * 	- `kv(header_types, "value")`
+ *
+ * 	- `or:` `kv_custom("key", "value")`
  */
-C_API string http_response(http_t *this, string body, http_status status, string type, string extras);
+C_API string http_response(http_t *this, string body, http_status status,
+	string type, u32 header_pairs, ...);
 
 /**
  * Construct a new request string.
  *
- * - `extras` additional headers - associative like "x-power-by: whatever" as `key=value;...`
+ * @param this current `http_t` instance
+ * @param method
+ * @param path
+ * @param type defaults to `text/html; charset=utf-8`, if empty
+ * @param body_data
+ * @param header_pairs number of additional headers
+ *
+ *	- `using:` header_types = `head_by, head_cookie, head_secure, head_conn, head_bearer, head_auth_basic`
+
+ * 	- `kv(header_types, "value")`
+ *
+ * 	- `or:` `kv_custom("key", "value")`
  */
-C_API string http_request(http_t *this,
-                          http_method method,
-                          string path,
-                          string type,
-                          string connection,
-                          string body_data,
-                          string extras);
+C_API string http_request(http_t *this, http_method method, string path, string type,
+	string body_data, u32 header_pairs, ...);
 
 /**
  * Return a request header `content`.

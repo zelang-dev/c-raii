@@ -212,6 +212,7 @@ typedef enum {
     RAII_SCHEME_TCP,
     RAII_SCHEME_PIPE,
     RAII_SCHEME_UDP,
+    RAII_SCHEME_INVALID,
     RAII_URLINFO,
     RAII_HTTPINFO,
     RAII_COUNTER
@@ -388,9 +389,17 @@ typedef char cacheline_pad_t[CACHELINE_SIZE];
 #   define C_API extern
 #endif
 
+#ifndef LFLF
+#	define LFLF	"\n\n"
+#endif
+#ifndef LN_CLR
+#	define LN_CLR  "\n\033[0K"
+#endif
 #ifndef CLR_LN
 #	define CLR_LN  "\033[0K\n"
-#	define LN_CLR  "\n\033[0K"
+#endif
+#ifndef CRLF
+#	define CRLF	"\r\n"
 #endif
 
 #endif /* RAII_DEFINE_TYPES_H */

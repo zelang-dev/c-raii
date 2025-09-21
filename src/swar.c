@@ -591,9 +591,11 @@ RAII_INLINE const_t str_memrchr(const_t s, int c, size_t n) {
 
 int strpos(string_t text, string pattern) {
     size_t c, d, e, text_length, pattern_length, position = RAII_ERR;
+	if (is_empty(pattern))
+		return RAII_ERR;
 
-    text_length = simd_strlen(text);
-    pattern_length = simd_strlen(pattern);
+	text_length = simd_strlen(text);
+	pattern_length = simd_strlen(pattern);
 
     if (pattern_length > text_length)
         return RAII_ERR;

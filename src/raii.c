@@ -31,14 +31,6 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 }
 #endif
 
-int clog(string_t msg, ...) {
-	va_list ap;
-	va_start(ap, msg);
-	int r = vfprintf(stderr, msg, ap);
-	va_end(ap);
-	return r;
-}
-
 int cerr(string_t msg, ...) {
 	fflush(stdout);
 	va_list ap;
