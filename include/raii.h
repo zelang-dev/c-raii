@@ -2,7 +2,7 @@
 #define RAII_H
 
 #define RAII_VERSION_MAJOR 2
-#define RAII_VERSION_MINOR 1
+#define RAII_VERSION_MINOR 2
 #define RAII_VERSION_PATCH 1
 
 #include "vector.h"
