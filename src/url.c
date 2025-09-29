@@ -556,27 +556,27 @@ void uri_free(uri_t *uri) {
 		uri->port = RAII_ERR;
 		uri->is_rejected = false;
 		if (!is_empty(uri->scheme))
-			RAII_FREE(uri->scheme);
+			free(uri->scheme);
 
 		if (!is_empty(uri->user))
-			RAII_FREE(uri->user);
+			free(uri->user);
 
 		if (!is_empty(uri->pass))
-			RAII_FREE(uri->pass);
+			free(uri->pass);
 
 		if (!is_empty(uri->host))
-			RAII_FREE(uri->host);
+			free(uri->host);
 
 		if (!is_empty(uri->path))
-			RAII_FREE(uri->path);
+			free(uri->path);
 
 		if (!is_empty(uri->query))
-			RAII_FREE(uri->query);
+			free(uri->query);
 
 		if (!is_empty(uri->fragment))
-			RAII_FREE(uri->fragment);
+			free(uri->fragment);
 
-		RAII_FREE(uri);
+		free(uri);
 	}
 }
 
@@ -628,7 +628,7 @@ string url_encode(char const *s, size_t len) {
 
     from = (unsigned char *)s;
     end = (unsigned char *)s + len;
-    start = RAII_CALLOC(1, 3 * len);
+    start = calloc(1, 3 * len);
     to = (unsigned char *)start;
 
     while (from < end) {
@@ -653,7 +653,7 @@ string url_encode(char const *s, size_t len) {
     size_t rlen = to - (unsigned char *)start;
     ret = calloc_local(1, rlen);
     memcpy(ret, start, rlen + 1);
-    RAII_FREE(start);
+    free(start);
 
     return ret;
 }

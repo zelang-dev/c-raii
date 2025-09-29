@@ -56,6 +56,7 @@ C_API hash_pair_t *insert_char(hash_t *htable, const_t key, char value);
 C_API hash_pair_t *insert_short(hash_t *htable, const_t key, short value);
 
 C_API hash_pair_t *hash_get_pair(hash_t *, const_t key);
+C_API template_t *hash_get_value(hash_t *htable, const_t key);
 C_API void_t hash_get(hash_t *, const_t key);
 C_API void_t hash_iter(hash_t *, void_t variable, hash_iter_func func);
 C_API void_t hash_replace(hash_t *, const_t key, const_t value);

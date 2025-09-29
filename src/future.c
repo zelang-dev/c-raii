@@ -19,7 +19,7 @@ struct future_pool {
 };
 
 promise *promise_create(memory_t *scope) {
-    promise *p = malloc_full(scope, sizeof(promise), RAII_FREE);
+    promise *p = malloc_full(scope, sizeof(promise), free);
     p->scope = scope;
     atomic_flag_clear(&p->mutex);
     atomic_flag_clear(&p->done);
@@ -30,7 +30,7 @@ promise *promise_create(memory_t *scope) {
 
 void promise_set(promise *p, void_t res) {
     atomic_lock(&p->mutex);
-    p->result = (raii_values_t *)calloc_full(p->scope, 1, sizeof(raii_values_t), RAII_FREE);
+    p->result = (raii_values_t *)calloc_full(p->scope, 1, sizeof(raii_values_t), free);
     if (!is_empty(res)) {
         if (is_args(res) || is_vector(res)) {
             p->result->is_vectored = is_vector(res);
@@ -86,7 +86,7 @@ static void future_close(future f) {
             thrd_join(f->thread, NULL);
 
         memset(f, 0, sizeof(*f));
-        RAII_FREE(f);
+        free(f);
     }
 }
 
@@ -108,7 +108,7 @@ static int thrd_raii_wrapper(void_t arg) {
 
     if (is_type(f, RAII_FUTURE_ARG)) {
         memset(f, 0, sizeof(*f));
-        RAII_FREE(f);
+        free(f);
     }
 
     raii_destroy();
@@ -242,7 +242,7 @@ size_t thrd_cpu_count(void) {
 
 void thrd_set_result(raii_values_t *r, int id) {
     result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
-    results[id]->result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), RAII_FREE);
+    results[id]->result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), free);
     if (r->is_arrayed || r->is_vectored) {
         results[id]->result = r;
     } else if (!is_zero(r->value.integer)) {
@@ -357,8 +357,8 @@ void thrd_destroy(future_t f) {
         memory_t *scope = f->scope;
         f->type = RAII_ERR;
         raii_delete(scope);
-        RAII_FREE(f->futures);
-        RAII_FREE(f);
+        free(f->futures);
+        free(f);
     }
 }
 
@@ -368,7 +368,7 @@ void thrd_delete(future f) {
         if (!is_empty(f->scope))
             raii_delete(f->scope);
 
-        RAII_FREE(f);
+        free(f);
     }
 }
 

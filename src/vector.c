@@ -66,7 +66,7 @@ static RAII_INLINE void vector_delete(vectors_t vec) {
             }
         }
 
-        RAII_FREE(p1__);
+        free(p1__);
     }
 }
 
@@ -121,7 +121,7 @@ RAII_INLINE vectors_t vector_copy(memory_t *scope, vectors_t des, vectors_t src)
         foreach(x in src)
             vector_push_back(des, x.object);
         vector_defer_set(des);
-        raii_deferred((gq_result.scope ? gq_result.scope : scope), RAII_FREE, vector_context(des));
+        raii_deferred((gq_result.scope ? gq_result.scope : scope), free, vector_context(des));
         raii_deferred(scope, (func_t)vector_delete, des);
     }
 
@@ -303,7 +303,7 @@ RAII_INLINE void array_delete(arrays_t arr) {
             }
         }
 
-        RAII_FREE(p1__);
+        free(p1__);
     }
 }
 
@@ -388,6 +388,25 @@ arrays_t array_of(memory_t *scope, size_t count, ...) {
     size_t i;
     arrays_t params = nullptr;
     size_t size = count ? count + 1 : vec_num();
+    vector_grow(params, size, scope);
+
+    if (count > 0) {
+        va_start(ap, count);
+        for (i = 0; i < count; i++)
+            array_append(params, va_arg(ap, void_t));
+        va_end(ap);
+    }
+
+    vector_set_type(params, RAII_ARRAY);
+    return params;
+}
+
+arrays_t arrays_ex(size_t count, ...) {
+    va_list ap;
+	size_t i;
+	memory_t *scope = get_scope();
+	arrays_t params = nullptr;
+    size_t size = vec_num();
     vector_grow(params, size, scope);
 
     if (count > 0) {

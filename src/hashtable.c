@@ -49,8 +49,8 @@ static RAII_INLINE void hash_put_tombstone(hash_t *htable, size_t idx);
 
 static u32 hash_initial_capacity = HASH_INIT_CAPACITY;
 static bool hash_initial_override = false;
-key_ops_t key_ops_string = {djb2_hash, hash_string_eq, hash_string_cp, RAII_FREE, nullptr};
-val_ops_t val_ops_string = {hash_string_eq, hash_string_cp, RAII_FREE, nullptr};
+key_ops_t key_ops_string = {djb2_hash, hash_string_eq, hash_string_cp, free, nullptr};
+val_ops_t val_ops_string = {hash_string_eq, hash_string_cp, free, nullptr};
 
 hash_t *hashtable_init(key_ops_t key_ops, val_ops_t val_ops, probe_func probing, u32 cap) {
     hash_t *htable = try_calloc(1, sizeof(*htable));
@@ -72,14 +72,14 @@ void pair_free(hash_pair_t *pair) {
     if (!is_empty(pair) && is_valid(pair)) {
         if (pair->type == RAII_CONST_CHAR) {
             void_t data = pair->extended->char_ptr;
-            RAII_FREE(data);
+            free(data);
         }
 
         pair->type = RAII_ERR;
-        RAII_FREE(pair->extended);
-        RAII_FREE(pair);
+        free(pair->extended);
+        free(pair);
     } else if (!is_empty(pair) && is_type(pair, RAII_NULL)) {
-        RAII_FREE(pair);
+        free(pair);
     }
 }
 
@@ -101,10 +101,10 @@ void hash_free(hash_t *htable) {
         }
 
         if (buckets)
-            RAII_FREE(buckets);
+            free(buckets);
 
         memset(htable, RAII_ERR, sizeof(raii_type));
-        RAII_FREE(htable);
+        free(htable);
     }
 }
 
@@ -133,7 +133,7 @@ static RAII_INLINE void hash_grow(hash_t *htable) {
         }
     }
 
-    RAII_FREE(old_buckets);
+    free(old_buckets);
     atomic_thread_fence(memory_order_release);
 }
 
@@ -170,7 +170,7 @@ hash_pair_t *hash_operation(hash_t *hash, const_t key, const_t value, raii_type 
         } else {
             // Update the existing value
             // Free the old values
-            RAII_FREE(buckets[idx]->extended);
+            free(buckets[idx]->extended);
             if (buckets[idx]->type == RAII_PTR)
                 hash->key_ops.free(buckets[idx]->value);
 
@@ -254,7 +254,7 @@ void_t hash_replace(hash_t *htable, const_t key, const_t value) {
     if (buckets[idx]->type == RAII_CONST_CHAR) {
         buckets[idx]->type = RAII_OBJ;
         void_t data = buckets[idx]->extended->char_ptr;
-        RAII_FREE(data);
+        free(data);
     }
 
     if (buckets[idx]->type == RAII_PTR)
@@ -287,6 +287,10 @@ static RAII_INLINE void hash_put_tombstone(hash_t *htable, size_t idx) {
         buckets[idx]->type = RAII_NULL;
         atomic_store_explicit(&htable->buckets, buckets, memory_order_release);
     }
+}
+
+template_t *hash_get_value(hash_t *htable, const_t key) {
+	return (template_t *)hash_get(htable, key);
 }
 
 void_t hash_get(hash_t *htable, const_t key) {
@@ -361,7 +365,7 @@ void hash_delete(hash_t *htable, const_t key) {
 
     hash_pair_t **buckets = (hash_pair_t **)atomic_load_explicit(&htable->buckets, memory_order_acquire);
     atomic_thread_fence(memory_order_seq_cst);
-    RAII_FREE(buckets[idx]->extended);
+    free(buckets[idx]->extended);
     htable->key_ops.free(buckets[idx]->key);
     if (buckets[idx]->type == RAII_PTR)
         htable->key_ops.free(buckets[idx]->value);

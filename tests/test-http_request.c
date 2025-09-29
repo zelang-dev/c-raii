@@ -2,7 +2,7 @@
 #include "test_assert.h"
 
 TEST(http_request) {
-    http_t *parser = http_for(HTTP_REQUEST, nullptr, 1.1);
+    http_t *parser = http_for(nullptr, 1.1);
     ASSERT_TRUE((type_of(parser) == RAII_HTTPINFO));
 
     string request = str_concat(6, "GET /index.html HTTP/1.1" CRLF,
@@ -23,30 +23,30 @@ TEST(http_request) {
  \n\n\
  <b>hello world</b>";
 
-    parse_http(parser, raw);
+    parse_http(HTTP_REQUEST, parser, raw);
 	ASSERT_STR(request, http_request(parser, HTTP_GET, "url.com/index.html", nullptr, nullptr, 2,
 		kv(head_by, "Ze"),
 		kv(head_conn, "close"))
 	);
 
-	ASSERT_STR("http://url.com/index.html", parser->uri);
-    ASSERT_STR("PHP-SOAP/BeSimpleSoapClient", get_header(parser, "User-Agent"));
-    ASSERT_STR("url.com:80", get_header(parser, "Host"));
-    ASSERT_STR("*/*", get_header(parser, "Accept"));
-    ASSERT_STR("deflate, gzip", get_header(parser, "Accept-Encoding"));
-    ASSERT_STR("text/xml; charset=utf-8", get_header(parser, "Content-Type"));
-    ASSERT_STR("1108", get_header(parser, "Content-Length"));
-    ASSERT_STR("100-continue", get_header(parser, "Expect"));
-    ASSERT_STR("utf-8", get_variable(parser, "Content-Type", "charset"));
-    ASSERT_STR("", get_variable(parser, "Expect", "charset"));
+	ASSERT_STR("http://url.com/index.html", http_get_url(parser));
+    ASSERT_STR("PHP-SOAP/BeSimpleSoapClient", http_get_header(parser, "User-Agent"));
+    ASSERT_STR("url.com:80", http_get_header(parser, "Host"));
+    ASSERT_STR("*/*", http_get_header(parser, "Accept"));
+    ASSERT_STR("deflate, gzip", http_get_header(parser, "Accept-Encoding"));
+    ASSERT_STR("text/xml; charset=utf-8", http_get_header(parser, "Content-Type"));
+    ASSERT_STR("1108", http_get_header(parser, "Content-Length"));
+    ASSERT_STR("100-continue", http_get_header(parser, "Expect"));
+    ASSERT_STR("utf-8", http_get_var(parser, "Content-Type", "charset"));
+	ASSERT_STR("", http_get_var(parser, "Expect", "charset"));
 
-    ASSERT_FALSE(has_header(parser, "Pragma"));
+    ASSERT_FALSE(http_has_header(parser, "Pragma"));
 
-    ASSERT_STR("<b>hello world</b>", parser->body);
-    ASSERT_STR("one", get_parameter(parser, "free"));
-    ASSERT_STR("POST", parser->method);
-    ASSERT_STR("/path", parser->path);
-    ASSERT_STR("HTTP/1.1", parser->protocol);
+    ASSERT_STR("<b>hello world</b>", http_get_body(parser));
+    ASSERT_STR("one", http_get_param(parser, "free"));
+    ASSERT_STR("POST", http_get_method(parser));
+    ASSERT_STR("/path", http_get_path(parser));
+    ASSERT_STR("HTTP/1.1", http_get_protocol(parser));
 
     raii_destroy();
     return 0;

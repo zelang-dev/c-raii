@@ -2,11 +2,22 @@
 #define _URL_HTTP_H_
 
 #include "hashtable.h"
+
+#if defined(_WIN32) || defined(_WIN64)
+#   include "compat/dirent.h"
+#else
+#   include <dirent.h>
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
+typedef struct form_data_s form_data_t;
+typedef struct cookie_s cookie_t;
+typedef struct response_s response_t;
+typedef struct http_s http_t;
 typedef hash_t hash_http_t;
 typedef struct fileinfo_s {
     raii_type type;
@@ -145,7 +156,7 @@ typedef enum {
     /* RFC-5789 */
     HTTP_PATCH,
     HTTP_PURGE
-} http_method;
+} http_method_type;
 
 typedef enum {
     HTTP_REQUEST = HTTP_PURGE + 1,
@@ -164,69 +175,22 @@ typedef enum {
 
 #define kv_custom(key, value) (head_custom), (key), (value)
 typedef enum {
-	/* For X-Powered-By */
+	/* For X-Powered-By: */
 	head_by = HTTP_BOTH + 1,
-	/* For Set-Cookie, `; Path=; Max-Age=; HttpOnly; Secure` */
+	/* For Cookie:, or Set-Cookie: `; Path=; Expires=; Max-Age=; SameSite=; Domain=; HttpOnly; Secure` */
 	head_cookie,
-	/* For Strict-Transport-Security,
+	/* For Strict-Transport-Security:
 	`max-age=31536000; includeSubDomains; preload` */
 	head_secure,
-	/* For Connection, `keep-alive`, `close`, `etc...` */
+	/* For Connection: `keep-alive`, `close`, `etc...` */
 	head_conn,
+	/* For Authorization: Bearer */
 	head_bearer,
+	/* For Authorization: Basic */
 	head_auth_basic,
-	/* Internal: use `kv_custom("key", "value")` */
+	/* Internal, use `kv_custom("key", "value")` instead */
 	head_custom,
 } header_types;
-
-typedef struct cookie_s {
-    bool httpOnly;
-    bool secure;
-    bool strict;
-    int expiry;
-    int maxAge;
-    string domain;
-    string lifetime;
-    string name;
-    string path;
-    string value;
-    string sameSite;
-} cookie_t;
-
-typedef struct http_s {
-    raii_type type;
-    http_parser_type action;
-    /* The current response status */
-    http_status status;
-    /* The current response body */
-    string body;
-    /* The unchanged data from server */
-    string raw;
-    /* The protocol */
-    string protocol;
-    /* The protocol version */
-    double version;
-    /* The requested status code */
-    http_status code;
-    /* The requested status message */
-    string message;
-    /* The requested method */
-    string method;
-    /* The requested path */
-    string path;
-    /* The requested uri */
-    string uri;
-    string hostname;
-    /* The cookie headers */
-    cookie_t *cookies;
-    /* The current headers */
-    hash_http_t *headers;
-    /* The request params */
-    hash_http_t *parameters;
-    /* Response headers to send */
-    hash_http_t *header;
-} http_t;
-
 
 /*
 Parse a URL and return its components, return `NULL` for malformed URLs.
@@ -246,7 +210,7 @@ C_API void uri_free(uri_t *uri);
 C_API string url_decode(string str, size_t len);
 C_API string url_encode(char const *s, size_t len);
 C_API fileinfo_t *pathinfo(string filepath);
-C_API hash_http_t *parse_str(string lines, string sep, string part);
+C_API void parse_str(http_t *this, string lines, string sep, string part);
 
 /*
 Returns valid HTTP status codes reasons.
@@ -260,20 +224,31 @@ C_API string_t http_status_str(uint16_t const status);
 /* Return date string in standard format for http headers */
 C_API string http_std_date(time_t t);
 
-/* Parse/prepare server headers, and store. */
-C_API void parse_http(http_t *this, string headers);
+/* Return date string ahead in standard format for `Set-Cookie` headers */
+C_API string http_date_ahead(u32 days, u32 hours, u32 minutes, u32 seconds);
 
 /**
- * Returns `http_t` instance, for simple generic handling/constructing **http** request/response
- * messages, following the https://tools.ietf.org/html/rfc2616.html specs.
+ * Parse `request/response` headers, and store.
+ *
+ * @param action either HTTP_RESPONSE or HTTP_REQUEST
+ * @param this current `http_t` instance
+ * @param headers raw message
+ */
+C_API void parse_http(http_parser_type action, http_t *this, string headers);
+
+/**
+ * Returns `http_t` instance, for simple generic handling/constructing
+ * `request/response` messages.
+ *
+ * Following the https://tools.ietf.org/html/rfc2616.html specs.
  *
  * - For use with `http_response()` and `http_request()`.
  *
- * - `action` either HTTP_RESPONSE or HTTP_REQUEST
- * - `hostname` for `Host:` header request,  will be ignored on `path/url` setting
- * - `protocol` version for `HTTP/` header
+ * @param hostname for `Host:` header request,  will be ignored on `path/url` setting
+ * @param protocol version for `HTTP/` header
  */
-C_API http_t *http_for(http_parser_type action, string hostname, double protocol);
+C_API http_t *http_for(string hostname, double protocol);
+C_API void http_free(http_t *this);
 
 /* Set User agent name for request, max length = `NAME_MAX/MAX_PATH` */
 C_API void http_user_agent(string);
@@ -290,11 +265,11 @@ C_API void http_server_agent(string);
  * @param type defaults to `text/html; charset=utf-8`, if empty
  * @param header_pairs number of additional headers
  *
- *	- `using:` header_types = `head_by, head_cookie, head_secure, head_conn, head_bearer, head_auth_basic`
-
- * 	- `kv(header_types, "value")`
+ * - `using:` header_types = `head_by, head_cookie, head_secure, head_conn, head_bearer, head_auth_basic`
  *
- * 	- `or:` `kv_custom("key", "value")`
+ * - `kv(header_types, "value")`
+ *
+ * - `or:` `kv_custom("key", "value")`
  */
 C_API string http_response(http_t *this, string body, http_status status,
 	string type, u32 header_pairs, ...);
@@ -309,41 +284,76 @@ C_API string http_response(http_t *this, string body, http_status status,
  * @param body_data
  * @param header_pairs number of additional headers
  *
- *	- `using:` header_types = `head_by, head_cookie, head_secure, head_conn, head_bearer, head_auth_basic`
-
- * 	- `kv(header_types, "value")`
+ * - `using:` header_types = `head_by, head_cookie, head_secure, head_conn, head_bearer, head_auth_basic`
  *
- * 	- `or:` `kv_custom("key", "value")`
+ * - `kv(header_types, "value")`
+ *
+ * - `or:` `kv_custom("key", "value")`
  */
-C_API string http_request(http_t *this, http_method method, string path, string type,
+C_API string http_request(http_t *this, http_method_type method, string path, string type,
 	string body_data, u32 header_pairs, ...);
 
 /**
- * Return a request header `content`.
+ * Return a request/response header `content`.
  */
-C_API string get_header(http_t *this, string key);
+C_API string http_get_header(http_t *this, string key);
 
 /**
- * Return a request header content `variable` value.
+ * Add or overwrite an request/response header parameter.
+ */
+C_API void http_put_header(http_t *this, string key, string value, bool force_cap);
+C_API bool http_has_header(http_t *this, string key);
+
+/**
+ * Return a `request/response` header content `variable` value.
  *
  * - `key` header to check for
  * - `var` variable to find
  */
-C_API string get_variable(http_t *this, string key, string var);
+C_API string http_get_var(http_t *this, string key, string var);
+C_API bool http_has_var(http_t *this, string key, string var);
+
+C_API bool http_has_flag(http_t *this, string key, string flag);
 
 /**
- * Return a request parameter `value`.
+ * Return a request `variable` parameter `value`.
  */
-C_API string get_parameter(http_t *this, string key);
+C_API string http_get_param(http_t *this, string key);
+C_API bool http_has_param(http_t *this, string key);
 
-/**
- * Add or overwrite an response header parameter.
- */
-C_API void put_header(http_t *this, string key, string value, bool force_cap);
-C_API bool has_header(http_t *this, string key);
-C_API bool has_variable(http_t *this, string key, string var);
-C_API bool has_flag(http_t *this, string key, string flag);
-C_API bool has_parameter(http_t *this, string key);
+C_API http_status http_get_status(http_t *this);
+C_API http_status http_get_code(http_t *this);
+C_API double http_get_version(http_t *this);
+C_API string http_get_message(http_t *this);
+C_API string http_get_method(http_t *this);
+C_API string http_get_body(http_t *this);
+C_API string http_get_protocol(http_t *this);
+C_API string http_get_url(http_t *this);
+C_API string http_get_path(http_t *this);
+C_API string http_get_boundary(http_t *this);
+
+C_API bool http_cookie_is_multi(http_t *this);
+C_API bool http_cookie_is_secure(http_t *this, string name);
+C_API bool http_cookie_is_httpOnly(http_t *this, string name);
+C_API size_t http_cookie_maxAge(http_t *this, string name);
+C_API size_t http_cookie_count(http_t *this);
+C_API arrays_t http_cookie_names(http_t *this);
+C_API string http_get_cookie(http_t *this, string name);
+C_API string http_cookie_expiries(http_t *this, string name);
+C_API string http_cookie_domain(http_t *this, string name);
+C_API string http_cookie_sameSite(http_t *this, string name);
+C_API string http_cookie_path(http_t *this, string name);
+
+C_API bool http_is_multipart(http_t *this);
+C_API bool http_multi_has(http_t *this, string name);
+C_API bool http_multi_is_file(http_t *this, string name);
+C_API string http_multi_filename(http_t *this, string name);
+C_API string http_multi_disposition(http_t *this, string name);
+C_API string http_multi_type(http_t *this, string name);
+C_API string http_multi_body(http_t *this, string name);
+C_API size_t http_multi_length(http_t *this, string name);
+C_API size_t http_multi_count(http_t *this);
+C_API arrays_t http_multi_names(http_t *this);
 
 #ifndef HTTP_AGENT
 #define HTTP_AGENT "http_client"

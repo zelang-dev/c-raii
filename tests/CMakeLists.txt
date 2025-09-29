@@ -24,6 +24,8 @@ set(TARGET_LIST
  test-channel
  test-http_request
  test-http_response
+ test-parse_multibad
+ test-parse_multipart
  test-parse_http
  test-parse_url
  test-json

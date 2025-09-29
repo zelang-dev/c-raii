@@ -401,7 +401,10 @@ RAII_INLINE uint64_t simd_htou(string_t s, uint32_t len) {
 }
 
 RAII_INLINE size_t simd_strlen(string_t str) {
-    string_t char_ptr;
+	if (is_empty((void_t)str))
+		return 0;
+
+	string_t char_ptr;
     const uintptr_t *longword_ptr;
     uintptr_t longword, himagic, lomagic;
 
@@ -591,7 +594,7 @@ RAII_INLINE const_t str_memrchr(const_t s, int c, size_t n) {
 
 int strpos(string_t text, string pattern) {
     size_t c, d, e, text_length, pattern_length, position = RAII_ERR;
-	if (is_empty(pattern))
+	if (is_empty(pattern) || is_empty((void_t)text))
 		return RAII_ERR;
 
 	text_length = simd_strlen(text);
@@ -634,7 +637,7 @@ string *str_split_ex(memory_t *defer, string_t s, string_t delim, int *count) {
 
     ptrsSize = (nbWords + 1) * sizeof(string);
     if (defer)
-        ptrs = data = calloc_full(defer, 1, ptrsSize + sLen + 1, RAII_FREE);
+        ptrs = data = calloc_full(defer, 1, ptrsSize + sLen + 1, free);
     else
         ptrs = data = try_calloc(1, ptrsSize + sLen + 1);
 
@@ -687,7 +690,7 @@ string str_concat_ex(memory_t *defer, int num_args, va_list ap_copy) {
     va_end(ap);
 
     if (defer)
-        raii_deferred(defer, RAII_FREE, res);
+        raii_deferred(defer, free, res);
 
     return res;
 }
@@ -713,7 +716,7 @@ string str_replace_ex(memory_t *defer, string_t haystack, string_t needle, strin
         return nullptr;
 
     if (defer)
-        result = (string)calloc_full(defer, 1, i + cnt * (newWlen - oldWlen) + 1, RAII_FREE);
+        result = (string)calloc_full(defer, 1, i + cnt * (newWlen - oldWlen) + 1, free);
     else
         result = (string)try_calloc(1, i + cnt * (newWlen - oldWlen) + 1);
 
@@ -737,7 +740,7 @@ RAII_INLINE string str_copy(string dest, string_t src, size_t len) {
 }
 
 RAII_INLINE string str_memdup_ex(memory_t *defer, const_t src, size_t len) {
-    string ptr = (string)calloc_full(defer, 1, len + 1, RAII_FREE);
+    string ptr = (string)calloc_full(defer, 1, len + 1, free);
 
     return memcpy(ptr, src, len);
 }
@@ -769,7 +772,7 @@ RAII_INLINE string str_replace(string_t haystack, string_t needle, string_t repl
 }
 
 RAII_INLINE arrays_t str_explode(string_t s, string_t delim) {
-    if (is_str_eq(s, ""))
+    if (is_empty((void_t)s) || is_str_eq(s, ""))
         return nullptr;
 
     if (is_empty((void_t)delim))
@@ -788,7 +791,7 @@ RAII_INLINE arrays_t str_explode(string_t s, string_t delim) {
 
     if (nbWords > 0) {
         ptrsSize = nbWords * sizeof(string);
-        ptrs = calloc_full(get_scope(), 1, ptrsSize + sLen + 1, RAII_FREE);
+        ptrs = calloc_full(get_scope(), 1, ptrsSize + sLen + 1, free);
         first = _s = str_copy((string)ptrs, s, sLen);
         while ((_s = strstr(_s, delim))) {
             *_s = '\0';
@@ -1024,7 +1027,7 @@ u_string str_encode64_ex(memory_t *defer, u_string_t src) {
     if (olen < len)
         return nullptr; /* integer overflow */
 
-    out = calloc_full(defer, 1, olen, RAII_FREE);
+    out = calloc_full(defer, 1, olen, free);
     end = src + len;
     begin = src;
     pos = out;
@@ -1070,7 +1073,7 @@ u_string str_decode64_ex(memory_t *defer, u_string_t src) {
         return nullptr;
 
     olen = (count / 4 * 3) + 1;
-    pos = out = calloc_full(defer, 1, olen, RAII_FREE);
+    pos = out = calloc_full(defer, 1, olen, free);
 
     count = 0;
     for (i = 0; i < len; i++) {

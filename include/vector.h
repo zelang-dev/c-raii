@@ -78,6 +78,7 @@ C_API ranges_t range_char(string_t text);
 /* Returns `empty` array `scoped` to either ~current~ call scope,
 `coroutine` or `thread` termination. */
 C_API arrays_t arrays(void);
+C_API arrays_t arrays_ex(size_t count, ...);
 
 #define $append(arr, value) array_append((arrays_t)arr, (void_t)value)
 #define $append_double(arr, value) array_append_item((arrays_t)arr, RAII_DOUBLE, (double)value)

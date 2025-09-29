@@ -311,7 +311,7 @@ static void deque_resize(raii_deque_t *q) {
      * this design choice ensures that any leaked memory remains bounded by the
      * memory actively employed by the functional queues.
      */
-    RAII_FREE(a);
+    free(a);
 }
 
 static routine_t *deque_take(raii_deque_t *q) {
@@ -379,11 +379,11 @@ static void deque_free(raii_deque_t *q) {
         a = atomic_get(deque_array_t *, &q->array);
         if (!is_empty(a)) {
             atomic_store(&q->array, nullptr);
-            RAII_FREE((void_t)a);
+            free((void_t)a);
         }
 
         memset(q, 0, sizeof(*q));
-        RAII_FREE(q);
+        free(q);
     }
 }
 
@@ -409,7 +409,7 @@ static void deque_destroy(void) {
         result_t *r = atomic_get(result_t *, &gq_result.results);
         if (!is_empty(r)) {
             atomic_store(&gq_result.results, nullptr);
-            RAII_FREE((void_t)r);
+            free((void_t)r);
         }
     }
 }
@@ -468,7 +468,7 @@ static RAII_INLINE bool coro_sched_is_assignable(size_t active) {
 static RAII_INLINE void coro_result_set(routine_t *co, void_t data) {
 	if (!is_empty(data) && is_addressable(co) && co->rid != RAII_ERR) {
         rid_t id = co->rid;
-        raii_values_t *result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), RAII_FREE);
+        raii_values_t *result = (raii_values_t *)calloc_full(gq_result.scope, 1, sizeof(raii_values_t), free);
         result_t *results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
         atomic_thread_fence(memory_order_seq_cst);
         results[id]->result = result;
@@ -1580,7 +1580,7 @@ static void coro_delete(routine_t *co) {
             co->is_waiting = false;
         } else if (co->magic_number == CORO_MAGIC_NUMBER) {
             co->magic_number = RAII_ERR;
-            RAII_FREE(co);
+            free(co);
         }
     }
 }
@@ -1633,7 +1633,7 @@ static routine_t *coro_create(size_t heapsize, raii_func_t func, void_t args) {
         coro()->main_handle = coro()->active_handle;
 
     if (UNLIKELY(raii_deferred_init(&co->scope->defer) < 0)) {
-        RAII_FREE(co);
+        free(co);
         return (routine_t *)RAII_ERR;
     }
 
@@ -2122,7 +2122,7 @@ static void coro_thread_waitfor(waitgroup_t wg) {
                             atomic_fetch_sub(&gq_result.active_count, 1);
                         coro_deferred_free(co);
                         co->magic_number = RAII_ERR;
-                        RAII_FREE(co);
+                        free(co);
                     } else {
                         coro_delete(co);
                     }
@@ -2174,7 +2174,7 @@ static void coro_cleanup(void) {
                 thrd_yield();
 
         if (!is_empty(coro()->sleep_handle) && coro()->sleep_handle->magic_number == CORO_MAGIC_NUMBER) {
-            RAII_FREE(coro()->sleep_handle);
+            free(coro()->sleep_handle);
             coro()->sleep_handle = nullptr;
         }
 
@@ -2337,7 +2337,7 @@ static int thrd_coro_wrapper(void_t arg) {
     worker_t *pool = (worker_t *)arg;
     raii_deque_t *queue = (raii_deque_t *)pool->arg;
     int res = 0, tid = pool->id;
-    RAII_FREE(arg);
+    free(arg);
     rpmalloc_init();
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
@@ -2352,7 +2352,7 @@ static int thrd_coro_wrapper(void_t arg) {
     res = scheduler();
 
     if (!is_empty(coro()->sleep_handle) && coro()->sleep_handle->magic_number == CORO_MAGIC_NUMBER)
-        RAII_FREE(coro()->sleep_handle);
+        free(coro()->sleep_handle);
 
     if (coro_interrupt_set)
         coro_interrupt_shutdown(nullptr);
@@ -2609,7 +2609,7 @@ waitresult_t waitfor(waitgroup_t wg) {
                                 atomic_fetch_sub(&gq_result.active_count, 1);
                             coro_deferred_free(co);
                             co->magic_number = RAII_ERR;
-                            RAII_FREE(co);
+                            free(co);
                         } else {
                             coro_delete(co);
                         }
@@ -2686,7 +2686,7 @@ template await(awaitable_t task) {
         task->type = RAII_ERR;
         rid_t rid = task->cid;
         waitgroup_t wg = task->wg;
-        RAII_FREE(task);
+        free(task);
         coro_active()->wait_group = wg;
         waitresult_t wgr = waitfor(wg);
         if ($size(wgr) > 0)
@@ -2715,7 +2715,7 @@ generator_t generator(callable_t fn, u64 num_of, ...) {
     if (!snprintf(t->name, sizeof(t->name), "Generator #%d", (int)rid))
         RAII_LOG("Invalid generator");
 
-    gen = calloc_full(t->scope, 1, sizeof(_generator_t), RAII_FREE);
+    gen = calloc_full(t->scope, 1, sizeof(_generator_t), free);
     gen->rid = rid;
     gen->is_ready = false;
     gen->context = t;
@@ -2777,7 +2777,7 @@ void delete(void_t ptr) {
         otherwise {
             if (is_valid(ptr)) {
                 memset(ptr, 0, sizeof(ptr));
-                RAII_FREE(ptr);
+                free(ptr);
             } else {
                 RAII_LOG("Pointer not freed, possible double free attempt!");
             }
@@ -2975,7 +2975,7 @@ static RAII_INLINE void coro_destroy(void) {
         atomic_lock(&gq_result.group_lock);
         foreach(t in gq_result.gc) {
             if (((routine_t *)t.object)->magic_number == CORO_MAGIC_NUMBER)
-                RAII_FREE(t.object);
+                free(t.object);
         }
 
         array_delete(gq_result.gc);
@@ -3060,7 +3060,7 @@ raii_deque_t *coro_pool_init(size_t queue_size) {
         size_t i;
         unique_t *scope = gq_result.scope, *global = coro_sys_set ? coro_scope() : raii_init();
         if (queue_size > 0 && coro_threading_enabled) {
-            local = (raii_deque_t **)calloc_full(scope, gq_result.thread_count, sizeof(local[0]), RAII_FREE);
+            local = (raii_deque_t **)calloc_full(scope, gq_result.thread_count, sizeof(local[0]), free);
             local[0] = (raii_deque_t *)malloc_full(scope, sizeof(raii_deque_t), (func_t)deque_free);
             deque_init(local[0], queue_size);
             for (i = 1; i < gq_result.thread_count; i++) {

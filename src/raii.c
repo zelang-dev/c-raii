@@ -154,7 +154,7 @@ RAII_INLINE bool result_is_ready(rid_t id) {
 result_t raii_result_create(void) {
     result_t result, *results;
     size_t id = atomic_fetch_add(&gq_result.result_id_generate, 1);
-    result = (result_t)malloc_full(gq_result.scope, sizeof(struct result_data), RAII_FREE);
+    result = (result_t)malloc_full(gq_result.scope, sizeof(struct result_data), free);
     results = (result_t *)atomic_load_explicit(&gq_result.results, memory_order_acquire);
     if (id % gq_result.queue_size == 0 || is_empty(results))
         results = try_realloc(results, (id + gq_result.queue_size) * sizeof(results[0]));
@@ -199,7 +199,7 @@ int raii_array_reset(raii_array_t *a) {
     if (UNLIKELY(!a))
         return -EINVAL;
 
-    RAII_FREE(a->base);
+    free(a->base);
     a->base = NULL;
     a->elements = 0;
     memset(a, 0, sizeof(raii_array_t));
@@ -314,7 +314,7 @@ memory_t *raii_init(void) {
 }
 
 void_t try_calloc(int count, size_t size) {
-    void_t ptr = RAII_CALLOC(count, size);
+    void_t ptr = calloc(count, size);
     if (ptr == NULL) {
         errno = ENOMEM;
         raii_panic("Calloc failed!");
@@ -324,7 +324,7 @@ void_t try_calloc(int count, size_t size) {
 }
 
 void_t try_malloc(size_t size) {
-    void_t ptr = RAII_MALLOC(size);
+    void_t ptr = malloc(size);
     if (ptr == NULL) {
         errno = ENOMEM;
         raii_panic("Malloc failed!");
@@ -398,7 +398,7 @@ void_t malloc_full(memory_t *scope, size_t size, func_t func) {
 }
 
 RAII_INLINE void_t malloc_local(size_t size) {
-    return malloc_full(get_scope(), size, RAII_FREE);
+    return malloc_full(get_scope(), size, free);
 }
 
 void_t calloc_full(memory_t *scope, int count, size_t size, func_t func) {
@@ -414,7 +414,7 @@ void_t calloc_full(memory_t *scope, int count, size_t size, func_t func) {
 }
 
 RAII_INLINE void_t calloc_local(int count, size_t size) {
-    return calloc_full(get_scope(), count, size, RAII_FREE);
+    return calloc_full(get_scope(), count, size, free);
 }
 
 void raii_delete(memory_t *ptr) {
@@ -430,7 +430,7 @@ void raii_delete(memory_t *ptr) {
 #endif
     {
         memset(ptr, 0, sizeof(memory_t));
-        RAII_FREE(ptr);
+        free(ptr);
     }
 
     ptr = NULL;
@@ -515,7 +515,7 @@ static void raii_deferred_run(memory_t *scope, size_t generation) {
     array->elements = generation;
     if (!is_empty(scope->protector)) {
         ex_unprotected_ptr(scope->protector);
-        RAII_FREE(scope->protector);
+        free(scope->protector);
         scope->protector = NULL;
     }
 }
@@ -656,7 +656,7 @@ void guard_reset(void_t scope, ex_setup_func set, ex_unwind_func unwind) {
 void guard_delete(memory_t *ptr) {
     if (is_guard(ptr)) {
         memset(ptr, RAII_ERR, sizeof(*ptr));
-        RAII_FREE(ptr);
+        free(ptr);
         ptr = NULL;
     }
 }

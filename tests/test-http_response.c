@@ -2,7 +2,7 @@
 #include "test_assert.h"
 
 TEST(http_response) {
-    http_t *parser = http_for(HTTP_RESPONSE, nullptr, 1.1);
+    http_t *parser = http_for(nullptr, 1.1);
     ASSERT_TRUE((type_of(parser) == RAII_HTTPINFO));
 
     string response = str_concat(9, "HTTP/1.1 200 OK" CRLF,

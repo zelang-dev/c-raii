@@ -79,7 +79,7 @@ RAII_INLINE void channel_destroy(void) {
     if (!is_chan_empty()) {
         chan_gc_t *gc = chan();
         hash_free(gc->gc);
-        RAII_FREE(gc);
+        free(gc);
         chan_update(nullptr);
     }
 }
@@ -97,13 +97,13 @@ void channel_free(channel_t c) {
         c->type = -1;
         int id = c->id;
         if (!is_empty(c->name))
-            RAII_FREE(c->name);
+            free(c->name);
 
-        RAII_FREE(c->data);
-        RAII_FREE(c->a_recv.a);
-        RAII_FREE(c->a_send.a);
+        free(c->data);
+        free(c->a_recv.a);
+        free(c->a_send.a);
         memset(c, 0, sizeof(raii_type));
-        RAII_FREE(c);
+        free(c);
 
         if (hash_count(chan()->gc) > 0)
             hash_delete(chan()->gc, simd_itoa(id, error_message));
