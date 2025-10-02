@@ -148,7 +148,6 @@ static RAII_INLINE void_t concat_cookies(void_t line, string_t key, const_t valu
 /* Return date string ahead in standard format for `Set-Cookie` headers */
 string http_date_ahead(u32 days, u32 hours, u32 minutes, u32 seconds) {
 	time_t time_ahead, current_time;
-	struct tm *tm1, result;
 	u32 date_ahead = 0;
 
 	if (days) date_ahead = (24 * 3600 * days);
@@ -292,7 +291,7 @@ void parse_str(http_t *this, string lines, string sep, string part) {
 
 static void parse_multipart(http_t *this) {
 	if (this->is_multipart) {
-		string key, value, line, parameters, delim = nullptr, keyname = nullptr,
+		string key, value, line, delim = nullptr, keyname = nullptr,
 			*boundary = nullptr, *boundaries = nullptr, *parts = nullptr, *params = nullptr,
 			*lines = nullptr, *filenames = nullptr, *filename = nullptr;
 		int x, y, sects = 0, names = 0, count = 0, pieces = 0;
@@ -579,7 +578,7 @@ string http_response(http_t *this, string body, http_status status,
 	char scrape2[SCRAPE_SIZE];
 	char scrape3[SCRAPE_SIZE];
 	char auth[NAME_MAX];
-	int x, i = 0;
+	int i = 0;
 
 	if (!is_empty(this->headers)) {
 		hash_delete(this->headers, "Date");
@@ -864,7 +863,7 @@ RAII_INLINE string http_multi_type(http_t *this, string name) {
 
 RAII_INLINE bool http_multi_is_file(http_t *this, string name) {
 	if (is_empty(this->dispositions))
-		return nullptr;
+		return false;
 
 	form_data_t *form = (form_data_t *)hash_get_value(this->dispositions, name)->object;
 	return is_empty(form) ? false : !is_empty(form->filename);

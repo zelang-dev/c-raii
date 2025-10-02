@@ -477,9 +477,14 @@ C_API void cli_message_set(string_t message, bool is_ordered);
 C_API bool is_cli_getopt(string_t flag, bool is_single);
 
 /*
-* Returns `argv[1]` or next `argv[]`, from matching `is_cli_getopt()`, aka `get_opt`.
+* Returns `argv[1]` or next `argv[]`, from matching `is_cli_getopt()`, aka `getopt`.
 */
 C_API string cli_getopt(void);
+
+/*
+* Set minium number of required command-line arguments, default: `1`.
+*/
+C_API void cli_required_set(u32 count);
 
 C_API void cli_arguments_set(int argc, char **argv);
 
