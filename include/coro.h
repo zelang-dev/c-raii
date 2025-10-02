@@ -118,6 +118,7 @@ C_API int swapcontext(ucontext_t *, const ucontext_t *);
 #else
 #define main(...)                       \
     main(int argc, char** argv) {       \
+		cli_arguments_set(argc, argv);	\
         return coro_main(argc, argv);   \
     }                                   \
     int coro_main(__VA_ARGS__)

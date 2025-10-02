@@ -2411,10 +2411,11 @@ static void coro_initialize(void) {
 }
 
 int raii_main(int argc, char **argv) {
-    coro_argc = argc;
-    coro_argv = argv;
+	coro_argc = argc;
+	coro_argv = argv;
+	cli_arguments_set(argc, argv);
 
-    rpmalloc_init();
+	rpmalloc_init();
     coro_initialize();
     coro_pool_init(gq_result.queue_size);
     coro_sched_init(true, 0);

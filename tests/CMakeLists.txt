@@ -39,3 +39,8 @@ foreach (TARGET ${TARGET_LIST})
     target_link_libraries(${TARGET} raii)
     add_test(NAME ${TARGET} COMMAND ${TARGET} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endforeach()
+
+add_executable(test-cli_getopt test-cli_getopt.c)
+target_link_libraries(test-cli_getopt raii)
+add_test(NAME test-cli_getopt COMMAND test-cli_getopt garbage -n nothing -first=hello --last=world -bool bar=45 -bad
+WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

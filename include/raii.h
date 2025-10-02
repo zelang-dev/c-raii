@@ -453,6 +453,36 @@ makes reference if variable. */
 C_API int cerr(string_t msg, ...);
 C_API int cout(string_t msg, ...);
 
+/**
+* Set usage `message` to display to `user`
+* documenting all defined ~command-line~ options/flags.
+*
+* @param message usage/help menu.
+* @param is_ordered command-line arguments in specificied order, allows duplicates.
+*
+* - If ~is_ordered~ `true` will retain each `argv[]` index in `is_cli_getopt` calls.
+*/
+C_API void cli_message_set(string_t message, bool is_ordered);
+
+/**
+* Parse and check command-line options, aka `getopt`.
+*
+* If `flag` match, MUST call `cli_getopt()` to ~retrieve~ next `argv[]`.
+*
+* @param flag argument/options to match against, if `nullptr`, `cli_getopt()` returns first `argv[1]`.
+* @param is_single or `is_boolean` argument, if `true`, only `flag` is returned by `cli_getopt()`.
+*
+* - NOTE: `is_single` WILL also parse `-flag=XXXX`, where `cli_getopt()` returns `XXXX`.
+*/
+C_API bool is_cli_getopt(string_t flag, bool is_single);
+
+/*
+* Returns `argv[1]` or next `argv[]`, from matching `is_cli_getopt()`, aka `get_opt`.
+*/
+C_API string cli_getopt(void);
+
+C_API void cli_arguments_set(int argc, char **argv);
+
 #ifdef __cplusplus
     }
 #endif

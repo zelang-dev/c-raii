@@ -491,7 +491,7 @@ parse_host:
     }
 
 	ret->host = (autofree) ? str_trim(s, (p - s)) : uri_dup(s, (p - s));
-    replace_ctrl_ex(ret->host, simd_strlen(ret->host));
+	replace_ctrl_ex(ret->host, simd_strlen(ret->host));
 
     if (e == ue) {
         return ret;
@@ -530,14 +530,20 @@ just_path:
     return ret;
 }
 
-static url_t *url_parse_ex(char const *str, size_t length, bool autofree) {
-    bool has_port;
-    return url_parse_ex2(str, length, &has_port, autofree);
+static url_t *url_parse_ex(string_t str, size_t length, bool autofree) {
+	bool has_port;
+	return url_parse_ex2(str, length, &has_port, autofree);
 }
 
 url_t *parse_url(string_t str) {
-    url_t *url = url_parse_ex(str, simd_strlen(str), true);
-    if (!is_empty(url))
+	if (is_empty((void_t)str))
+		return nullptr;
+
+	url_t *url = url_parse_ex(str, simd_strlen(str), true);
+	if (!is_empty(url) && is_empty(url->host))
+		return nullptr;
+
+	if (!is_empty(url))
         url->type = scheme_type(url->scheme);
 
     return url;
@@ -581,9 +587,12 @@ void uri_free(uri_t *uri) {
 }
 
 uri_t *parse_uri(string_t str) {
+	if (is_empty((void_t)str))
+		return nullptr;
+
 	uri_t *uri = url_parse_ex(str, simd_strlen(str), false);
 	uri->type = scheme_type(uri->scheme);
-	if (uri->is_rejected) {
+	if (uri->is_rejected || is_empty(uri->host)) {
 		uri_free(uri);
 		return nullptr;
 	}
