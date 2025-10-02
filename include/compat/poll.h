@@ -17,7 +17,7 @@
 #ifndef _WIN32
 #include_next <poll.h>
 #else
-
+#include <winsock2.h>       // fix missing macros and types
 
 /* Type used for the number of file descriptors. */
 typedef unsigned long int nfds_t;
@@ -44,12 +44,14 @@ struct pollfd {
 #define POLLHUP 0x010 /* Hung up. */
 #define POLLNVAL 0x020 /* Invalid polling request. */
 
+#define poll(a, b, c) WSAPoll((a), (b), (c))
+#define closesocket(x) closesocket(x)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int poll(struct pollfd *pfds, nfds_t nfds, int timeout);
+//int poll(struct pollfd *pfds, nfds_t nfds, int timeout);
 
 #ifdef __cplusplus
 }

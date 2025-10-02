@@ -12,6 +12,7 @@ static char **command_line_argv;
 static bool command_line_set = false;
 static bool command_line_ordered = false;
 static u32 command_line_index = 1;
+static u32 command_line_required = 1;
 static string command_line_message = nullptr;
 static string command_line_option = nullptr;
 
@@ -36,6 +37,31 @@ int gettimeofday(struct timeval *tp, struct timezone *tzp) {
     tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
     return 0;
 }
+
+#ifndef HAVE_GETENTROPY
+int getentropy(void *buf, size_t len) {
+	HCRYPTPROV provider;
+
+	if (len > 256) {
+		errno = EIO;
+		return (-1);
+	}
+
+	if (CryptAcquireContext(&provider, NULL, NULL, PROV_RSA_FULL,
+		CRYPT_VERIFYCONTEXT) == 0)
+		goto fail;
+	if (CryptGenRandom(provider, len, buf) == 0) {
+		CryptReleaseContext(provider, 0);
+		goto fail;
+	}
+	CryptReleaseContext(provider, 0);
+	return (0);
+
+fail:
+	errno = EIO;
+	return (-1);
+}
+#endif
 #endif
 
 int cerr(string_t msg, ...) {
@@ -816,7 +842,7 @@ bool is_cli_getopt(string_t flag, bool is_single) {
 	int i = 0;
 
 	// Parse command-line flags
-	if (command_line_argc > 1) {
+	if (command_line_argc > command_line_required) {
 		for (i = command_line_index; i < command_line_argc; i++) {
 			if (is_single && is_str_in(command_line_argv[i], "=")) {
 				flags = str_split_ex(nullptr, command_line_argv[i], "=", nullptr);
@@ -869,6 +895,10 @@ bool is_cli_getopt(string_t flag, bool is_single) {
 		usage(command_line_argv[0], command_line_message);
 
 	return false;
+}
+
+RAII_INLINE void cli_required_set(u32 count) {
+	command_line_required = count > 1 ? count : 1;
 }
 
 RAII_INLINE void cli_arguments_set(int argc, char **argv) {
