@@ -3,7 +3,7 @@
 
 #define RAII_VERSION_MAJOR 2
 #define RAII_VERSION_MINOR 2
-#define RAII_VERSION_PATCH 3
+#define RAII_VERSION_PATCH 4
 
 #include "vector.h"
 #include "cthread.h"
