@@ -2,7 +2,7 @@
 #include "test_assert.h"
 
 TEST(cli_getopt) {
-	cli_message_set("\tgarbage -n nothing -first=hello --last=world -bool bar=45\n", false);
+	cli_message_set("\tgarbage -n nothing -first=hello --last=world -bool bar=45\n", 7, false);
 	ASSERT_TRUE(is_cli_getopt(nullptr, true));
 	ASSERT_STR("garbage", cli_getopt());
 	ASSERT_TRUE(is_cli_getopt("-n", false));

@@ -6,7 +6,7 @@ endif()
 
 project(
     raii
-    VERSION 2.2.2
+    VERSION 2.2.4
     DESCRIPTION "An robust high-level Defer, RAII implementation for C, automatic memory safety, custom malloc, with ultra simple threading, Go like capabilities."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
@@ -37,6 +37,7 @@ if(WIN32)
         message("Building Windows x86-32bit")
         add_definitions(-D_WIN32_PLATFORM_X86=1)
     endif()
+	add_definitions(/wd5287 /wd5286 /wd4477)
 endif()
 
 file(GLOB raii_files

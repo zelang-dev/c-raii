@@ -19,7 +19,9 @@
    These may be OR'd together.  */
 #define R_OK    4       /* Test for read permission.  */
 #define W_OK    2       /* Test for write permission.  */
-#define X_OK    0		/* execute permission - unsupported in windows*/
+#ifndef X_OK
+#	define X_OK    0		/* execute permission - unsupported in windows*/
+#endif
 #define F_OK    0       /* Test for existence.  */
 
 #define SEEK_SET        0
@@ -56,10 +58,6 @@ static inline unsigned int sleep(unsigned int seconds) {
     Sleep(seconds * 1000);
     return seconds;
 }
-#endif
-
-#ifndef HAVE_GETENTROPY
-int getentropy(void *buf, size_t buflen);
 #endif
 
 #define realpath(a, b) _fullpath((b), (a), FILENAME_MAX)

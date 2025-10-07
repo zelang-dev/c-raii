@@ -3,7 +3,7 @@
 
 #define RAII_VERSION_MAJOR 2
 #define RAII_VERSION_MINOR 2
-#define RAII_VERSION_PATCH 2
+#define RAII_VERSION_PATCH 4
 
 #include "vector.h"
 #include "cthread.h"
@@ -458,18 +458,20 @@ C_API int cout(string_t msg, ...);
 * documenting all defined ~command-line~ options/flags.
 *
 * @param message usage/help menu.
+* @param minium set number of required command-line arguments.
 * @param is_ordered command-line arguments in specificied order, allows duplicates.
 *
 * - If ~is_ordered~ `true` will retain each `argv[]` index in `is_cli_getopt` calls.
 */
-C_API void cli_message_set(string_t message, bool is_ordered);
+C_API void cli_message_set(string_t message, int minium, bool is_ordered);
 
 /**
 * Parse and check command-line options, aka `getopt`.
 *
 * If `flag` match, MUST call `cli_getopt()` to ~retrieve~ next `argv[]`.
 *
-* @param flag argument/options to match against, if `nullptr`, `cli_getopt()` returns first `argv[1]`.
+* @param flag argument/options to match against, if `nullptr`, `cli_getopt()` returns `argv[1]`
+*  or current `argv[index]`, if ~ordered~ set in `cli_message_set()`.
 * @param is_single or `is_boolean` argument, if `true`, only `flag` is returned by `cli_getopt()`.
 *
 * - NOTE: `is_single` WILL also parse `-flag=XXXX`, where `cli_getopt()` returns `XXXX`.
@@ -477,14 +479,9 @@ C_API void cli_message_set(string_t message, bool is_ordered);
 C_API bool is_cli_getopt(string_t flag, bool is_single);
 
 /*
-* Returns `argv[1]` or next `argv[]`, from matching `is_cli_getopt()`, aka `getopt`.
+* Returns `argv[index]` or next `argv[]`, from matching `is_cli_getopt()`, aka `getopt`.
 */
 C_API string cli_getopt(void);
-
-/*
-* Set minium number of required command-line arguments, default: `1`.
-*/
-C_API void cli_required_set(u32 count);
 
 C_API void cli_arguments_set(int argc, char **argv);
 
