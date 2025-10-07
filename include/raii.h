@@ -458,11 +458,12 @@ C_API int cout(string_t msg, ...);
 * documenting all defined ~command-line~ options/flags.
 *
 * @param message usage/help menu.
+* @param minium set number of required command-line arguments.
 * @param is_ordered command-line arguments in specificied order, allows duplicates.
 *
 * - If ~is_ordered~ `true` will retain each `argv[]` index in `is_cli_getopt` calls.
 */
-C_API void cli_message_set(string_t message, bool is_ordered);
+C_API void cli_message_set(string_t message, int minium, bool is_ordered);
 
 /**
 * Parse and check command-line options, aka `getopt`.
@@ -480,11 +481,6 @@ C_API bool is_cli_getopt(string_t flag, bool is_single);
 * Returns `argv[1]` or next `argv[]`, from matching `is_cli_getopt()`, aka `getopt`.
 */
 C_API string cli_getopt(void);
-
-/*
-* Set minium number of required command-line arguments, default: `1`.
-*/
-C_API void cli_required_set(u32 count);
 
 C_API void cli_arguments_set(int argc, char **argv);
 
