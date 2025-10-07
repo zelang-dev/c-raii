@@ -470,7 +470,8 @@ C_API void cli_message_set(string_t message, int minium, bool is_ordered);
 *
 * If `flag` match, MUST call `cli_getopt()` to ~retrieve~ next `argv[]`.
 *
-* @param flag argument/options to match against, if `nullptr`, `cli_getopt()` returns first `argv[1]`.
+* @param flag argument/options to match against, if `nullptr`, `cli_getopt()` returns `argv[1]`
+*  or current `argv[index]`, if ~ordered~ set in `cli_message_set()`.
 * @param is_single or `is_boolean` argument, if `true`, only `flag` is returned by `cli_getopt()`.
 *
 * - NOTE: `is_single` WILL also parse `-flag=XXXX`, where `cli_getopt()` returns `XXXX`.
@@ -478,7 +479,7 @@ C_API void cli_message_set(string_t message, int minium, bool is_ordered);
 C_API bool is_cli_getopt(string_t flag, bool is_single);
 
 /*
-* Returns `argv[1]` or next `argv[]`, from matching `is_cli_getopt()`, aka `getopt`.
+* Returns `argv[index]` or next `argv[]`, from matching `is_cli_getopt()`, aka `getopt`.
 */
 C_API string cli_getopt(void);
 

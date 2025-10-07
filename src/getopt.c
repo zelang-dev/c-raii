@@ -4,7 +4,7 @@ static int command_line_argc;
 static char **command_line_argv;
 static bool command_line_set = false;
 static bool command_line_ordered = false;
-static u32 command_line_index = 1;
+static int command_line_index = 1;
 static int command_line_required = 1;
 static string command_line_message = nullptr;
 static string command_line_option = nullptr;
@@ -40,7 +40,7 @@ bool is_cli_getopt(string_t flag, bool is_single) {
 				is_split = true;
 			}
 
-			if (flag == nullptr && i == 1) {
+			if (flag == nullptr && i == command_line_index) {
 				if (is_split)
 					free(flags);
 
