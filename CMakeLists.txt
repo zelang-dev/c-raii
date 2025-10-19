@@ -6,7 +6,7 @@ endif()
 
 project(
     raii
-    VERSION 2.3.0
+    VERSION 2.3.1
     DESCRIPTION "An robust high-level Defer, RAII implementation for C, automatic memory safety, custom malloc, with ultra simple threading, Go like capabilities."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
@@ -176,13 +176,10 @@ install(
     NAMESPACE ${PROJECT_NAME}::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
+
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
-if(WIN32)
-    install(DIRECTORY include/ DESTINATION include)
-else()
-    file(GLOB HEADER_LIST "include/*.h")
-    install(FILES ${HEADER_LIST} DESTINATION include)
-endif()
+file(GLOB HEADER_LIST "include/*.h")
+install(FILES ${HEADER_LIST} DESTINATION include)
 
 set(CPACK_INSTALL_CMAKE_CONFIGURATIONS Release)
 include(CPack)
