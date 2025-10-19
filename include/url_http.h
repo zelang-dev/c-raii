@@ -4,7 +4,7 @@
 #include "hashtable.h"
 
 #if defined(_WIN32) || defined(_WIN64)
-#   include "compat/dirent.h"
+#   include <compat/dirent.h>
 #else
 #   include <dirent.h>
 #endif

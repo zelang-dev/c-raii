@@ -26,9 +26,9 @@
 #if defined(_WIN32) || defined(_WIN64)
     #include <windows.h>
     #include <intrin.h>
-    #include "compat/sys/mman.h"
-    #include "compat/unistd.h"
-    #include "compat/fcntl.h"
+    #include <compat/sys/mman.h>
+    #include <compat/unistd.h>
+    #include <compat/fcntl.h>
     #if !defined(__cplusplus)
         #define __STDC__ 1
     #endif
@@ -36,7 +36,7 @@
 
 #define EX_MAX_NAME_LEN  256
 #if !defined(RAII_MALLOC) || !defined(RAII_FREE) || !defined(RAII_REALLOC)|| !defined(RAII_CALLOC)
-  #include "rpmalloc.h"
+  #include <rpmalloc.h>
   #define RAII_MALLOC malloc
   #define RAII_FREE rpfree
   #define RAII_REALLOC realloc

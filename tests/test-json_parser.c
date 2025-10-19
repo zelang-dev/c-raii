@@ -2,7 +2,7 @@
 #include "test_assert.h"
 
 #if defined(_WIN32) || defined(_WIN64)
-#   include "compat/dirent.h"
+#   include <compat/dirent.h>
 #   define TESTDIR "../../tests/valid"
 #else
 #   include <dirent.h>

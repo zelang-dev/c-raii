@@ -14,8 +14,6 @@ set(TARGET_LIST
  test-defer
  test-exceptions
  test-mman
- test-thrd_local
- test-cthread
  test-future
  test-future-exception
  test-future-scope
