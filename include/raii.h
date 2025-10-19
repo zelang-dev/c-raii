@@ -2,12 +2,12 @@
 #define RAII_H
 
 #define RAII_VERSION_MAJOR 2
-#define RAII_VERSION_MINOR 2
-#define RAII_VERSION_PATCH 5
+#define RAII_VERSION_MINOR 3
+#define RAII_VERSION_PATCH 0
 
 #include "vector.h"
-#include "cthread.h"
-#include "catomic.h"
+#include <cthreads.h>
+#include <catomics.h>
 #include <stdio.h>
 #include <time.h>
 #include "coro.h"

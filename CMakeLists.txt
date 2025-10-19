@@ -6,7 +6,7 @@ endif()
 
 project(
     raii
-    VERSION 2.2.4
+    VERSION 2.3.0
     DESCRIPTION "An robust high-level Defer, RAII implementation for C, automatic memory safety, custom malloc, with ultra simple threading, Go like capabilities."
     HOMEPAGE_URL "https://zelang-dev.github.io/c-raii/"
     LANGUAGES C
@@ -26,6 +26,7 @@ set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 set(BUILD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 
@@ -45,22 +46,16 @@ file(GLOB raii_files
 )
 
 if(BUILD_SHARED_LIBS)
-    if(WIN32)
-        add_definitions(-DMMAN_LIBRARY_DLL)
-    endif()
     add_library(raii SHARED ${raii_files})
 else()
-    if(WIN32)
-        add_definitions(-DPTW32_STATIC_LIB)
-    endif()
     add_library(raii STATIC ${raii_files})
 endif()
 
 if(UNIX)
     if(APPLE)
-        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -Wno-format -D USE_DEBUG ")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wno-format -D USE_DEBUG ")
     else()
-        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -rdynamic -Wno-format -D USE_DEBUG")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -rdynamic -Wno-format -D USE_DEBUG")
     endif()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fomit-frame-pointer -Wno-return-type")
 else()
@@ -69,13 +64,19 @@ else()
     add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
 endif()
 
-FetchContent_Declare(threads
- URL https://github.com/zelang-dev/cthread/archive/refs/tags/v4.1.0.9.zip
- URL_MD5 8e7a1260dc13bf1bd44ad2fba6404436
-)
-FetchContent_MakeAvailable(threads)
+find_package(cthreads QUIET)
+if(NOT cthreads_FOUND)
+    FetchContent_Declare(cthreads
+		URL https://github.com/zelang-dev/c-threads/archive/refs/tags/1.0.0.zip
+		URL_MD5 0f1c66f911f0912aa2a955a486952a8d
+    )
+    FetchContent_MakeAvailable(cthreads)
+endif()
+target_include_directories(${PROJECT_NAME} PRIVATE
+	$<BUILD_INTERFACE:${CTHREADS_INCLUDE_DIR}
+	$<INSTALL_INTERFACE:${CTHREADS_INCLUDE_DIR})
 
-target_link_libraries(raii PUBLIC cthread)
+target_link_libraries(raii PUBLIC cthreads)
 set_property(TARGET raii PROPERTY POSITION_INDEPENDENT_CODE True)
 
 target_include_directories(raii PUBLIC
@@ -137,8 +138,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/raiiConfig.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME} )
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
 set(CPACK_PACKAGE_DIRECTORY "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/Package")
 set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY raii)
@@ -163,7 +162,7 @@ set(CPACK_RPM_PACKAGE_ARCHITECTURE "noarch")
 
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 install(
-    TARGETS ${PROJECT_NAME} cthread
+    TARGETS ${PROJECT_NAME} cthreads
     EXPORT "${PROJECT_NAME}Targets"
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

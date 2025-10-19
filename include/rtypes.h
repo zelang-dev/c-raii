@@ -8,7 +8,7 @@
 #include <ctype.h>
 #endif
 #if defined(_WIN32) || defined(_WIN64)
-    #include "compat/sys/time.h"
+    #include <compat/sys/time.h>
     #include <excpt.h>
     #ifndef SYS_CONSOLE
         /* O.S. platform ~input/output~ console `DEVICE`. */
