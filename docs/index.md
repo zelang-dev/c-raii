@@ -50,7 +50,7 @@ This library has been decoupled from ~c-coroutine~ [c-asio](https://zelang-dev.g
 
 In the effort to find uniform naming of terms, various other packages was discovered [Except](https://github.com/meaning-matters/Except), and [exceptions-and-raii-in-c](https://github.com/psevon/exceptions-and-raii-in-c). Choose to settle in on [A defer mechanism for C](https://gustedt.wordpress.com/2020/12/14/a-defer-mechanism-for-c/), an upcoming C standard compiler feature. It's exactly this library's working design and concepts addressed in [c-asio](https://github.com/zelang-dev/c-asio).
 
-This library uses an custom version of [rpmalloc](https://github.com/mjansson/rpmalloc) for **malloc/heap** allocation, not **C11** compiler `thread local` dependant, nor **C++** focus, _removed_. The customization is merged with required [cthread](https://github.com/zelang-dev/cthread) for **C11** _thread like emulation_.
+This library uses an custom version of [rpmalloc](https://github.com/mjansson/rpmalloc) for **malloc/heap** allocation, not **C11** compiler `thread local` dependant, nor **C++** focus, _removed_. The customization is merged with required [c-threads](https://github.com/zelang-dev/c-threads) for **C11** _thread like emulation_.
 
 * The behavior here is as in other _languages_ **Go's** [defer](https://go.dev/ref/spec#Defer_statements), **Zig's** [defer](https://ziglang.org/documentation/master/#defer), **Swift's** [defer](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/statements/#Defer-Statement), even **Rust** has [multi defer crates](https://crates.io/keywords/defer) there are other **borrow checker** issues - [A defer discussion](https://internals.rust-lang.org/t/a-defer-discussion/20387).
 
@@ -142,7 +142,7 @@ The planned implementation from [defer reference implementation for C](https://g
 <td>
 
 <pre><code>
-// includes "cthread.h" emulated C11 threads
+// includes "cthreads.h" emulated C11 threads
 #include "raii.h"
 
 int main(int argc, char **argv)
