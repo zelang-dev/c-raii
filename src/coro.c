@@ -1814,6 +1814,15 @@ static void coro_system(void) {
     }
 }
 
+static uint64_t nsec(void) {
+	struct timeval tv;
+
+	if (gettimeofday(&tv, nullptr) < 0)
+		return -1;
+
+	return (uint64_t)tv.tv_sec * 1000 * 1000 * 1000 + tv.tv_usec * 1000;
+}
+
 static void_t coro_wait_system(void_t v) {
     routine_t *t;
     size_t now;
