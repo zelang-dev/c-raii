@@ -94,7 +94,8 @@ TEST(list) {
     EXEC_TEST(vector_variant);
     EXEC_TEST(vector_variant_overflow);
 
-    return result;
+	exit_scope();
+	return result;
 }
 
 int main(int argc, char **argv) {

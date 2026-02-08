@@ -29,6 +29,7 @@ func divByZero() {
   }
  }()
  fmt.Println(div(1, 0))
+}
 */
 
 #define USE_CORO
